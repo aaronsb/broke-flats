@@ -12,8 +12,8 @@ Playtest parameters are ON in `src/config.js` (`PLAYTEST_URL`). When off, every 
 | `start` | flag | Skip the title and coin slot, start with 4 lives |
 | `battle` | flag | Like `start`, then straight into the Air-Sea Battle |
 | `level` | 1–99 | Start on this level |
-| `force` | `meadow` `grass` `road` `river` `runway` `rail` `hedge` | Every band on the board is this scenario |
-| `gauntlet` | `road` `river` `runway` `rail` | A gauntlet level of this hazard |
+| `force` | `meadow` `grass` `road` `river` `runway` `rail` `mines` `hedge` | Every band on the board is this scenario |
+| `gauntlet` | `road` `river` `runway` `rail` `mines` | A gauntlet level of this hazard |
 | `sky` | `day` `sunset` `night` `rain` | Override the level's sky |
 | `scenery` | `forest` `residential` `city` `parking` | Override the level's scenery theme |
 | `chars` | `chicken` `goose` `duck` `frog` `cat` `pig` `robot` | Roster, comma separated; two ids gives co-op |
@@ -48,6 +48,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 | `river` | logs, boats, subs, gators; divers | [`?start&force=river&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=river&god&coins=50) | [`?start&force=river&sky=night&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=river&sky=night&god&coins=50) | [`?start&level=8&force=river&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&level=8&force=river&god&coins=50) |
 | `runway` | planes taxiing, taking off, landing; ridable wings | [`?start&force=runway&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=runway&god&coins=50) | [`?start&force=runway&sky=night&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=runway&sky=night&god&coins=50) | [`?start&level=8&force=runway&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&level=8&force=runway&god&coins=50) |
 | `rail` | trains with ridable cars and crossing gates | [`?start&force=rail&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=rail&god&coins=50) | [`?start&force=rail&sky=night&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=rail&sky=night&god&coins=50) | [`?start&level=8&force=rail&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&level=8&force=rail&god&coins=50) |
+| `mines` | minesweeper field: mounds from the side, dots on safe cells, coins mark the path | [`?start&force=mines&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=mines&god&coins=50) | [`?start&force=mines&sky=night&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=mines&sky=night&god&coins=50) | [`?start&level=8&force=mines&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&level=8&force=mines&god&coins=50) |
 | `hedge` | wall with a visible gap and a hidden tunnel | [`?start&force=hedge&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=hedge&god&coins=50) | [`?start&force=hedge&sky=night&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&force=hedge&sky=night&god&coins=50) | [`?start&level=8&force=hedge&god&coins=50`](https://aaronsb.github.io/road-crosser/?start&level=8&force=hedge&god&coins=50) |
 
 ## Gauntlets
@@ -58,6 +59,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 | `river` | [`?start&level=4&gauntlet=river`](https://aaronsb.github.io/road-crosser/?start&level=4&gauntlet=river) |
 | `runway` | [`?start&level=4&gauntlet=runway`](https://aaronsb.github.io/road-crosser/?start&level=4&gauntlet=runway) |
 | `rail` | [`?start&level=4&gauntlet=rail`](https://aaronsb.github.io/road-crosser/?start&level=4&gauntlet=rail) |
+| `mines` | [`?start&level=4&gauntlet=mines`](https://aaronsb.github.io/road-crosser/?start&level=4&gauntlet=mines) |
 
 ## Skies and scenery
 

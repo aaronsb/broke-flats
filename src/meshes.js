@@ -503,3 +503,44 @@ export function makeRailSignal() {
   g.add(box(0.7, 0.1, 0.06, 0xffffff, 0, 1.3, 0.08, false));  // crossbuck
   return g;
 }
+
+// ---- mines ----
+// Two grey plates and an antenna with a lamp. Buried until triggered.
+export function makeMine() {
+  const g = new THREE.Group();
+  g.add(box(1.0, 0.12, 1.0, 0x55585e, 0, 0));
+  g.add(box(0.7, 0.1, 0.7, 0x8a8f96, 0, 0.12));
+  g.add(box(0.06, 0.55, 0.06, 0x333333, 0, 0.22));
+  const lamp = box(0.16, 0.16, 0.16, new THREE.MeshBasicMaterial({ color: 0x3a0a0a }), 0, 0.77, 0, false);
+  g.add(lamp);
+  g.lamp = lamp;
+  return g;
+}
+
+// Disturbed earth over a buried mine: top face matches the ground, so it only
+// reads from the side.
+export function makeMound(color) {
+  return box(0.9, 0.12, 0.9, color, 0, 0, 0, false);
+}
+
+const DOT = new THREE.MeshBasicMaterial({ color: 0xff3b1a });
+// Adjacent-mine count on a revealed safe cell, as a row of dots.
+export function makeCountTile(n) {
+  const g = new THREE.Group();
+  for (let i = 0; i < Math.min(n, 8); i++) {
+    const col = i % 4, row = Math.floor(i / 4);
+    g.add(box(0.14, 0.05, 0.14, DOT, -0.3 + col * 0.2, 0.01, -0.12 + row * 0.24, false));
+  }
+  return g;
+}
+
+// Flag marker for a suspected mine, and the scorch a mine leaves behind.
+export function makeFlagMarker() {
+  const g = new THREE.Group();
+  g.add(box(0.06, 0.7, 0.06, 0xdddddd, 0.15, 0, 0.15));
+  g.add(box(0.36, 0.22, 0.05, 0xff3b1a, 0.35, 0.45, 0.15));
+  return g;
+}
+export function makeScorch() {
+  return box(0.95, 0.03, 0.95, 0x1e1a18, 0, 0, 0, false);
+}

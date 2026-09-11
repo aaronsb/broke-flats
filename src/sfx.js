@@ -119,6 +119,7 @@ export const sfx = {
   fall: () => voice({ wave: 'triangle', freq: 1400, slideTo: 180, attack: 0.02, decay: 0.05, sustain: 0.8, hold: 0.55, release: 0.2, vol: 0.07 }),
   // Soft double ding: a nudge that something is hidden nearby.
   dingding: () => { for (const d of [0, 160]) setTimeout(() => voice({ wave: 'triangle', freq: N(93), attack: 0.003, decay: 0.05, sustain: 0.5, hold: 0.05, release: 0.12, vol: 0.045 }), d); },
+  beep: (pitch = 1) => voice({ wave: 'square', freq: 2100 * pitch, attack: 0.002, decay: 0.02, sustain: 0.5, hold: 0.03, release: 0.03, vol: 0.05 }),
   tick: () => voice({ wave: 'square', freq: N(84), attack: 0.002, decay: 0.02, sustain: 0.3, hold: 0.02, release: 0.04, vol: 0.05 }),
   // Coin drop into the slot: two bright metallic blips.
   clink: () => { voice({ wave: 'square', freq: N(91), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.03, release: 0.05, vol: 0.06 });

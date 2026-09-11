@@ -18,7 +18,7 @@ const forceable = Object.keys(SCENARIOS).filter((k) => k !== 'finish');
 const BLURB = {
   meadow: 'open strip, interstitial', grass: 'hunting maze with shelters, coins and eggs', road: 'cars, trucks, flatbeds; stallers at higher levels',
   river: 'logs, boats, subs, gators; divers', runway: 'planes taxiing, taking off, landing; ridable wings', rail: 'trains with ridable cars and crossing gates',
-  hedge: 'wall with a visible gap and a hidden tunnel',
+  hedge: 'wall with a visible gap and a hidden tunnel', mines: 'minesweeper field: mounds from the side, dots on safe cells, coins mark the path',
 };
 
 const rows = [];

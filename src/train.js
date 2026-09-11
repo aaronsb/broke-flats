@@ -148,7 +148,11 @@ export class Train {
         k.mesh.position.set(lerp(k.from.x, tx, t), lerp(k.from.y, ty, t) + s * 0.4, lerp(k.from.z, tz, t));
         sy = 1 + 0.2 * s;
         setFrame(k.mesh, t > 0.2 && t < 0.85 ? 1 : 0);
-        if (k.t >= 1) { k.moving = false; setFrame(k.mesh, 0); }
+        if (k.t >= 1) {
+          k.moving = false; setFrame(k.mesh, 0);
+          const l = this.world.laneAt(k.rec.row);
+          l?.scenario.onFollowerLand?.(l, Math.round(this.resolveX(k.rec)));
+        }
       } else {
         k.mesh.position.set(tx, ty, tz);
       }

@@ -196,6 +196,22 @@ if (script === 'about') {
   await key('Escape', 'Escape'); await sleep(200);
   console.log('about closed', await evaluate(`document.getElementById('about').classList.contains('show')`));
 }
+if (script === 'mines') {
+  await start();
+  await evaluate(`__game.run.gauntlet = 'mines'; __game.restartStage()`); await sleep(1500);
+  const info = await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'mines'); let mines = 0, coinsOnMines = 0, coins = 0; for (const l of rows) { mines += l.data.mines.size; for (const c of l.coins.keys()) { coins++; if (l.data.mines.has(c)) coinsOnMines++; } } return [rows.length, mines, coins, coinsOnMines, __game.mode.world.rows.size]; })()`);
+  console.log('field', info);
+  // Walk the safe path (path cells never carry mines), then step onto a mine deliberately.
+  const walked = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const first = [...w.rows.values()].filter(l => l.scenario.id === 'mines').map(l => l.r).sort((a, b) => a - b)[0]; p.row = first - 1; p.col = w.pathCol; p.x = p.col; p.z = -p.row; p.mesh.position.set(p.x, 0, p.z); let r = p.row; for (let i = 0; i < 6; i++) { const l = w.rows.get(r + 1); if (!l || l.scenario.id !== 'mines') break; const c = [...Array(17).keys()].map(k => k - 8).find(c => !l.data.mines.has(c) && Math.abs(c - p.col) <= 1); p.row = r + 1; p.col = c; p.x = c; p.z = -p.row; p.mesh.position.set(p.x, 0, p.z); p.land(); r++; } return [p.row, p.alive, [...(w.rows.get(p.row).data.revealed)].length]; })()`);
+  console.log('walked', walked);
+  // Flag the mine ahead, then the finale: cross the line and let them all go up.
+  const flagged = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const l = w.rows.get(p.row + 1); const c = [...l.data.mines.keys()][0]; if (c === undefined) return 'no mine'; p.x = c; p.col = c; p.mesh.position.x = c; p.facing = 0; __game.mode.plantFlag(p); return [l.data.flags.has(c), l.data.mines.has(c)]; })()`);
+  console.log('flagged', flagged);
+  await evaluate(`__game.mode.finished = true`); await sleep(6500);
+  console.log('finale', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'mines'); return [rows.reduce((a, l) => a + l.data.mines.size, 0), rows.reduce((a, l) => a + (l.data.hits ?? 0), 0), document.getElementById('card').textContent.includes('FLAGS')]; })()`));
+  await sleep(10000);
+  console.log('after', await evaluate(`[__game.run.level, __game.mode.constructor.name]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);
@@ -285,7 +301,12 @@ if (script === 'shots') {
   await sleep(300); await shot('river-top');
   await key('Space', ' '); await sleep(1500); await shot('river-iso');
   await key('Space', ' '); await sleep(300);
-  await evaluate(`__game.debug.force = 'runway'; __game.debug.sky = 'sunset'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
+  await evaluate(`__game.run.gauntlet = 'mines'; __game.debug.sky = 'day'; __game.debug.scenery = 'residential'; __game.run.level = 1; __game.restartStage()`); await sleep(800);
+  for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(500); await shot('mines-top');
+  await key('Space', ' '); await sleep(1500); await shot('mines-iso');
+  await key('Space', ' '); await sleep(300);
+  await evaluate(`__game.run.gauntlet = null; __game.debug.scenery = null; __game.debug.force = 'runway'; __game.debug.sky = 'sunset'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(1500); await shot('runway-top');
   await key('Space', ' '); await sleep(1500); await shot('runway-iso');

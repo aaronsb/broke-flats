@@ -39,6 +39,7 @@ export class Player {
     this.onLanded = null;     // hook: called after every landing
     this.isOccupied = null;   // hook: (col, row) => true blocks a hop
     this.invincible = false;
+    this.frozen = false;
     this.bump = 0;
     this.lastHop = -10; this.burst = 0; this.idle = 0;
     this.mesh.scale.set(1, 1, 1);
@@ -57,7 +58,7 @@ export class Player {
   }
 
   hop(dc, dr) {
-    if (!this.alive) return;
+    if (!this.alive || this.frozen) return;
     if (this.moving) { this.buffered = [dc, dr]; return; }
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     const tc = Math.round(this.x) + dc;
@@ -82,6 +83,20 @@ export class Player {
     this.carrier = null;
     sfx.hop();
     this.call();
+  }
+
+  // Turn a quarter without moving; the flag goes where you face.
+  turn(dir) {
+    if (!this.alive || this.moving) return;
+    this.facing += dir * (Math.PI / 2);
+    sfx.tick();
+  }
+
+  // The cell one step ahead in the facing direction.
+  ahead() {
+    const a = Math.round(this.facing / (Math.PI / 2)) & 3;   // 0 fwd, 1 left, 2 back, 3 right
+    const d = [[0, 1], [-1, 0], [0, -1], [1, 0]][a];
+    return [Math.round(this.x) + d[0], this.row + d[1]];
   }
 
   mount(m) {

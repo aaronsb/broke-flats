@@ -34,6 +34,14 @@ Captured by `make shots` on 2026-09-11.
 
 ![iso.png](screenshots/iso.png)
 
+## mines-iso
+
+![mines-iso.png](screenshots/mines-iso.png)
+
+## mines-top
+
+![mines-top.png](screenshots/mines-top.png)
+
 ## night-iso
 
 ![night-iso.png](screenshots/night-iso.png)

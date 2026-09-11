@@ -7,6 +7,8 @@ import { Train } from '../train.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
+import { W } from '../lane.js';
+import { FLAG_BONUS } from '../scenarios/mines.js';
 import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
 import { GAUNTLET_BONUS } from '../game.js';
@@ -46,6 +48,7 @@ export class CrossingMode {
       gauntlet: this.game.run.gauntlet,
       onFinish: () => { this.finished = true; },
     });
+    this.world.onMine = () => { this.mined = 0.001; };
     this.buildPlayers();
     this.world.ensure(26);
     this.finished = false;
@@ -57,6 +60,7 @@ export class CrossingMode {
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
     if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
+    if (this.game.run.gauntlet === 'mines') this.hint = 'arrows hop · Q/E turn · F flag the cell ahead · followers beep on mines · SPACE peek';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
   }
 
@@ -150,6 +154,8 @@ export class CrossingMode {
   onKey(e) {
     if (e.code === 'Space') { this.setTilt(!this.tilted); return true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { this.setTilt(true); return true; }
+    if (e.code === 'KeyQ' || e.code === 'KeyE') { this.players[0].turn(e.code === 'KeyQ' ? 1 : -1); return true; }
+    if (e.code === 'KeyF') { this.plantFlag(this.players[0]); return true; }
     const solo = this.players.length === 1;
     for (let i = 0; i < KEYMAPS.length; i++) {
       const d = KEYMAPS[i][e.code];
@@ -159,6 +165,14 @@ export class CrossingMode {
       return true;
     }
     return false;
+  }
+
+  // Toggle a flag on the cell the player faces, on minefield rows only.
+  plantFlag(p) {
+    const [c, r] = p.ahead();
+    const lane = this.world.laneAt(r);
+    if (!lane?.scenario.toggleFlag || Math.abs(c) > W) { sfx.bump(); return; }
+    lane.scenario.toggleFlag(lane, c);
   }
 
   onKeyUp(e) {
@@ -246,6 +260,13 @@ export class CrossingMode {
     const waiting = this.trains.reduce((a, t) => a + t.waiting, 0);
     game.hud(game.run.score + front, `<b>${chicks}</b>${waiting ? ` +${waiting} WAITING` : ''}`);
 
+    if (this.mined) {
+      // A mine went off: a beat to take it in, then straight to the next level with nothing earned.
+      this.mined += dt;
+      game.card('KABOOM · NO BONUS');
+      if (this.mined > 2.4) { game.card(''); game.run.gauntlet = null; game.nextLevel(); }
+      return;
+    }
     if (this.tally) { this.updateTally(dt); return; }
     if (this.finished) { this.startTally(front); return; }
     for (const p of this.players) if (!p.alive && !p.gone && p.deadFor > DEATH_FLAP + 0.9) { this.respawn(p); return; }
@@ -258,8 +279,10 @@ export class CrossingMode {
     const led = this.trains.reduce((a, t) => a + t.count, 0);
     const found = this.trains.reduce((a, t) => a + t.waiting, 0);
     const missed = Math.max(0, (this.world.data.eggsPlaced ?? 0) - this.trains.reduce((a, t) => a + t.hatched, 0));
-    this.tally = { t: 0, led, found, missed, rows: front, done: false, gauntlet: !!game.run.gauntlet };
+    this.tally = { t: 0, led, found, missed, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines' };
     for (const p of this.players) p.invincible = true;
+    // Minefield finale: everything left in the ground goes up, nearest rows first.
+    if (this.tally.mines) for (const l of this.world.rows.values()) if (l.scenario.id === 'mines') l.scenario.detonateAll(l, this.players[0].row);
     this.setTilt(false);
     game.run.score += front;
     sfx.start();
@@ -274,6 +297,13 @@ export class CrossingMode {
     if (T.t > 0.8) lines.push(`LED HOME ×${T.led}  +${T.led * LED_BONUS}`);
     if (T.t > 1.8) lines.push(`FOUND ×${T.found}  +${T.found * FOUND_BONUS}`);
     if (T.t > 2.8 && T.missed) lines.push(`MISSED ×${T.missed}`);
+    if (T.t > 3.4 && T.mines) {
+      const rows = [...this.world.rows.values()].filter((l) => l.scenario.id === 'mines');
+      const hits = rows.reduce((a, l) => a + (l.data.hits ?? 0), 0);
+      const flags = rows.reduce((a, l) => a + l.data.flags.size, 0);
+      lines.push(`FLAGS ${hits}/${flags} RIGHT  +${hits * FLAG_BONUS}`);
+      if (!T.flagged) { T.flagged = true; game.run.score += hits * FLAG_BONUS; }
+    }
     if (T.t > 3.4 && T.gauntlet) lines.push(`PHEW, MADE IT  +${GAUNTLET_BONUS}`);
     game.card(lines.join('   ·   '));
     if (T.t > 1.8 && !T.paid) {
@@ -282,7 +312,7 @@ export class CrossingMode {
       game.run.coins += T.led + T.found;
     }
     if (T.t > 3.4 && T.gauntlet && !T.phew) { T.phew = true; game.run.score += GAUNTLET_BONUS; game.run.gauntlet = null; sfx.phew(); }
-    if (T.t > TALLY_TIME) {
+    if (T.t > TALLY_TIME + (T.mines ? 2 : 0)) {
       // Everyone carries over, gathered or not.
       this.trains.forEach((t, i) => { game.run.flock[i] = { count: t.total, waiting: 0 }; });
       game.card('');
