@@ -157,7 +157,8 @@ export class Train {
 
       if (k.moving && k.t < 0.5) continue;
       const lane = this.world.laneAt(k.rec.row);
-      if (lane?.scenario.lethalAt?.(lane, k.mesh.position.x)) this.lose(k);
+      const hit = lane?.scenario.lethalAt?.(lane, k.mesh.position.x);
+      if (hit && hit !== 'bounce') this.lose(k);
       else if (Math.abs(k.mesh.position.x) > OFF_EDGE || k.rec.carrier?.submerged) this.lose(k, lane?.scenario.id === 'river');
     }
   }

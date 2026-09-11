@@ -122,6 +122,16 @@ if (script === 'gauntlet') {
   await evaluate(`__game.mode.finished = true`); await sleep(9000);
   console.log('phew', await evaluate(`[document.getElementById('card').textContent.includes('PHEW'), __game.run.score >= 500, __game.run.gauntlet]`));
 }
+if (script === 'bounce') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'road'; __game.restartStage()`); await sleep(500);
+  // Park the player right behind a car's rear bumper on the first road row and watch.
+  const r = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'road'); const m = lane.movers[0]; const p = __game.mode.players[0];
+    m.x = 2; m.mesh.position.x = 2;
+    p.row = lane.r; p.z = -lane.r; p.x = m.x - lane.dir * (m.len / 2 + 0.3); p.col = Math.round(p.x); p.mesh.position.set(p.x, 0, p.z); return [lane.r, lane.dir, Math.round(p.x * 10) / 10]; })()`);
+  await sleep(400);
+  console.log('bounce', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].row, __game.run.lives]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

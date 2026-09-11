@@ -105,6 +105,12 @@ export class Lane {
     return false;
   }
 
+  // True when x is at a mover's rear bumper and the mover is pulling away.
+  rearOf(m, x, pad = 0.5) {
+    const rear = m.x - this.dir * m.len / 2;
+    return Math.abs(x - rear) < pad && (m.x - x) * this.dir > 0;
+  }
+
   moverAt(x, pad) {
     for (const m of this.movers) if (Math.abs(x - m.x) < m.len / 2 + pad) return m;
     return null;

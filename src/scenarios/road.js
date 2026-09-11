@@ -40,7 +40,8 @@ export default {
   update(lane, dt) { lane.advance(dt); },
   lethalAt(lane, x) {
     const m = lane.moverAt(x, 0.35);
-    return m && !lane.onBed(m, x) ? 'car' : null;
+    if (!m || lane.onBed(m, x)) return null;
+    return lane.rearOf(m, x) ? 'bounce' : 'car';
   },
   onLand(lane, player) {
     const m = lane.moverAt(player.x, 0.35);

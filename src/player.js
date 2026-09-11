@@ -81,6 +81,21 @@ export class Player {
     if (this.burst >= BURST_HOPS && Math.random() < 0.6) { this.burst = 0; this.voice?.(); }
   }
 
+  // Shoved one cell back by a bumper. Nowhere to go means a splat after all.
+  bounce(lane) {
+    const col = Math.round(this.x) - lane.dir;
+    const row = this.moving ? this.trow : this.row;
+    if (Math.abs(col) > W || this.world.isBlocked(col, row) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
+    this.row = row; this.col = col;
+    this.from = { x: this.x, z: this.z, y: this.y };
+    this.to = { x: col, z: -row };
+    this.tcol = col; this.trow = row;
+    this.moving = true; this.t = 0;
+    this.carrier = null;
+    this.facing = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+    sfx.bump();
+  }
+
   gotCoin() {
     sfx.coin();
     this.onCoin?.();
@@ -189,7 +204,8 @@ export class Player {
     const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
     const lane = this.world.laneAt(checkRow);
     const cause = lane?.scenario.lethalAt?.(lane, this.x);
-    if (cause) this.die(cause);
+    if (cause === 'bounce') this.bounce(lane);
+    else if (cause) this.die(cause);
 
     m.position.set(this.x, this.y, this.z);
     m.rotation.y = this.facing;

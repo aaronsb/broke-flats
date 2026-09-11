@@ -78,6 +78,7 @@ export default {
 
   lethalAt(lane, x) {
     const m = lane.moverAt(x, 0.35);
-    return m && m.y < LETHAL_BELOW ? 'plane' : null;
+    if (!m || m.y >= LETHAL_BELOW) return null;
+    return lane.rearOf(m, x) ? 'bounce' : 'plane';
   },
 };
