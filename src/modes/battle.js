@@ -3,19 +3,24 @@
 // Timed. Ends the level and hands the run record to the next one.
 import * as THREE from 'three';
 import { makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone } from '../meshes.js';
-import { W, SPAN, GW } from '../lane.js';
+import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { rand, pick, clamp } from '../util.js';
 
 const ROWS = { land: 4, sea: 8, air: 12 };            // z depth of each target row
 const POINTS = { land: 10, sea: 20, air: 30 };
+const TILTS = ['land', 'sea', 'air'];                 // each tilt aims at one row
+// [camera preset, ground point the camera looks at]
+const VIEW = { land: ['battleLand', 3.5], sea: ['battleSea', 8.7], air: ['battleAir', 13.7] };
+const FIELD_W = 400;   // wide enough to reach the fog at every tilt
+const HEIGHT = { land: 0.6, sea: 0.6, air: 3.2 };
 const SLIDE = 7, EGG_SPEED = 14, COOLDOWN = 0.3;
 
 export class BattleMode {
   constructor(game) {
     this.game = game;
-    this.hint = 'A/D or arrows slide · SPACE / W / UP fire eggs';
+    this.hint = 'A/D slide · SPACE / W / UP fire · S / DOWN tilt to aim land, sea or air';
   }
 
   enter() {
@@ -33,18 +38,22 @@ export class BattleMode {
     this.ending = 0;
     this.dark = sky.dark;
 
-    for (let r = 0; r <= 14; r++) {
-      const g = r === ROWS.land ? makeGround(GW, 0x4a4a52)
-        : r === ROWS.sea ? makeGround(GW, 0x3f8fd6, -0.3, 0.2)
-        : makeGround(GW, r % 2 ? 0x9ad24a : 0x8fca43);
+    for (let r = -6; r <= 16; r++) {
+      const g = r === ROWS.land ? makeGround(FIELD_W, 0x4a4a52)
+        : r === ROWS.sea ? makeGround(FIELD_W, 0x3f8fd6, -0.3, 0.2)
+        : makeGround(FIELD_W, r % 2 ? 0x9ad24a : 0x8fca43);
       g.position.z = -r;
       this.group.add(g);
     }
+    const far = makeGround(FIELD_W, 0x8fca43);   // plain ground out to the fog line
+    far.scale.z = 120; far.position.z = -16.5 - 60;
+    this.group.add(far);
     this.chicken = makeChicken();
     this.group.add(this.chicken);
     this.cx = 0;
 
-    this.game.camera.snap(0, -6, 'battle');
+    this.aim = 'land';
+    this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
     music.setMood({ battle: true, dead: false, tilted: false, danger: false });
     this.game.card(`LEVEL ${level.number} CLEAR · BATTLE`);
   }
@@ -57,11 +66,23 @@ export class BattleMode {
   onKey(e) {
     this.keys[e.code] = true;
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { this.fire(); return true; }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') { this.cycleAim(); return true; }
     return e.code in { ArrowLeft: 1, ArrowRight: 1, KeyA: 1, KeyD: 1 };
   }
   onKeyUp(e) { this.keys[e.code] = false; }
-  onSwipe(dx) { if (Math.abs(dx) < 20) this.fire(); else this.cx = clamp(this.cx + Math.sign(dx) * 2, -W, W); }
-  onViewButton() {}
+  onSwipe(dx, dy) {
+    if (Math.hypot(dx, dy) < 20) this.fire();
+    else if (Math.abs(dx) > Math.abs(dy)) this.cx = clamp(this.cx + Math.sign(dx) * 2, -W, W);
+    else this.cycleAim();
+  }
+  onViewButton() { this.cycleAim(); }
+
+  // The tilt is the aim: boats are slow and cheap, planes fast and rich.
+  cycleAim() {
+    this.aim = TILTS[(TILTS.indexOf(this.aim) + 1) % TILTS.length];
+    this.game.camera.setGoal(VIEW[this.aim][0]);
+    sfx.tilt();
+  }
 
   fire() {
     if (this.cooldown > 0 || this.ending) return;
@@ -69,7 +90,7 @@ export class BattleMode {
     const egg = makeEgg();
     egg.position.set(this.cx, 0.6, 0);
     this.group.add(egg);
-    this.eggs.push({ mesh: egg, x: this.cx, z: 0 });
+    this.eggs.push({ mesh: egg, x: this.cx, z: 0, aim: this.aim });
     sfx.hop();
   }
 
@@ -78,7 +99,8 @@ export class BattleMode {
       : kind === 'sea' ? makeBoat() : makePlane();
     t.kind = kind;
     t.dir = pick(-1, 1);
-    t.speed = rand(2.5, 4.5) + this.game.level.difficulty * 0.5 + (kind === 'air' ? 1.5 : 0);
+    const base = kind === 'sea' ? rand(1.5, 2.5) : kind === 'air' ? rand(5, 7.5) : rand(3, 4.5);
+    t.speed = base + this.game.level.difficulty * 0.5;
     t.z = ROWS[kind];
     t.x = -t.dir * (SPAN + 2);
     t.mesh.position.set(t.x, kind === 'air' ? 3.2 : 0, -t.z);
@@ -120,13 +142,14 @@ export class BattleMode {
       return !gone;
     });
 
-    // Eggs
+    // Eggs fly to the row they were aimed at and only hit targets there.
     for (const e of this.eggs) {
       e.z += EGG_SPEED * dt;
-      e.mesh.position.set(e.x, 0.6 + Math.sin(e.z * 0.4) * 0.3, -e.z);
+      const reach = ROWS[e.aim], k = Math.min(1, e.z / reach);
+      e.mesh.position.set(e.x, 0.6 + Math.sin(k * Math.PI) * 2.2 + HEIGHT[e.aim] * k, -e.z);
       e.mesh.rotation.x += dt * 10;
       for (const t of this.targets) {
-        if (t.dying !== undefined || Math.abs(e.z - t.z) > 0.6 || Math.abs(e.x - t.x) > t.len / 2 + 0.3) continue;
+        if (t.kind !== e.aim || t.dying !== undefined || Math.abs(e.z - t.z) > 0.6 || Math.abs(e.x - t.x) > t.len / 2 + 0.3) continue;
         t.dying = 0;
         e.z = 99;
         this.points += POINTS[t.kind];
@@ -135,10 +158,11 @@ export class BattleMode {
         break;
       }
     }
-    this.eggs = this.eggs.filter((e) => { const gone = e.z > 16; if (gone) this.group.remove(e.mesh); return !gone; });
+    this.eggs = this.eggs.filter((e) => { const gone = e.z > ROWS[e.aim] + 1; if (gone) this.group.remove(e.mesh); return !gone; });
 
-    game.camera.update(dt, 0, -6);
-    game.sky.update(dt, 0, -6);
+    const tz = -VIEW[this.aim][1];
+    game.camera.update(dt, this.cx * 0.3, tz);
+    game.sky.update(dt, this.cx * 0.3, tz, game.camera.distance);
     game.hud(game.run.score + this.points);
 
     if (this.ending) {

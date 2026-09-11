@@ -1,19 +1,29 @@
 import * as THREE from 'three';
 import { damp, lerp } from './util.js';
 
-// rig (yaw) -> pivot (tilt) -> ortho camera hanging D units up, looking straight down.
-// Tilt 0 is Frogger top-down. Tilting swings the camera behind and to the side.
-const D = 40;
+// rig (yaw) -> pivot (tilt) -> perspective camera on the pivot's local +y axis,
+// looking straight down. Tilt 0 is Frogger top-down. Tilting swings the camera
+// behind and to the side. The field of view opens as the view tilts: narrow
+// from above (near-orthographic, so canopies hide what is under them), wide
+// when low so the ground converges to a horizon.
+//
+// tilt: radians from vertical. fov: degrees. Distance is derived so the
+// visible height at the target stays HALF/aspect world units, unless the
+// preset fixes `dist` (the battle views frame a fixed camera spot instead).
+const HALF = 10.5;
 const PRESETS = {
-  top:    { tilt: 0,    yaw: 0,    half: 10.5 },
-  iso:    { tilt: 0.85, yaw: 0.55, half: 10.5 },
-  battle: { tilt: 1.05, yaw: 0,    half: 11.5 },
+  top:        { tilt: 0,    yaw: 0,   fov: 12 },
+  iso:        { tilt: 0.85, yaw: 0.55, fov: 20 },   // near-orthographic isometric
+  // Battle: camera about 9-10 units up and 8-9 behind the chicken; the tilt
+  // picks which row sits mid-screen. Targets are set by the battle mode.
+  battleLand: { tilt: 0.95, yaw: 0,   fov: 50, dist: 15.8 },
+  battleSea:  { tilt: 1.1,  yaw: 0,   fov: 50, dist: 20.3 },
+  battleAir:  { tilt: 1.2,  yaw: 0,   fov: 50, dist: 27.6 },
 };
 
 export class CameraRig {
   constructor(scene) {
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
-    this.camera.position.set(0, D, 0);
+    this.camera = new THREE.PerspectiveCamera(12, 1, 0.5, 600);
     this.camera.rotation.x = -Math.PI / 2;
     this.pivot = new THREE.Object3D();
     this.rig = new THREE.Object3D();
@@ -23,6 +33,7 @@ export class CameraRig {
     this.aspect = 1;
     this.view = { ...PRESETS.top };
     this.goal = PRESETS.top;
+    this.distance = 40;
     this.applyView();
   }
 
@@ -31,12 +42,16 @@ export class CameraRig {
   resize(aspect) { this.aspect = aspect; this.applyView(); }
 
   applyView() {
-    const c = this.camera, h = this.view.half;
-    c.left = -h; c.right = h;
-    c.top = h / this.aspect; c.bottom = -h / this.aspect;
+    const c = this.camera, v = this.view;
+    const halfH = HALF / this.aspect;
+    const derived = halfH / Math.tan((v.fov * Math.PI) / 360);
+    this.distance = v.dist > 0 ? v.dist : derived;
+    c.fov = v.fov;
+    c.aspect = this.aspect;
+    c.position.set(0, this.distance, 0);
     c.updateProjectionMatrix();
-    this.pivot.rotation.x = this.view.tilt;
-    this.rig.rotation.y = this.view.yaw;
+    this.pivot.rotation.x = v.tilt;
+    this.rig.rotation.y = v.yaw;
   }
 
   setGoal(name) { this.goal = PRESETS[name]; }
@@ -52,7 +67,8 @@ export class CameraRig {
     const k = damp(6, dt);
     this.view.tilt = lerp(this.view.tilt, this.goal.tilt, k);
     this.view.yaw = lerp(this.view.yaw, this.goal.yaw, k);
-    this.view.half = lerp(this.view.half, this.goal.half, k);
+    this.view.fov = lerp(this.view.fov, this.goal.fov, k);
+    this.view.dist = lerp(this.view.dist ?? 0, this.goal.dist ?? 0, k);
     const f = damp(5, dt);
     this.rig.position.x = lerp(this.rig.position.x, tx, f);
     this.rig.position.z = lerp(this.rig.position.z, tz, f);

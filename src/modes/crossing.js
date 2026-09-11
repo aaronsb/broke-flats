@@ -101,7 +101,7 @@ export class CrossingMode {
     const cam = game.camera;
     const lead = 3 + cam.tilt * 3;
     cam.update(dt, Math.max(-3, Math.min(3, player.x)) * 0.35, player.z - lead);
-    game.sky.update(dt, player.x, player.z);
+    game.sky.update(dt, player.x, player.z, cam.distance);
 
     game.run.coins = player.coins;
     game.hud(game.run.score + player.maxRow);

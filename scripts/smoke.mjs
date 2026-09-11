@@ -80,6 +80,37 @@ if (script === 'debug') {
   await key('Backquote', '`'); await sleep(100);
   console.log('panel hidden', await evaluate(`document.getElementById('debug').hidden`));
 }
+if (script === 'shots') {
+  // Screenshots of each view for eyeballing. Written to OUT (default: cwd).
+  const fs = await import('node:fs');
+  const out = process.env.OUT ?? '.';
+  const shot = async (name) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')); };
+  await evaluate(`__game.debug.god = true; __game.mode.player.invincible = true`);
+  for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(600); await shot('top');
+  await evaluate(`__game.mode.player.coins = 50`);
+  await key('Space', ' '); await sleep(1500); await shot('iso');
+  await key('Space', ' '); await sleep(300);
+  await evaluate(`__game.run.level = 2; __game.nextLevel()`); await sleep(500);
+  for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(500); await shot('night-top');
+  await key('Space', ' '); await sleep(1500); await shot('night-iso');
+  await evaluate(`__game.mode.finished = true`); await sleep(1500); await shot('battle-land');
+  await key('ArrowDown', 'Down'); await sleep(1500); await shot('battle-sea');
+  await key('ArrowDown', 'Down'); await sleep(1500); await shot('battle-air');
+  await evaluate(`__game.run.level = 1; __game.nextLevel()`); await sleep(500);
+  await key('Space', ' '); await sleep(1500); await shot('sunset-iso');
+  await evaluate(`__game.run.level = 3; __game.nextLevel()`); await sleep(500);
+  for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(400); await shot('rain-top');
+  await key('Space', ' '); await sleep(1500); await shot('rain-iso');
+  await evaluate(`__game.debug.force = 'hedge'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(400); await shot('hedge-top');
+  await key('Space', ' '); await sleep(1500); await shot('hedge-iso');
+  await key('Space', ' '); await sleep(300);
+  await evaluate(`__game.mode.player.invincible = false; __game.mode.player.die('car')`); await sleep(1500); await shot('game-over');
+}
 if (script === 'battle') {
   await evaluate(`__game.mode.finished = true`);
   await sleep(500);

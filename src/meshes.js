@@ -156,6 +156,9 @@ export function makeBoat() {
   g.add(box(0.9, 0.5, 0.7, 0xf4f4f4, -0.2, 0.1));          // cabin
   g.add(box(0.4, 0.3, 0.6, GLASS, 0.3, 0.15));             // windshield
   g.add(box(0.12, 0.5, 0.12, 0x333333, -0.5, 0.6));        // stack
+  g.add(box(0.14, 0.14, 0.14, lantern, 0.95, 0.15));        // bow lantern
+  g.add(box(0.12, 0.12, 0.12, navRed, -1.0, 0.25, 0.3));    // stern lights
+  g.add(box(0.12, 0.12, 0.12, navGreen, -1.0, 0.25, -0.3));
   return { mesh: g, len: 2.2 };
 }
 
@@ -168,6 +171,9 @@ export function makePlane() {
   g.add(box(0.5, 0.5, 0.9, color, -1.0, 0.3));             // tail
   g.add(box(0.4, 0.5, 0.15, color, -1.05, 0.5));           // fin
   g.add(box(0.5, 0.3, 0.45, GLASS, 0.6, 0.45));            // cockpit
+  g.add(box(0.15, 0.12, 0.15, navRed, 0.1, 0.2, 1.15));     // wingtip lights
+  g.add(box(0.15, 0.12, 0.15, navGreen, 0.1, 0.2, -1.15));
+  g.add(box(0.12, 0.12, 0.12, lantern, -1.05, 1.0, 0));     // tail beacon
   return { mesh: g, len: 2.4 };
 }
 
@@ -179,6 +185,9 @@ export function makeEgg() {
   return g;
 }
 
+const navRed = new THREE.MeshBasicMaterial({ color: 0xff4040 });
+const navGreen = new THREE.MeshBasicMaterial({ color: 0x40ff60 });
+const lantern = new THREE.MeshBasicMaterial({ color: 0xfff0a0 });
 const coneMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.35, depthWrite: false });
 // Additive-looking light spill in front of a vehicle, facing +x.
 export function makeHeadlightCone(len = 2.2) {
