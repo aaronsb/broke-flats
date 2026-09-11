@@ -252,3 +252,93 @@ export function makeChick() {
   g.add(box(0.06, 0.14, 0.06, o, -0.08, 0, 0.02));
   return g;
 }
+
+// ---- scenery ----
+
+const WINDOW_LIT = new THREE.MeshBasicMaterial({ color: 0xffe28a });
+const WINDOW_DARK = 0x2a3140;
+const BUILDING_COLORS = [0xb8b0a4, 0xd9c8b0, 0x9c6b52, 0x7c8590, 0xc9b99a, 0x8a6a5a];
+const HOUSE_COLORS = [0xf3e2c5, 0xd7e6f2, 0xf2d2c9, 0xe6f0cf, 0xf9e6a8];
+const ROOF_COLORS = [0x8b3a2f, 0x4a4a55, 0x6b4a2f];
+
+// One 1x1 column of a footprint building. `side` is which x face looks at
+// the playable strip (-1 or +1); windows go on that face.
+export function makeBuildingCell({ h, color, roof, windows, lit }, side) {
+  const g = new THREE.Group();
+  g.add(box(1, h, 1, color));
+  if (roof) g.add(box(1.08, 0.22, 1.08, roof, 0, h));
+  if (windows) {
+    const mat = lit ? WINDOW_LIT : WINDOW_DARK;
+    for (let y = 0.5; y < h - 0.5; y += 1) {
+      for (const z of [-0.25, 0.25]) g.add(box(0.06, 0.4, 0.3, mat, side * 0.5, y, z, false));
+    }
+  }
+  return g;
+}
+
+export function buildingStyle(kind, lit) {
+  if (kind === 'house') return { h: rand(1.4, 2.0), color: pick(...HOUSE_COLORS), roof: pick(...ROOF_COLORS), windows: true, lit };
+  return { h: rand(3, 8), color: pick(...BUILDING_COLORS), roof: null, windows: true, lit };
+}
+
+// Picket fence one cell long, running along x.
+export function makeFence() {
+  const g = new THREE.Group();
+  const c = 0xe9e4d6;
+  g.add(box(1, 0.08, 0.08, c, 0, 0.55));
+  g.add(box(1, 0.08, 0.08, c, 0, 0.25));
+  for (const x of [-0.35, 0, 0.35]) g.add(box(0.1, 0.8, 0.1, c, x, 0));
+  return g;
+}
+
+export function makeShrub() {
+  const g = new THREE.Group();
+  g.add(box(0.8, 0.6, 0.8, pick(...GREENS)));
+  g.add(box(0.5, 0.3, 0.5, pick(...GREENS), 0, 0.6));
+  return g;
+}
+
+export function makeDumpster() {
+  const g = new THREE.Group();
+  g.add(box(0.9, 0.7, 0.8, 0x2f6b3a));
+  g.add(box(0.95, 0.1, 0.85, 0x244f2b, 0, 0.7));
+  return g;
+}
+
+export function makePlanter() {
+  const g = new THREE.Group();
+  g.add(box(0.9, 0.4, 0.9, 0x8a6a4a));
+  g.add(box(0.7, 0.5, 0.7, pick(...GREENS), 0, 0.4));
+  return g;
+}
+
+// A car parked nose-in along z, squashed to fit a one-deep row.
+export function makeParkedCar() {
+  const { mesh } = makeCar();
+  mesh.rotation.y = pick(Math.PI / 2, -Math.PI / 2);
+  mesh.scale.set(0.55, 1, 1);
+  return mesh;
+}
+
+// Flat roof on four corner posts spanning three cells; the middle cell holds
+// `centre` (a parked car, a bench). The bays either side stay walkable.
+export function makeCanopy(centre, roofColor = 0x5a5a62) {
+  const g = new THREE.Group();
+  for (const x of [-1.45, 1.45]) for (const z of [-0.45, 0.45]) g.add(box(0.1, 1.3, 0.1, 0x555555, x, 0, z));
+  g.add(box(3, 0.2, 1, roofColor, 0, 1.3));
+  g.add(box(2.6, 0.12, 0.7, 0x3a3a40, 0, 1.5));
+  if (centre) g.add(centre);
+  return g;
+}
+
+export function makeBench() {
+  const g = new THREE.Group();
+  g.add(box(0.8, 0.08, 0.35, 0x8a5a2b, 0, 0.4));
+  g.add(box(0.8, 0.3, 0.06, 0x8a5a2b, 0, 0.5, -0.18));
+  for (const x of [-0.3, 0.3]) g.add(box(0.06, 0.4, 0.3, 0x333333, x, 0));
+  return g;
+}
+
+export function makeParkingStripe() {
+  return box(0.08, 0.02, 0.9, 0xe0e0e0, 0, 0, 0, false);
+}

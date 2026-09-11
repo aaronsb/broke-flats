@@ -8,8 +8,8 @@ export default {
   weight: 0,
   band: [1, 1],
   build(lane, { world }) {
-    lane.ground(0x8fca43);
-    lane.forestEdges();
+    lane.terrain();
+    lane.edges();
     for (let c = -W; c <= W; c++) lane.add(makeCheckerTile(c + W), c);
     lane.add(makeFlag(0xe0473a), -W - 1);
     lane.add(makeFlag(0xe0473a), W + 1);

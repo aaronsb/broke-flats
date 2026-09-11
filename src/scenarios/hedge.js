@@ -13,8 +13,8 @@ export default {
   pad: 'meadow',     // treeless rows either side keep every column reachable
   minGap: 14,
   build(lane, { world }) {
-    lane.ground(0x8fca43);
-    lane.forestEdges();
+    lane.terrain();
+    lane.edges();
     const tunnel = randInt(-W + 1, W - 1);
     let gap;
     do gap = randInt(-W, W); while (Math.abs(gap - tunnel) < 6);

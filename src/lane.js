@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeGround, makeTree, makeCoin, makeEgg } from './meshes.js';
+import { makeGround, makeCoin, makeEgg } from './meshes.js';
 import { rand } from './util.js';
 
 export const W = 8;          // playable columns run -W..W
@@ -9,9 +9,11 @@ export const GW = 44;        // ground width
 // One board row. Scenarios fill it through these helpers; the board and the
 // player only read the fields (blocked, coins, movers, dir, speed).
 export class Lane {
-  constructor(r, scenario) {
+  constructor(r, scenario, world = null) {
     this.r = r;
     this.scenario = scenario;
+    this.world = world;
+    this.scenery = world?.config?.scenery ?? null;
     this.group = new THREE.Group();
     this.group.position.z = -r;
     this.blocked = new Set();
@@ -33,14 +35,11 @@ export class Lane {
 
   block(c) { this.blocked.add(c); }
 
-  // Dense forest outside the playable strip.
-  forestEdges() {
-    for (let c = W + 1; c <= W + 7; c++) {
-      for (const s of [-1, 1]) {
-        if (Math.random() < 0.75) this.add(makeTree(true), s * c + rand(-0.15, 0.15));
-      }
-    }
-  }
+  // Fill outside the playable strip with the level's scenery.
+  edges() { this.scenery.edge(this, this.world); }
+
+  // Ground in the scenery's style (grass, pavement, asphalt).
+  terrain() { this.scenery.ground(this); }
 
   coin(c) { this.coins.set(c, this.add(makeCoin(), c)); }
 

@@ -26,6 +26,7 @@ export class CrossingMode {
     const { scene, level, sky } = this.game;
     this.world = new World(scene, {
       weights: this.game.stageWeights(), bands: level.bands, difficulty: level.difficulty, sky,
+      scenery: this.game.scenery(),
       ignoreGaps: !!this.game.debug.force,
       onFinish: () => { this.finished = true; },
     });

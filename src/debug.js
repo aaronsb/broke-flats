@@ -1,6 +1,7 @@
 // Playtest controls. Backquote toggles the panel; keys only act while it is open.
 import { SCENARIOS } from './scenarios/index.js';
 import { SKIES } from './sky.js';
+import { SCENERY } from './scenery/index.js';
 
 const FORCE = { KeyQ: 'road', KeyE: 'river', KeyT: 'grass', KeyY: 'hedge', KeyU: 'meadow' };
 
@@ -11,8 +12,8 @@ export function installDebug(game, ui) {
       '<b>DEBUG</b> (` closes)',
       '1-4 level &nbsp; 5 battle &nbsp; N next level',
       'Q road &nbsp; E river &nbsp; T grass &nbsp; Y hedge &nbsp; U meadow &nbsp; 0 clear',
-      'K sky &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
-      `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,
+      'K sky &nbsp; J scenery &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
+      `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · scenery: ${game.debug.scenery ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,
     ].join('<br>');
   };
 
@@ -33,6 +34,11 @@ export function installDebug(game, ui) {
     else if (c === 'KeyK') {
       const names = Object.keys(SKIES);
       game.debug.sky = names[(names.indexOf(game.debug.sky ?? game.level.sky) + 1) % names.length];
+      game.restartStage();
+    }
+    else if (c === 'KeyJ') {
+      const names = Object.keys(SCENERY);
+      game.debug.scenery = names[(names.indexOf(game.debug.scenery ?? game.level.scenery) + 1) % names.length];
       game.restartStage();
     }
     else if (c === 'KeyG') { game.debug.god = !game.debug.god; if (game.mode.player) game.mode.player.invincible = game.debug.god; }

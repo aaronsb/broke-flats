@@ -1,14 +1,14 @@
-// A level is data: sky, how many danger bands the crossing runs, sequencer
+// A level is data: sky, scenery theme, how many danger bands the crossing runs, sequencer
 // weights, and the battle mix that ends it.
 // After the last entry the list cycles with a rising difficulty multiplier.
 export const LEVELS = [
-  { sky: 'day',    bands: 8,  weights: { road: 4, river: 2, grass: 3, meadow: 1, hedge: 1 },
+  { sky: 'day',    scenery: 'forest',      bands: 8,  weights: { road: 4, river: 2, grass: 3, meadow: 1, hedge: 1 },
     battle: { air: 1, sea: 1, land: 2, duration: 30 } },
-  { sky: 'sunset', bands: 9,  weights: { road: 4, river: 3, grass: 3, meadow: 1, hedge: 1 },
+  { sky: 'sunset', scenery: 'residential', bands: 9,  weights: { road: 4, river: 3, grass: 3, meadow: 1, hedge: 1 },
     battle: { air: 2, sea: 2, land: 2, duration: 30 } },
-  { sky: 'night',  bands: 10, weights: { road: 5, river: 3, grass: 2, meadow: 1, hedge: 1 },
+  { sky: 'night',  scenery: 'city',        bands: 10, weights: { road: 5, river: 3, grass: 2, meadow: 1, hedge: 1 },
     battle: { air: 2, sea: 2, land: 3, duration: 35 } },
-  { sky: 'rain',   bands: 10, weights: { road: 4, river: 4, grass: 3, meadow: 1, hedge: 1 },
+  { sky: 'rain',   scenery: 'parking',     bands: 10, weights: { road: 4, river: 4, grass: 3, meadow: 1, hedge: 1 },
     battle: { air: 3, sea: 2, land: 2, duration: 35 } },
 ];
 

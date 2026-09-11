@@ -2,7 +2,8 @@
 // and lobs eggs up-screen at cars, boats and planes crossing at three depths.
 // Timed. Ends the level and hands the run record to the next one.
 import * as THREE from 'three';
-import { makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone } from '../meshes.js';
+import { makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone, makeTree, makeHedge } from '../meshes.js';
+import { Lane } from '../lane.js';
 import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
@@ -38,12 +39,25 @@ export class BattleMode {
     this.cooldown = 0;
     this.ending = 0;
 
+    // The field borrows the level's scenery for the strip edges, and the far
+    // rows get trees and hedges so the horizon is not bare.
+    const scenery = this.game.scenery();
+    const fakeWorld = { data: {}, config: { sky, scenery } };
     for (let r = -6; r <= 16; r++) {
       const g = r === ROWS.land ? makeGround(FIELD_W, 0x4a4a52)
         : r === ROWS.sea ? makeGround(FIELD_W, 0x3f8fd6, -0.3, 0.2)
         : makeGround(FIELD_W, r % 2 ? 0x9ad24a : 0x8fca43);
       g.position.z = -r;
       this.group.add(g);
+      if (r === ROWS.land || r === ROWS.sea) continue;
+      const lane = new Lane(r, null, fakeWorld);
+      lane.edges();
+      if (r > 0 && r !== ROWS.air) for (let c = -W; c <= W; c++) {
+        if (r >= 13 && Math.random() < 0.5) lane.add(Math.random() < 0.6 ? makeTree(true) : makeHedge(), c);
+        else if (Math.random() < 0.06) lane.add(makeTree(), c);
+      }
+      for (let c = W + 8; c <= 40; c += 1) for (const s of [-1, 1]) if (Math.random() < 0.35) lane.add(makeTree(true), s * c);
+      this.group.add(lane.group);
     }
     const far = makeGround(FIELD_W, 0x8fca43);   // plain ground out to the fog line
     far.scale.z = 120; far.position.z = -16.5 - 60;

@@ -5,7 +5,7 @@ export default {
   weight: 1,
   band: [1, 2],
   build(lane) {
-    lane.ground(lane.r % 2 ? 0x9ad24a : 0x8fca43);
-    lane.forestEdges();
+    lane.terrain();
+    lane.edges();
   },
 };

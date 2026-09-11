@@ -4,6 +4,7 @@ import { CrossingMode } from './modes/crossing.js';
 import { BattleMode } from './modes/battle.js';
 import { levelFor } from './levels.js';
 import { SKIES } from './sky.js';
+import { SCENERY } from './scenery/index.js';
 import { DEATHS } from './deaths.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
@@ -22,7 +23,7 @@ export class Game {
     this.best = Number(localStorage.getItem('rc-best') || 0);
     this.ui.best.textContent = `BEST ${this.best}`;
     this.run = { level: 1, score: 0, coins: START_COINS };
-    this.debug = { on: false, force: null, sky: null, god: false };
+    this.debug = { on: false, force: null, sky: null, scenery: null, god: false };
   }
 
   start() {
@@ -47,6 +48,8 @@ export class Game {
   stageWeights() {
     return this.debug.force ? { [this.debug.force]: 1 } : this.level.weights;
   }
+
+  scenery() { return SCENERY[this.debug.scenery ?? this.level.scenery]; }
 
   jumpLevel(n) { this.setLevel(n); this.setMode(new CrossingMode(this)); }
   restartStage() { this.setLevel(this.run.level); this.setMode(new CrossingMode(this)); }

@@ -7,10 +7,11 @@ export { W, SPAN } from './lane.js';
 // The board: owns the rows, sequences scenario bands, and dispatches the
 // per-row hooks. Scenario-specific behaviour lives in src/scenarios/.
 export class World {
-  // config: { weights, bands, difficulty, sky, onFinish }
+  // config: { weights, bands, difficulty, sky, scenery, onFinish }
   constructor(scene, config) {
     this.scene = scene;
     this.config = config;
+    this.data = {};          // scratch shared by scenery planners
     this.rows = new Map();
     this.nextRow = 0;
     this.pathCol = 0;        // a guaranteed-open column that scenarios keep solvable
@@ -73,7 +74,7 @@ export class World {
 
   addRow(r) {
     const spec = this.nextSpec(r);
-    const lane = new Lane(r, spec.scenario);
+    const lane = new Lane(r, spec.scenario, this);
     spec.scenario.build(lane, {
       world: this, index: spec.index, count: spec.count, prev: this.rows.get(r - 1),
       sky: this.config.sky, difficulty: this.config.difficulty,
