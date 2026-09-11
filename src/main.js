@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { Player, BACK_LIMIT } from './player.js';
+import { DEATHS } from './deaths.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
 import { damp, lerp, clamp } from './util.js';
@@ -165,7 +166,7 @@ function frame(now) {
       over = true;
       if (player.maxRow > best) { best = player.maxRow; localStorage.setItem('rc-best', best); }
       ui.best.textContent = `BEST ${best}`;
-      ui.overTitle.textContent = player.deadBy === 'car' ? 'SPLAT' : 'GLUB';
+      ui.overTitle.textContent = DEATHS[player.deadBy]?.title ?? 'OUCH';
       ui.overScore.textContent = `score ${player.maxRow}`;
       ui.overCoins.textContent = `coins ${Math.floor(player.coins)}`;
       ui.over.classList.add('show');
@@ -178,7 +179,7 @@ function frame(now) {
 
   if (started && !over) {
     const lane = world.laneAt(player.moving ? player.trow : player.row);
-    music.setMood({ danger: !!lane && (lane.type === 'road' || lane.type === 'river'), tilted });
+    music.setMood({ danger: !!lane?.scenario.danger, tilted });
   }
 
   if (tilted && started && !over) {

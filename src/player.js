@@ -1,9 +1,10 @@
 import { makeChicken } from './meshes.js';
-import { W } from './world.js';
+import { W } from './lane.js';
+import { DEATHS } from './deaths.js';
 import { sfx } from './sfx.js';
 import { lerp } from './util.js';
 
-const HOP = 0.16;      // seconds per hop
+const HOP = 0.16;             // seconds per hop
 export const BACK_LIMIT = 12; // rows allowed behind the furthest row reached
 
 export class Player {
@@ -22,7 +23,7 @@ export class Player {
     this.facing = 0;
     this.alive = true; this.deadBy = null; this.deadFor = 0;
     this.maxRow = 0;
-    this.onLog = null;
+    this.carrier = null;      // mover currently carrying the player (a log, say)
     this.bump = 0;
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
@@ -44,7 +45,7 @@ export class Player {
     this.to = { x: tc, z: -tr };
     this.tcol = tc; this.trow = tr;
     this.moving = true; this.t = 0;
-    this.onLog = null;
+    this.carrier = null;
     sfx.hop();
   }
 
@@ -53,39 +54,48 @@ export class Player {
     sfx.coin();
   }
 
-  die(how) {
+  die(cause) {
     if (!this.alive) return;
     this.alive = false;
-    this.deadBy = how;
+    this.deadBy = cause;
     this.deadFor = 0;
     this.moving = false;
-    if (how === 'car') sfx.splat(); else sfx.splash();
+    const spec = DEATHS[cause];
+    if (spec?.sfx) sfx[spec.sfx]?.();
   }
 
   land() {
     const lane = this.world.laneAt(this.row);
     if (!lane) return;
-    if (lane.type === 'river') {
-      this.onLog = this.world.logAt(lane, this.x);
-      if (!this.onLog) { this.die('water'); return; }
-      if (Math.abs(this.x - this.onLog.x) < 0.6 && this.world.takeLogCoin(this.onLog)) this.gotCoin();
-    }
-    if (this.world.takeCoin(lane, this.col)) this.gotCoin();
+    const cause = lane.scenario.onLand?.(lane, this);
+    if (cause) { this.die(cause); return; }
+    if (lane.takeCoin(this.col)) this.gotCoin();
+    if (this.carrier && Math.abs(this.x - this.carrier.x) < 0.6 && lane.takeMoverCoin(this.carrier)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
   }
 
-  update(dt) {
+  updateDead(dt) {
     const m = this.mesh;
-    if (!this.alive) {
-      this.deadFor += dt;
+    this.deadFor += dt;
+    const anim = DEATHS[this.deadBy]?.anim ?? 'squash';
+    if (anim === 'squash') {
       const k = Math.min(1, this.deadFor / 0.12);
-      if (this.deadBy === 'car') m.scale.set(1 + 0.5 * k, 1 - 0.88 * k, 1 + 0.5 * k);
-      else { m.position.y = -Math.min(1.2, this.deadFor * 2.5); m.rotation.z = this.deadFor * 3; }
-      return;
+      m.scale.set(1 + 0.5 * k, 1 - 0.88 * k, 1 + 0.5 * k);
+    } else if (anim === 'sink') {
+      m.position.y = -Math.min(1.2, this.deadFor * 2.5);
+      m.rotation.z = this.deadFor * 3;
+    } else if (anim === 'launch') {
+      m.position.y = this.deadFor * 12 - this.deadFor * this.deadFor * 9;
+      m.rotation.x = this.deadFor * 8;
     }
+  }
 
+  update(dt) {
+    if (!this.alive) { this.updateDead(dt); return; }
+    const m = this.mesh;
     let sx = 1, sy = 1;
+
     if (this.moving) {
       this.t += dt / HOP;
       const t = Math.min(1, this.t);
@@ -102,7 +112,7 @@ export class Player {
       }
     } else {
       const lane = this.world.laneAt(this.row);
-      if (this.onLog && lane) {
+      if (this.carrier && lane) {
         this.x += lane.dir * lane.speed * dt;
         this.col = Math.round(this.x);
         if (Math.abs(this.x) > W + 0.6) { this.die('water'); return; }
@@ -110,10 +120,11 @@ export class Player {
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
     }
 
-    // Traffic check against whichever row the chicken is mostly in.
+    // Hazard check against whichever row the chicken is mostly in.
     const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
     const lane = this.world.laneAt(checkRow);
-    if (lane && this.world.vehicleAt(lane, this.x)) { this.die('car'); }
+    const cause = lane?.scenario.lethalAt?.(lane, this.x);
+    if (cause) this.die(cause);
 
     m.position.set(this.x, this.y, this.z);
     m.rotation.y = this.facing;
