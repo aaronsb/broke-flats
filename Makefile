@@ -4,7 +4,7 @@ PORT  := 5173
 SHOTS := docs/screenshots
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build preview smoke shots with-server
+.PHONY: help dev build preview smoke shots playtest-doc with-server
 
 help: ## Show this help
 	@echo "Road Crosser"
@@ -30,6 +30,9 @@ shots: ## Capture a screenshot per view into docs/screenshots and rebuild docs/s
 	@$(MAKE) --no-print-directory with-server CMD="env OUT=$(SHOTS) scripts/smoke.sh shots"
 	@node scripts/shots-index.mjs $(SHOTS) > docs/screenshots.md
 	@echo "wrote docs/screenshots.md"
+
+playtest-doc: ## Regenerate docs/playtest.md from the game's registries (BASE_URL overrides the site)
+	@node scripts/playtest-doc.mjs
 
 # Run CMD with the dev server up, starting one only if the port is free.
 with-server:
