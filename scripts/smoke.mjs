@@ -103,6 +103,7 @@ if (script === 'runway') {
   await evaluate(`__game.debug.on = true; __game.debug.force = 'runway'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(180); }
   await sleep(3000);
+  console.log('flanks', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()]; const bad = []; for (const l of rows) if (l.scenario.id === 'runway') for (const r of [l.r - 1, l.r + 1]) { const n = rows.find(o => o.r === r); if (n && !['meadow', 'road', 'river'].includes(n.scenario.id)) bad.push([l.r, n.scenario.id]); } return bad; })()`));
   console.log('runway', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'runway'); const kinds = {}; let high = 0; for (const l of rows) for (const m of l.movers) { kinds[m.kind] = (kinds[m.kind] ?? 0) + 1; if (m.y > 1) high++; } return [rows.length, kinds, high] })()`));
 }
 if (script === 'rail') {

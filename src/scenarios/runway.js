@@ -44,6 +44,7 @@ export default {
   band: [1, 1],     // one row per band, and never within two rows of another: wings must not touch
   minGap: 3,
   keepGap: true,    // even when forced or in a gauntlet
+  flank: ['meadow', 'road', 'road', 'river'],   // wings need flat rows either side
   build(lane, { prev, sky, difficulty, gauntlet }) {
     lane.ground(0x3e3e46);
     for (let x = -GW / 2; x < GW / 2; x += 2) lane.add(box(1.1, 0.02, 0.12, 0xe8e8e8, x, 0, 0, false));   // centreline

@@ -5,6 +5,8 @@
 //   band      [min, max] rows per band
 //   pad       optional scenario id placed before and after the band
 //   minGap    optional minimum rows between two bands of this scenario
+//   keepGap   honour minGap even when the sequencer is forced to one scenario
+//   flank     optional list of scenario ids allowed directly before and after the band
 //   build(lane, ctx)          fill the lane; ctx = { world, index, count, prev, sky, difficulty }
 //   update(lane, dt, time)    optional per-frame step
 //   onLand(lane, player)      optional; return a death cause, or set player.carrier

@@ -85,9 +85,15 @@ export class World {
       if (s.danger) this.dangerBands++;
       const count = randInt(s.band[0], s.band[1]);
       const pad = s.pad && { scenario: SCENARIOS[s.pad], index: 0, count: 1 };
+      // Scenarios with `flank` need flat neighbours (a runway's wings reach over
+      // the rows either side): add one before if the last row is not flat, and one after.
+      const flankSpec = () => ({ scenario: SCENARIOS[s.flank[Math.floor(Math.random() * s.flank.length)]], index: 0, count: 1 });
+      const prev = this.rows.get(r - 1);
+      if (s.flank && prev && !s.flank.includes(prev.scenario.id)) this.queue.push(flankSpec());
       if (pad) this.queue.push(pad);
       for (let i = 0; i < count; i++) this.queue.push({ scenario: s, index: i, count });
       if (pad) this.queue.push({ ...pad });
+      if (s.flank) this.queue.push(flankSpec());
       this.lastUsed[s.id] = r;
     }
     return this.queue.shift();
