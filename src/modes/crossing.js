@@ -8,6 +8,7 @@ import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
 import { rollVariant } from '../characters.js';
+import { Debris } from '../debris.js';
 
 const TILT_COST = 1;   // coins per second while peeking
 const LED_BONUS = 50;    // per follower led across the line
@@ -38,6 +39,7 @@ export class CrossingMode {
       ignoreGaps: !!this.game.debug.force,
       onFinish: () => { this.finished = true; },
     });
+    this.fx = new Debris(scene);
     this.buildPlayers();
     this.world.ensure(26);
     this.finished = false;
@@ -58,13 +60,14 @@ export class CrossingMode {
       p.index = i;
       p.invincible = debug.god;
       p.onCoin = () => { run.coins += 1; };
+      p.onDie = (cause) => { if (cause === 'water') this.fx.splash(p.mesh.position); };
       p.isOccupied = (col, row) => this.blocked(p, col, row);
       const col = roster.length > 1 ? (i === 0 ? -1 : 1) : 0;
       p.col = col; p.x = col; p.mesh.position.x = col;
       return p;
     });
     this.trains = this.players.map((p, i) => {
-      const t = new Train(scene, this.world, p, () => roster[i].young(p.variant), p.voice);
+      const t = new Train(scene, this.world, p, () => roster[i].young(p.variant), p.voice, this.fx);
       p.onEgg = () => t.hatch();
       const flock = this.game.flockFor(i);
       t.waiting = flock.waiting;
@@ -100,6 +103,7 @@ export class CrossingMode {
   }
 
   exit() {
+    this.fx.dispose();
     this.world.dispose();
     for (const t of this.trains) t.dispose();
     for (const p of this.players) this.game.scene.remove(p.mesh);
@@ -109,8 +113,8 @@ export class CrossingMode {
 
   alive() { return this.players.filter((p) => p.alive); }
 
-  // A hop is refused into another player's cell, any chick's cell, or too far
-  // ahead of a living partner.
+  // A hop is refused into another player's cell, another player's follower,
+  // or too far ahead of a living partner. Your own followers swap with you.
   blocked(me, col, row) {
     for (const p of this.players) {
       if (p === me || !p.alive) continue;
@@ -118,7 +122,7 @@ export class CrossingMode {
       if (pc === col && pr === row) return true;
       if (row > p.row + LEASH) return true;
     }
-    return this.trains.some((t) => t.occupies(col, row));
+    return this.trains.some((t) => t.player !== me && t.occupies(col, row));
   }
 
   setTilt(on) {
@@ -161,8 +165,9 @@ export class CrossingMode {
   emitters(focusRow) {
     const out = [];
     for (const lane of this.world.rows.values()) {
-      if (lane.scenario.id !== 'road' || Math.abs(lane.r - focusRow) > 11) continue;
-      for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len });
+      if (Math.abs(lane.r - focusRow) > 11) continue;
+      if (lane.scenario.id === 'road') for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len });
+      if (lane.scenario.id === 'runway') for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len, y: m.y + 0.2, front: 0.2, lateral: [-1.15, 1.15] });
     }
     return out;
   }
@@ -171,6 +176,7 @@ export class CrossingMode {
     const { game, world } = this;
     for (const p of this.players) p.update(dt);
     for (const t of this.trains) t.update(dt, time);
+    this.fx.update(dt);
     world.update(dt, time);
 
     const alive = this.alive();

@@ -88,6 +88,7 @@ export class Player {
     this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'squash');
     if (this.deathAnim === 'halo') sfx.halo(); else if (spec?.sfx) sfx[spec.sfx]?.();
     this.voice?.(0.85);
+    this.onDie?.(cause);
   }
 
   land() {
@@ -162,7 +163,8 @@ export class Player {
       if (this.carrier && lane) {
         this.x += lane.dir * lane.speed * dt;
         this.col = Math.round(this.x);
-        this.y = this.carrier.rideY ?? 0;
+        this.y = (this.carrier.rideY ?? 0) + Math.min(0, this.carrier.mesh.position.y);
+        if (this.carrier.submerged) { this.die('water'); return; }
         if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }

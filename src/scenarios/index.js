@@ -15,6 +15,7 @@ import road from './road.js';
 import river from './river.js';
 import hedge from './hedge.js';
 import finish from './finish.js';
+import runway from './runway.js';
 
-export const SCENARIOS = { meadow, grass, road, river, hedge, finish };
+export const SCENARIOS = { meadow, grass, road, river, runway, hedge, finish };
 export const INTRO = 'meadow';

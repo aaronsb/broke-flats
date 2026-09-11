@@ -26,6 +26,15 @@ export class Debris {
     sfx.crackle();
   }
 
+  // Pixel splash: light cubes thrown up from the water line, falling back.
+  splash(at, kick = 1) {
+    for (let i = 0; i < 10; i++) {
+      this.puff(new THREE.Vector3(at.x, -0.3, at.z), pick(0xbfe6ff, 0xffffff, 0x8fd0ff), rand(0.1, 0.22) * kick, rand(0.4, 0.7),
+        new THREE.Vector3(rand(-2.2, 2.2), rand(3, 5.5) * kick, rand(-2.2, 2.2)), -1);
+    }
+    sfx.splash();
+  }
+
   puff(at, color, size, life, v, grow) {
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false });
     const m = new THREE.Mesh(unit, mat);

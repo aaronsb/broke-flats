@@ -7,11 +7,16 @@ import { rand, randInt, pick } from '../util.js';
 
 registerDeath('hauled', { anim: 'squash', title: 'HAULED OFF', sfx: 'splat' });
 
-function pickVehicle() {
-  const roll = Math.random();
-  if (roll < 0.12) return makeFlatbed();
-  if (roll < 0.4) return makeTruck();
-  return makeCar();
+// Lane compositions: usually one kind, sometimes a mix.
+const MAKERS = { car: makeCar, truck: makeTruck, flatbed: makeFlatbed };
+const COMPOSITIONS = [
+  { kinds: ['car'], w: 5 }, { kinds: ['truck'], w: 2 }, { kinds: ['flatbed'], w: 0.5 },
+  { kinds: ['car', 'truck'], w: 2 }, { kinds: ['car', 'truck', 'flatbed'], w: 1 },
+];
+function pickComposition() {
+  let roll = Math.random() * COMPOSITIONS.reduce((a, c) => a + c.w, 0);
+  for (const c of COMPOSITIONS) { roll -= c.w; if (roll <= 0) return c.kinds; }
+  return ['car'];
 }
 
 // World-space bed span of a flatbed, accounting for its heading.
@@ -33,7 +38,8 @@ export default {
     }
     lane.dir = pick(-1, 1);
     lane.speed = rand(2, 4.5) + Math.min(3, difficulty + lane.r / 80);
-    lane.spawnMovers(randInt(2, 4), pickVehicle);
+    const kinds = pickComposition();
+    lane.spawnMovers(randInt(2, 4), () => MAKERS[pick(...kinds)]());
     if (sky.headlights) for (const m of lane.movers) m.mesh.add(makeHeadlightCone(m.len * CONE));
     if (Math.random() < 0.3) lane.coin(randInt(-W + 1, W - 1));
   },

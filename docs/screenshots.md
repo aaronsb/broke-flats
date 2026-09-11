@@ -46,6 +46,22 @@ Captured by `make shots` on 2026-09-11.
 
 ![rain-top.png](screenshots/rain-top.png)
 
+## river-iso
+
+![river-iso.png](screenshots/river-iso.png)
+
+## river-top
+
+![river-top.png](screenshots/river-top.png)
+
+## runway-iso
+
+![runway-iso.png](screenshots/runway-iso.png)
+
+## runway-top
+
+![runway-top.png](screenshots/runway-top.png)
+
 ## select-spin
 
 ![select-spin.png](screenshots/select-spin.png)

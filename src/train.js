@@ -10,12 +10,13 @@ import { lerp, randInt } from './util.js';
 const HOP = 0.16;
 
 export class Train {
-  constructor(scene, world, player, makeYoung, voice = null) {
+  constructor(scene, world, player, makeYoung, voice = null, fx = null) {
     this.scene = scene;
     this.world = world;
     this.player = player;
     this.makeYoung = makeYoung;
     this.voice = voice;
+    this.fx = fx;
     this.chicks = [];
     this.trail = [];      // most recent leader landing first
     this.waiting = 0;     // followers already at the finish line
@@ -44,7 +45,7 @@ export class Train {
     this.scene.add(mesh);
     const rec = this.record();
     mesh.position.set(this.resolveX(rec), rec.rideY, -rec.row);
-    this.chicks.push({ mesh, rec, moving: false, t: 0, from: null, facing: this.player.facing });
+    this.chicks.push({ mesh, rec, moving: false, t: 0, from: null, facing: this.player.facing, chatter: randInt(6, 18) });
     if (!quiet) { sfx.hatch(); this.hatched++; }
   }
 
@@ -64,27 +65,48 @@ export class Train {
     }
   }
 
+  // The follower standing on a cell, if any.
+  chickAt(c, r) {
+    return this.chicks.find((k) => k.rec && k.rec.row === r && Math.round(this.resolveX(k.rec)) === c) ?? null;
+  }
+
+  sendTo(k, target, delay = 0) {
+    k.from = { x: this.resolveX(k.rec), z: -k.rec.row, y: k.rec.rideY };
+    const dx = this.resolveX(target) - k.from.x, dz = -target.row - k.from.z;
+    k.facing = Math.abs(dz) > Math.abs(dx) ? (dz < 0 ? 0 : Math.PI) : (dx < 0 ? Math.PI / 2 : -Math.PI / 2);
+    k.rec = target;
+    k.moving = true;
+    k.t = -delay;
+  }
+
+  // Doubling back onto a follower swaps places with it; otherwise the line
+  // ripples forward along the trail. trail[i + 1] is always follower i's cell.
   onLeaderLanded() {
-    this.trail.unshift(this.record());
+    const rec = this.record();
+    const prev = this.trail[0];
+    const occupant = this.chickAt(Math.round(this.resolveX(rec)), rec.row);
+    if (occupant && prev) {
+      this.sendTo(occupant, prev);
+      this.trail[0] = rec;
+      this.trail[this.chicks.indexOf(occupant) + 1] = prev;
+      return;
+    }
+    this.trail.unshift(rec);
     if (this.trail.length > this.chicks.length + 1) this.trail.length = this.chicks.length + 1;
     this.chicks.forEach((k, i) => {
       const target = this.trail[i + 1];
       if (!target || target === k.rec) return;
-      k.from = { x: this.resolveX(k.rec), z: -k.rec.row, y: k.rec.rideY };
-      const dx = this.resolveX(target) - k.from.x, dz = -target.row - k.from.z;
-      k.facing = Math.abs(dz) > Math.abs(dx) ? (dz < 0 ? 0 : Math.PI) : (dx < 0 ? Math.PI / 2 : -Math.PI / 2);
-      k.rec = target;
-      k.moving = true;
-      k.t = -i * 0.06;   // ripple down the line
+      this.sendTo(k, target, i * 0.06);   // ripple down the line
     });
   }
 
   // A hit follower scampers off to the finish line.
-  lose(k) {
+  lose(k, water = false) {
+    if (water) this.fx?.splash(k.mesh.position, 0.6); else sfx.bump();
     this.scene.remove(k.mesh);
     this.chicks = this.chicks.filter((c) => c !== k);
+    this.trail = [this.trail[0], ...this.chicks.map((c) => c.rec)];
     this.waiting++;
-    sfx.bump();
   }
 
   // Send every current follower to wait at the finish (used when the leader resets).
@@ -114,6 +136,9 @@ export class Train {
     if (this.waitingMeshes) for (const w of this.waitingMeshes) w.mesh.position.y = Math.abs(Math.sin(time * 6 + w.phase)) * 0.2;
 
     for (const k of [...this.chicks]) {
+      // Followers chatter now and then, always pitched above the player.
+      k.chatter -= dt;
+      if (k.chatter < 0) { k.chatter = randInt(10, 25); this.voice?.(1.5 + Math.random() * 0.4); }
       const tx = this.resolveX(k.rec), tz = -k.rec.row, ty = k.rec.rideY;
       let sy = 1;
       if (k.moving) {
@@ -132,7 +157,8 @@ export class Train {
 
       if (k.moving && k.t < 0.5) continue;
       const lane = this.world.laneAt(k.rec.row);
-      if (lane?.scenario.lethalAt?.(lane, k.mesh.position.x) || Math.abs(k.mesh.position.x) > OFF_EDGE) this.lose(k);
+      if (lane?.scenario.lethalAt?.(lane, k.mesh.position.x)) this.lose(k);
+      else if (Math.abs(k.mesh.position.x) > OFF_EDGE || k.rec.carrier?.submerged) this.lose(k, lane?.scenario.id === 'river');
     }
   }
 

@@ -53,6 +53,20 @@ if (script === 'tally') {
   await sleep(12000);
   console.log('after tally', await state(), await evaluate(`[__game.mode.constructor.name, __game.run.flock]`));
 }
+if (script === 'river') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'river'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(180); }
+  await sleep(2000);
+  console.log('river', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'river'); const kinds = {}; for (const l of rows) for (const m of l.movers) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1; return [rows.length, kinds, rows.reduce((a, l) => a + l.movers.filter(m => m.diver).length, 0), __game.mode.players[0].row, !!__game.mode.players[0].carrier] })()`));
+}
+if (script === 'runway') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'runway'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(180); }
+  await sleep(3000);
+  console.log('runway', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'runway'); const kinds = {}; let high = 0; for (const l of rows) for (const m of l.movers) { kinds[m.kind] = (kinds[m.kind] ?? 0) + 1; if (m.y > 1) high++; } return [rows.length, kinds, high] })()`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);
@@ -66,7 +80,9 @@ if (script === 'occupied') {
   await start();
   await evaluate(`__game.mode.train.hatch()`);
   await key('ArrowUp'); await sleep(250);
-  console.log('occupied', await evaluate(`[__game.mode.player.row, __game.mode.train.chicks[0].rec.row, __game.mode.player.isOccupied(0, 0), __game.mode.player.isOccupied(1, 0)]`));
+  console.log('before swap', await evaluate(`[__game.mode.player.row, __game.mode.train.chicks[0].rec.row]`));
+  await key('ArrowDown'); await sleep(400);
+  console.log('after swap', await evaluate(`[__game.mode.player.row, __game.mode.train.chicks[0].rec.row]`));
 }
 if (script === 'night') {
   await start();
@@ -115,7 +131,7 @@ if (script === 'shots') {
   await evaluate(`__game.debug.god = true; __game.mode.player.invincible = true`);
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(600); await shot('top');
-  await evaluate(`__game.mode.player.coins = 50`);
+  await evaluate(`__game.run.coins = 50`);
   await key('Space', ' '); await sleep(1500); await shot('iso');
   await key('Space', ' '); await sleep(300);
   await evaluate(`__game.run.level = 2; __game.nextLevel()`); await sleep(500);
@@ -132,6 +148,16 @@ if (script === 'shots') {
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(400); await shot('rain-top');
   await key('Space', ' '); await sleep(1500); await shot('rain-iso');
+  await evaluate(`__game.debug.force = 'river'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(300); await shot('river-top');
+  await key('Space', ' '); await sleep(1500); await shot('river-iso');
+  await key('Space', ' '); await sleep(300);
+  await evaluate(`__game.debug.force = 'runway'; __game.debug.sky = 'sunset'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(1500); await shot('runway-top');
+  await key('Space', ' '); await sleep(1500); await shot('runway-iso');
+  await key('Space', ' '); await sleep(300);
   await evaluate(`__game.debug.force = 'hedge'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(400); await shot('hedge-top');

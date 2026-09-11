@@ -89,6 +89,10 @@ export function makeLog(len) {
   g.add(box(len, 0.45, 0.8, 0x8b5a2b, 0, -0.45));
   g.add(box(0.12, 0.35, 0.6, 0xc4915c, -len / 2 + 0.02, -0.4));
   g.add(box(0.12, 0.35, 0.6, 0xc4915c, len / 2 - 0.02, -0.4));
+  for (let i = 0; i < randInt(2, 4); i++) {                                   // bark lines
+    const w = rand(0.4, Math.min(1.2, len - 0.6));
+    g.add(box(w, 0.03, 0.08, pick(0x6b4423, 0x74492a), rand(-len / 2 + 0.3 + w / 2, len / 2 - 0.3 - w / 2), 0, rand(-0.28, 0.28), false));
+  }
   return g;
 }
 
@@ -333,4 +337,52 @@ export function makeBench() {
 
 export function makeParkingStripe() {
   return box(0.08, 0.02, 0.9, 0xe0e0e0, 0, 0, 0, false);
+}
+
+// ---- water traffic (all modeled moving toward +x, deck at y ≈ 0.05) ----
+
+// Flat boat: cabin at the stern, open deck ahead of it to ride on.
+export function makeRiverBoat(len = 2.4) {
+  const color = pick(...CAR_COLORS);
+  const g = new THREE.Group();
+  g.add(box(len, 0.5, 0.9, color, 0, -0.45));
+  g.add(box(len - 0.3, 0.06, 0.7, 0xd8c9a8, 0.1, 0.05));            // deck planks
+  g.add(box(0.6, 0.5, 0.7, 0xf4f4f4, -len / 2 + 0.5, 0.05));         // cabin
+  g.add(box(0.14, 0.14, 0.14, lantern, len / 2 - 0.15, 0.1));
+  return { mesh: g, len, bed: [-len / 2 + 0.9, len / 2 - 0.1], rideY: 0.11, offCause: 'water' };
+}
+
+// Submarine: a boat that dives. Grey hull, conning tower, periscope.
+export function makeSub(len = 2.6) {
+  const g = new THREE.Group();
+  g.add(box(len, 0.55, 0.85, 0x5f6b78, 0, -0.5));
+  g.add(box(len - 0.4, 0.06, 0.6, 0x76838f, 0, 0.05));
+  g.add(box(0.7, 0.5, 0.5, 0x4a5561, -0.3, 0.05));                   // tower
+  g.add(box(0.06, 0.45, 0.06, 0x2f3740, -0.2, 0.55));                // periscope
+  g.add(box(0.12, 0.12, 0.12, navRed, -0.3, 0.55));
+  return { mesh: g, len, bed: [-len / 2 + 0.3, len / 2 - 0.1], rideY: 0.11, offCause: 'water' };
+}
+
+// Alligator: ride the back, never the head.
+export function makeGator(len = 3.2) {
+  const g = new THREE.Group();
+  const hide = 0x3f7a3a, belly = 0x5a9a4a;
+  const body = len - 1.1;
+  g.add(box(body, 0.35, 0.8, hide, -0.45, -0.3));                     // body
+  for (let x = -body / 2 - 0.3; x < body / 2 - 0.4; x += 0.4) g.add(box(0.2, 0.12, 0.3, belly, x, 0.05));  // ridges
+  g.add(box(0.7, 0.2, 0.4, hide, -len / 2 + 0.2, -0.25));            // tail
+  g.add(box(0.95, 0.3, 0.7, hide, len / 2 - 0.5, -0.28));            // head
+  g.add(box(0.15, 0.15, 0.15, 0xffe36b, len / 2 - 0.75, 0.02, 0.25)); // eyes
+  g.add(box(0.15, 0.15, 0.15, 0xffe36b, len / 2 - 0.75, 0.02, -0.25));
+  for (const z of [-0.25, -0.08, 0.08, 0.25]) g.add(box(0.08, 0.1, 0.08, 0xffffff, len / 2 - 0.08, -0.22, z)); // teeth
+  return { mesh: g, len, bed: [-len / 2 + 0.2, len / 2 - 1.0], head: [len / 2 - 1.0, len / 2 + 0.1], rideY: 0.05, offCause: 'water' };
+}
+
+const fleckMat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff });
+// A little foam streak drifting on the surface.
+export function makeFleck() {
+  const m = new THREE.Mesh(unit, fleckMat);
+  m.scale.set(rand(0.3, 0.7), 0.04, 0.1);
+  m.position.y = -0.27;
+  return m;
 }
