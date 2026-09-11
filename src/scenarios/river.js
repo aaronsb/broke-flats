@@ -5,6 +5,7 @@ import { makeLog, makeRiverBoat, makeSub, makeGator, makeFirefly, makeFleck } fr
 import { W, SPAN } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { rand, randInt, pick, damp } from '../util.js';
+import { traffic } from '../tuning.js';
 
 registerDeath('chomped', { anim: 'flat', title: 'CHOMP', sfx: 'crack' });
 
@@ -41,10 +42,11 @@ export default {
   build(lane, { sky, difficulty, gauntlet }) {
     lane.ground(0x3f8fd6, -0.3, 0.2);
     lane.dir = pick(-1, 1);
-    lane.speed = rand(1.2, 2.4) + Math.min(1.5, difficulty * 0.4 + lane.r / 120);
+    const tr = traffic(difficulty + lane.r / 120);
+    lane.speed = rand(1.2, 2.2) * tr.speed;
     const kinds = pickComposition();
     const diveBoost = Math.min(0.3, difficulty * 0.08);
-    lane.spawnMovers(randInt(2, 3), () => {
+    lane.spawnSpaced(randInt(...tr.count), () => {
       const kind = pick(...kinds);
       const m = KINDS[kind]();
       m.kind = kind;
@@ -54,7 +56,7 @@ export default {
       m.submerged = false;
       m.baseY = m.mesh.position.y;
       return m;
-    }, 0.3);
+    }, { gapMin: Math.max(1.4, tr.gapMin - 0.6), gapVar: tr.gapVar });
     for (const m of lane.movers) if (m.kind === 'log' && Math.random() < 0.3) lane.moverCoin(m);
     if (gauntlet) lane.bonusDrop();
 

@@ -79,10 +79,31 @@ export class Lane {
     for (let i = 0; i < n; i++) {
       const m = make(i);
       m.x = -SPAN + i * slot + rand(gap, slot - m.len - gap);
+      m.v = 1;
       if (this.dir < 0) m.mesh.rotation.y = Math.PI;
       this.add(m.mesh, m.x);
       this.movers.push(m);
     }
+    return this.movers;
+  }
+
+  // Place movers nose to tail with random gaps of gapMin..gapMin+gapVar,
+  // dropping any that would not fit around the wrap. Stallers (per `stall`
+  // chance) ease to a halt now and then and pull away again.
+  spawnSpaced(n, make, { gapMin, gapVar, stall = 0 }) {
+    let x = -SPAN + rand(0, gapVar);
+    for (let i = 0; i < n; i++) {
+      const m = make(i);
+      x += m.len / 2;
+      if (x + m.len / 2 > SPAN - gapMin) break;
+      m.x = x; m.v = 1;
+      if (Math.random() < stall) m.staller = { phase: 'go', wait: rand(2, 7) };
+      if (this.dir < 0) m.mesh.rotation.y = Math.PI;
+      this.add(m.mesh, m.x);
+      this.movers.push(m);
+      x += m.len / 2 + gapMin + rand(0, gapVar);
+    }
+    this.gapMin = gapMin;
     return this.movers;
   }
 
@@ -117,8 +138,31 @@ export class Lane {
   }
 
   advance(dt) {
+    const n = this.movers.length;
+    // Stallers: go -> slowing -> stopped -> go, each phase eased.
     for (const m of this.movers) {
-      m.x += this.dir * this.speed * dt;
+      if (!m.staller) continue;
+      const st = m.staller;
+      st.wait -= dt;
+      if (st.wait <= 0) {
+        st.phase = st.phase === 'go' ? 'stop' : 'go';
+        st.wait = st.phase === 'stop' ? rand(1, 3) : rand(4, 12);
+      }
+      const target = st.phase === 'stop' ? 0 : 1;
+      m.v += (target - m.v) * Math.min(1, dt * 2.5);
+    }
+    // Car following: nobody closes on the vehicle ahead past the minimum gap.
+    const ordered = [...this.movers].sort((a, b) => a.x * this.dir - b.x * this.dir);
+    const gapMin = this.gapMin ?? 0;
+    for (let i = 0; i < n; i++) {
+      const m = ordered[i], ahead = ordered[(i + 1) % n];
+      let v = m.v ?? 1;
+      if (n > 1 && gapMin > 0) {
+        let gap = (ahead.x - m.x) * this.dir - (ahead.len + m.len) / 2;
+        if (i === n - 1) gap += 2 * SPAN;
+        if (gap < gapMin) v = Math.min(v, ahead.v ?? 1);
+      }
+      m.x += this.dir * this.speed * v * dt;
       if (m.x > SPAN) m.x -= 2 * SPAN;
       if (m.x < -SPAN) m.x += 2 * SPAN;
       m.mesh.position.x = m.x;

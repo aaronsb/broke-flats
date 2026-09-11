@@ -8,6 +8,7 @@ import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { sfx } from '../sfx.js';
 import { rand, randInt, pick, damp } from '../util.js';
+import { traffic } from '../tuning.js';
 import * as THREE from 'three';
 
 registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat' });
@@ -41,7 +42,7 @@ export default {
     lane.dir = pick(-1, 1);
     const type = pickType();
     const spec = TYPES[type];
-    lane.speed = rand(...spec.speed) + Math.min(3, difficulty * 0.8);
+    lane.speed = rand(...spec.speed) * (0.85 + traffic(difficulty).speed * 0.25);
     const n = randInt(2, 5);
     const t = makeTrain(type, Array.from({ length: n }, () => pick(...spec.cars)));
     t.x = -lane.dir * (SPAN + t.len / 2 + 2);        // parked out of sight

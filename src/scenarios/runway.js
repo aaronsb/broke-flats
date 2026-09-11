@@ -8,6 +8,7 @@ import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
 import { sfx } from '../sfx.js';
+import { traffic } from '../tuning.js';
 
 registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat' });
 
@@ -47,9 +48,10 @@ export default {
       for (let x = -GW / 2; x < GW / 2; x += 2.5) lane.add(box(0.14, 0.1, 0.14, EDGE_LIGHT.blue, x, 0, 0.47, false));
     }
     lane.dir = pick(-1, 1);
-    lane.speed = rand(2.5, 4) + Math.min(3, difficulty + lane.r / 80);
+    const tr = traffic(difficulty + lane.r / 120);
+    lane.speed = rand(2.5, 3.5) * tr.speed;
     const kinds = pickComposition();
-    lane.spawnMovers(randInt(2, 3), () => {
+    lane.spawnMovers(Math.min(3, randInt(...tr.count)), () => {
       const m = makePlane();
       m.kind = pick(...kinds);
       m.y = 0;

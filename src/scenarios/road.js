@@ -4,6 +4,7 @@ import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { W, GW } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
+import { traffic } from '../tuning.js';
 
 registerDeath('hauled', { anim: 'flat', title: 'HAULED OFF', sfx: 'splat' });
 
@@ -30,9 +31,10 @@ export default {
       for (let x = -GW / 2; x < GW / 2; x += 1.5) lane.add(box(0.7, 0.02, 0.1, 0xdedede, x, 0, 0.5, false));
     }
     lane.dir = pick(-1, 1);
-    lane.speed = rand(2, 4.5) + Math.min(3, difficulty + lane.r / 80);
+    const tr = traffic(difficulty + lane.r / 120);
+    lane.speed = rand(2, 4) * tr.speed;
     const kinds = pickComposition();
-    lane.spawnMovers(randInt(2, 4), () => MAKERS[pick(...kinds)]());
+    lane.spawnSpaced(randInt(...tr.count), () => MAKERS[pick(...kinds)](), tr);
     if (sky.headlights) for (const m of lane.movers) m.mesh.add(makeHeadlightCone(m.len * CONE));
     if (Math.random() < 0.3) lane.coin(randInt(-W + 1, W - 1));
     if (gauntlet) lane.bonusDrop();
