@@ -9,6 +9,7 @@ import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
 import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
+import { GAUNTLET_BONUS } from '../game.js';
 
 const TILT_COST = 1;   // coins per second while peeking
 const LED_BONUS = 50;    // per follower led across the line
@@ -36,7 +37,8 @@ export class CrossingMode {
     this.world = new World(scene, {
       weights: this.game.stageWeights(), bands: level.bands, difficulty: level.difficulty, sky,
       scenery: this.game.scenery(),
-      ignoreGaps: !!this.game.debug.force,
+      ignoreGaps: !!this.game.debug.force || !!this.game.run.gauntlet,
+      gauntlet: this.game.run.gauntlet,
       onFinish: () => { this.finished = true; },
     });
     this.fx = new Debris(scene);
@@ -48,7 +50,8 @@ export class CrossingMode {
     this.focus = { x: 0, z: 0 };
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
-    music.setMood({ dead: false, danger: false, battle: false, tilted: false });
+    music.setMood({ dead: false, danger: false, battle: false, tilted: false, gauntlet: !!this.game.run.gauntlet, countdown: 0 });
+    if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
   }
 
@@ -230,7 +233,7 @@ export class CrossingMode {
     const led = this.trains.reduce((a, t) => a + t.count, 0);
     const found = this.trains.reduce((a, t) => a + t.waiting, 0);
     const missed = Math.max(0, (this.world.data.eggsPlaced ?? 0) - this.trains.reduce((a, t) => a + t.hatched, 0));
-    this.tally = { t: 0, led, found, missed, rows: front, done: false };
+    this.tally = { t: 0, led, found, missed, rows: front, done: false, gauntlet: !!game.run.gauntlet };
     for (const p of this.players) p.invincible = true;
     this.setTilt(false);
     game.run.score += front;
@@ -246,12 +249,14 @@ export class CrossingMode {
     if (T.t > 0.8) lines.push(`LED HOME ×${T.led}  +${T.led * LED_BONUS}`);
     if (T.t > 1.8) lines.push(`FOUND ×${T.found}  +${T.found * FOUND_BONUS}`);
     if (T.t > 2.8 && T.missed) lines.push(`MISSED ×${T.missed}`);
+    if (T.t > 3.4 && T.gauntlet) lines.push(`PHEW, MADE IT  +${GAUNTLET_BONUS}`);
     game.card(lines.join('   ·   '));
     if (T.t > 1.8 && !T.paid) {
       T.paid = true;
       game.run.score += T.led * LED_BONUS + T.found * FOUND_BONUS;
       game.run.coins += T.led + T.found;
     }
+    if (T.t > 3.4 && T.gauntlet && !T.phew) { T.phew = true; game.run.score += GAUNTLET_BONUS; game.run.gauntlet = null; sfx.phew(); }
     if (T.t > TALLY_TIME) {
       // Everyone carries over, gathered or not.
       this.trains.forEach((t, i) => { game.run.flock[i] = { count: t.total, waiting: 0 }; });

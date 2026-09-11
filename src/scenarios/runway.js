@@ -40,7 +40,7 @@ export default {
   danger: true,
   weight: 2,
   band: [1, 3],
-  build(lane, { prev, sky, difficulty }) {
+  build(lane, { prev, sky, difficulty, gauntlet }) {
     lane.ground(0x3e3e46);
     for (let x = -GW / 2; x < GW / 2; x += 2) lane.add(box(1.1, 0.02, 0.12, 0xe8e8e8, x, 0, 0, false));   // centreline
     if (!prev || prev.scenario.id !== 'runway') {
@@ -56,6 +56,7 @@ export default {
       if (sky.headlights) for (const dz of [-1.15, 1.15]) m.mesh.add(makeHeadlightCone(m.len * CONE, m.len * CONE / 2 + 0.2, 0.15, dz, 0.5));
       return m;
     }, 0.6);
+    if (gauntlet) lane.bonusDrop();
   },
 
   update(lane, dt) {

@@ -77,7 +77,7 @@ export class World {
     const lane = new Lane(r, spec.scenario, this);
     spec.scenario.build(lane, {
       world: this, index: spec.index, count: spec.count, prev: this.rows.get(r - 1),
-      sky: this.config.sky, difficulty: this.config.difficulty,
+      sky: this.config.sky, difficulty: this.config.difficulty, gauntlet: !!this.config.gauntlet,
     });
     this.scene.add(lane.group);
     this.rows.set(r, lane);

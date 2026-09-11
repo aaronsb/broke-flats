@@ -38,7 +38,7 @@ export default {
   danger: true,
   weight: 2,
   band: [1, 3],
-  build(lane, { sky, difficulty }) {
+  build(lane, { sky, difficulty, gauntlet }) {
     lane.ground(0x3f8fd6, -0.3, 0.2);
     lane.dir = pick(-1, 1);
     lane.speed = rand(1.2, 2.4) + Math.min(1.5, difficulty * 0.4 + lane.r / 120);
@@ -56,6 +56,7 @@ export default {
       return m;
     }, 0.3);
     for (const m of lane.movers) if (m.kind === 'log' && Math.random() < 0.3) lane.moverCoin(m);
+    if (gauntlet) lane.bonusDrop();
 
     lane.data.flecks = [];
     for (let i = 0; i < 7; i++) {

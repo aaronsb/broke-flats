@@ -15,6 +15,9 @@ export const LIFE_COST = 25; // coins per life, at the slot or to continue
 const START_LIVES = 4;       // one coin buys this many
 const ODD_WEATHER = 0.1;     // chance the first level opens under a different sky
 const CONTINUE_TIME = 10;    // seconds to decide at game over
+const GAUNTLET_CHANCE = 0.06; // a level that is all one hazard, from level 2 on
+const GAUNTLET_KINDS = ['road', 'river', 'runway', 'rail'];
+export const GAUNTLET_BONUS = 500;
 
 export class Game {
   constructor({ scene, camera, sky, ui, headlights }) {
@@ -144,17 +147,25 @@ export class Game {
     const skyName = this.debug.sky ?? (n === 1 ? this.run.oddSky : null) ?? this.level.sky;
     this.sky.apply(skyName);
     this.headlights.enabled = this.sky.headlights;
-    this.ui.level.innerHTML = `LV <b>${n}</b> ${SKIES[skyName].label}${this.debug.on ? ' <b>DEBUG</b>' : ''}`;
+    const tag = this.run.gauntlet ? ` <b>${this.run.gauntlet.toUpperCase()} GAUNTLET</b>` : '';
+    this.ui.level.innerHTML = `LV <b>${n}</b> ${SKIES[skyName].label}${tag}${this.debug.on ? ' <b>DEBUG</b>' : ''}`;
   }
 
-  // Sequencer weights for the current stage, honouring a forced scenario.
+  // Rolled once on entering a level. A death clears it, so the retry is normal.
+  rollGauntlet(n) {
+    this.run.gauntlet = n > 1 && Math.random() < GAUNTLET_CHANCE ? GAUNTLET_KINDS[Math.floor(Math.random() * GAUNTLET_KINDS.length)] : null;
+  }
+
+  // Sequencer weights for the current stage, honouring a forced scenario or a gauntlet.
   stageWeights() {
-    return this.debug.force ? { [this.debug.force]: 1 } : this.level.weights;
+    if (this.debug.force) return { [this.debug.force]: 1 };
+    if (this.run.gauntlet) return { [this.run.gauntlet]: 1 };
+    return this.level.weights;
   }
 
   scenery() { return SCENERY[this.debug.scenery ?? this.level.scenery]; }
 
-  jumpLevel(n) { this.setLevel(n); this.setMode(new CrossingMode(this)); }
+  jumpLevel(n) { this.rollGauntlet(n); this.setLevel(n); this.setMode(new CrossingMode(this)); }
   restartStage() { this.setLevel(this.run.level); this.setMode(new CrossingMode(this)); }
 
   setMode(mode) {
@@ -167,6 +178,7 @@ export class Game {
   stageClear() { this.setMode(new BattleMode(this)); }
 
   nextLevel() {
+    this.rollGauntlet(this.run.level + 1);
     this.setLevel(this.run.level + 1);
     this.setMode(new CrossingMode(this));
   }
@@ -178,6 +190,7 @@ export class Game {
     if (this.run.score > this.best) { this.best = this.run.score; localStorage.setItem('rc-best', this.best); }
     this.ui.best.textContent = this.best;
     if (!this.spendLife()) { this.gameOver(cause); return; }
+    this.run.gauntlet = null;      // no second run at a gauntlet
     this.restartStage();
   }
 

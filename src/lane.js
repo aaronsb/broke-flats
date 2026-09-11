@@ -49,6 +49,13 @@ export class Lane {
     if (this.world) this.world.data.eggsPlaced = (this.world.data.eggsPlaced ?? 0) + 1;
   }
 
+  // A coin or egg left lying in the row, untouched by whatever crosses it.
+  bonusDrop(chance = 0.5, eggShare = 0.35) {
+    if (Math.random() > chance) return;
+    const c = Math.round(rand(-W + 1, W - 1));
+    if (Math.random() < eggShare) this.egg(c); else this.coin(c);
+  }
+
   takeEgg(c) {
     const egg = this.eggs.get(c);
     if (!egg) return false;

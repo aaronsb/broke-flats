@@ -19,6 +19,7 @@ const MOODS = {
   calm: { bpm: 92, cutoff: 700 },
   danger: { bpm: 150, cutoff: 1800 },
   battle: { bpm: 164, cutoff: 2600 },
+  gauntlet: { bpm: 184, cutoff: 3200 },
 };
 const BATTLE_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [57, 60, 64]]; // C F G Am
 
@@ -111,7 +112,7 @@ const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, {
 
 // ---------- step sequencer ----------
 function scheduleStep(s, t) {
-  const target = MOODS[mood.dead ? 'calm' : mood.battle ? 'battle' : mood.danger ? 'danger' : 'calm'];
+  const target = MOODS[mood.dead ? 'calm' : mood.battle ? 'battle' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm'];
   // A running continue countdown pushes the tempo up toward the end.
   const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : target.bpm;
   bpm += (goalBpm - bpm) * 0.12;
@@ -120,7 +121,7 @@ function scheduleStep(s, t) {
   const chord = prog[bar % prog.length];
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
-  const danger = (mood.danger || mood.battle) && !mood.dead;
+  const danger = (mood.danger || mood.battle || mood.gauntlet) && !mood.dead;
 
   filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff, t, 0.2);
 

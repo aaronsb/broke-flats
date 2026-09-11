@@ -114,6 +114,13 @@ if (script === 'rail') {
   const r = await send('Page.captureScreenshot', { format: 'png' });
   fsR.writeFileSync(`${process.env.OUT ?? '.'}/rail-top.png`, Buffer.from(r.data, 'base64'));
 }
+if (script === 'gauntlet') {
+  await start();
+  await evaluate(`__game.debug.god = true; __game.run.gauntlet = 'river'; __game.restartStage()`); await sleep(2500);
+  console.log('gauntlet', await evaluate(`[document.getElementById('level').textContent, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 20).map(l => l.scenario.id))].join(','), [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'river').reduce((a, l) => a + l.coins.size + l.eggs.size, 0)]`));
+  await evaluate(`__game.mode.finished = true`); await sleep(9000);
+  console.log('phew', await evaluate(`[document.getElementById('card').textContent.includes('PHEW'), __game.run.score >= 500, __game.run.gauntlet]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

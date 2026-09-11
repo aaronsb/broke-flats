@@ -34,7 +34,7 @@ export default {
   weight: 1,
   band: [1, 2],
   minGap: 6,
-  build(lane, { sky, difficulty }) {
+  build(lane, { sky, difficulty, gauntlet }) {
     lane.ground(0x6a645c);
     for (let x = -GW / 2; x < GW / 2; x += 0.7) lane.add(box(0.3, 0.06, 0.9, 0x5a3d24, x, 0, 0, false));   // sleepers
     for (const z of [-0.3, 0.3]) lane.add(box(GW, 0.08, 0.08, 0xb8b8b8, 0, 0.05, z, false));                // rails
@@ -51,6 +51,7 @@ export default {
     lane.add(t.mesh);
     lane.movers.push(t);
     Object.assign(lane.data, { train: t, wait: rand(3, 8), state: 'idle', puffs: [], puffClock: 0 });
+    if (gauntlet) lane.bonusDrop();
     lane.data.signals = [-W - 1, W + 1].map((x) => { const s = lane.add(makeRailSignal(), x); s.position.z = 0.6; return s; });
     lane.data.gates = [-1, 1].map((side) => {
       const g = lane.add(makeGate(GATE_ARM), side * (W + 0.6));

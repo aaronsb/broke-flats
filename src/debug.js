@@ -12,7 +12,7 @@ export function installDebug(game, ui) {
       '<b>DEBUG</b> (` closes)',
       '1-4 level &nbsp; 5 battle &nbsp; N next level',
       'Q road &nbsp; E river &nbsp; I runway &nbsp; O rail &nbsp; T grass &nbsp; Y hedge &nbsp; U meadow &nbsp; 0 clear',
-      'K sky &nbsp; J scenery &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
+      'K sky &nbsp; J scenery &nbsp; V gauntlet &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
       `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · scenery: ${game.debug.scenery ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,
     ].join('<br>');
   };
@@ -41,6 +41,7 @@ export function installDebug(game, ui) {
       game.debug.scenery = names[(names.indexOf(game.debug.scenery ?? game.level.scenery) + 1) % names.length];
       game.restartStage();
     }
+    else if (c === 'KeyV') { game.run.gauntlet = game.debug.force ?? 'road'; game.debug.force = null; game.restartStage(); }
     else if (c === 'KeyG') { game.debug.god = !game.debug.god; game.mode.players?.forEach((p) => { p.invincible = game.debug.god; }); }
     else if (c === 'KeyC') { game.run.coins += 10; }
     else if (c === 'KeyH') game.mode.trains?.forEach((t) => t.hatch());
