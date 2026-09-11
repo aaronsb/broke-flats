@@ -113,6 +113,7 @@ export class Player {
     this.carrier = null;
     this.facing = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     this.bounces = (this.bounces ?? 0) + 1;
+    this.bouncing = true;        // no second hit until this hop lands
     sfx.bump();
   }
 
@@ -136,6 +137,7 @@ export class Player {
   }
 
   land() {
+    this.bouncing = false;
     const lane = this.world.laneAt(this.row);
     if (!lane) return;
     // A wing over this cell catches you before whatever is below can.
@@ -240,7 +242,7 @@ export class Player {
 
     // Hazard check against whichever row the chicken is mostly in. Nothing
     // can reach you on a wing or in the air.
-    if (!this.carrier?.wing && !this.airborne) {
+    if (!this.carrier?.wing && !this.airborne && !(this.moving && this.bouncing)) {
       const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
       const lane = this.world.laneAt(checkRow);
       const cause = lane?.scenario.lethalAt?.(lane, this.x, this);
