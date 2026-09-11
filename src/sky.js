@@ -92,6 +92,13 @@ export class Sky {
   }
 
   get dark() { return !!SKIES[this.name].dark; }
+
+  // Size of the sun's shadow box around the focus; the title needs a wide one.
+  setShadowSpan(size) {
+    const sc = this.sun.shadow.camera;
+    sc.left = -size; sc.right = size; sc.top = size; sc.bottom = -size;
+    sc.updateProjectionMatrix();
+  }
   get headlights() { const s = SKIES[this.name]; return !!(s.dark || s.dusk); }
 
   apply(name) {

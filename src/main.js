@@ -41,7 +41,7 @@ const ui = {
   p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
 };
 const game = new Game({ scene, camera, sky, ui, headlights });
-if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
+if (import.meta.env.DEV) { window.__game = game; import('./meshes.js').then((m) => { window.__meshes = m; }); }   // for the headless smoke test
 const debugKey = installDebug(game, ui);
 installTouch(document.getElementById('hud'));
 let started = false;
@@ -50,7 +50,7 @@ if (playtest) applyBeforeStart(game, playtest);
 game.preview();
 let select = new Select(scene, camera);
 select.setPicks(game.picks);
-let attract = new Attract(scene);
+let attract = new Attract(scene, sky);
 
 // Insert coin: lives clink in, the picked cards blink, and the run starts.
 function begin() {
@@ -79,7 +79,7 @@ function toTitle() {
   ui.title.classList.remove('hide');
   select = new Select(scene, camera);
   select.setPicks(game.picks);
-  attract = new Attract(scene);
+  attract = new Attract(scene, sky);
 }
 let inserting = false;
 game.onTimeout = toTitle;

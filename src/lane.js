@@ -132,6 +132,9 @@ export class Lane {
     return Math.abs(x - rear) < pad && (m.x - x) * this.dir > 0;
   }
 
+  // True when the player is riding (or just hopped along) this very mover.
+  riding(m, player) { return !!player && (player.carrier === m || player.hopCarrier === m); }
+
   moverAt(x, pad) {
     for (const m of this.movers) if (Math.abs(x - m.x) < m.len / 2 + pad) return m;
     return null;

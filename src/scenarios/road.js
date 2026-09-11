@@ -40,10 +40,10 @@ export default {
     if (gauntlet) lane.bonusDrop();
   },
   update(lane, dt) { lane.advance(dt); },
-  lethalAt(lane, x) {
+  lethalAt(lane, x, player) {
     const m = lane.moverAt(x, 0.35);
     if (!m || lane.onBed(m, x)) return null;
-    return lane.rearOf(m, x) ? 'bounce' : 'car';
+    return lane.rearOf(m, x) || lane.riding(m, player) ? 'bounce' : 'car';
   },
   onLand(lane, player) {
     const m = lane.moverAt(player.x, 0.35);

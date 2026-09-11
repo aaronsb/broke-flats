@@ -105,7 +105,7 @@ export const makePig = () => twoFrames((g, air) => {
   g.add(box(0.28, 0.2, 0.1, dark, 0, 0.7, -0.57));
   g.add(box(0.06, 0.06, 0.04, BLACK, 0.07, 0.77, -0.63));
   g.add(box(0.06, 0.06, 0.04, BLACK, -0.07, 0.77, -0.63));
-  eyes(g, 0.92, -0.4, 0.18, 0.07);
+  eyes(g, 0.92, -0.53, 0.14, 0.07);                          // on the face
   g.add(box(0.12, 0.18, 0.08, dark, 0.18, air ? 1.16 : 1.1, air ? -0.15 : -0.25));   // ears flap back
   g.add(box(0.12, 0.18, 0.08, dark, -0.18, air ? 1.16 : 1.1, air ? -0.15 : -0.25));
   g.add(box(0.08, 0.08, 0.2, dark, 0, air ? 0.7 : 0.6, 0.5));
@@ -132,7 +132,7 @@ export const makeCat = (kind = 'tabby') => { const m = twoFrames((g, air) => {
   g.add(box(0.2, 0.15, 0.2, c.muzzle, 0, bodyY + 0.45, -0.5));
   if (c.points) g.add(box(0.3, 0.26, 0.06, c.points, 0, bodyY + 0.47, -0.5));
   g.add(box(0.06, 0.05, 0.06, 0xe07fa4, 0, bodyY + 0.57, -0.62));
-  eyes(g, bodyY + 0.7, -0.45, 0.16, 0.07);
+  eyes(g, bodyY + 0.72, -0.52, 0.13, 0.07);                  // on the face
   g.add(box(0.12, 0.16, 0.08, ear, 0.16, bodyY + 0.89, air ? -0.2 : -0.3));   // ears back in the air
   g.add(box(0.12, 0.16, 0.08, ear, -0.16, bodyY + 0.89, air ? -0.2 : -0.3));
   if (air) g.add(box(0.1, 0.1, 0.5, tail, 0.15, bodyY + 0.3, 0.7));    // tail straight back

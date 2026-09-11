@@ -31,8 +31,10 @@ function desaturate(material) {
 }
 
 export class Attract {
-  constructor(scene) {
+  constructor(scene, sky) {
     this.scene = scene;
+    this.sky = sky;
+    sky?.setShadowSpan(48);
     this.group = new THREE.Group();
     // Lit so the entities in front throw shadows onto it.
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), new THREE.MeshLambertMaterial({ color: 0x3558b8, fog: false }));
@@ -75,5 +77,5 @@ export class Attract {
     }
   }
 
-  dispose() { this.scene.remove(this.group); }
+  dispose() { this.scene.remove(this.group); this.sky?.setShadowSpan(18); }
 }

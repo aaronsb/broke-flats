@@ -169,6 +169,17 @@ if (script === 'hint') {
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(220); }
   console.log('hint', await evaluate(`[[...__game.mode.hinted], document.getElementById('view').classList.contains('hint')]`));
 }
+if (script === 'cab') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'road'; __game.restartStage()`); await sleep(500);
+  // Ride a flatbed's bed, then hop toward the cab: expect a bounce back onto the bed, still alive.
+  const r = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'road');
+    for (const o of lane.movers) lane.group.remove(o.mesh); lane.movers = [];
+    const m = __meshes.makeFlatbed(); m.x = 0; m.v = 1; if (lane.dir < 0) m.mesh.rotation.y = Math.PI; lane.add(m.mesh, 0); lane.movers.push(m);
+    const p = __game.mode.players[0]; p.row = lane.r; p.z = -lane.r; p.x = m.x + lane.dir * (m.bed[0] + m.bed[1]) / 2; p.col = Math.round(p.x); p.mesh.position.set(p.x, 0, p.z); p.land(); return [!!p.carrier, lane.dir]; })()`);
+  if (r !== 'no flatbed') for (let i = 0; i < 2; i++) { await key(r[1] > 0 ? 'ArrowRight' : 'ArrowLeft'); await sleep(450); }
+  console.log('cab', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].bounces ?? 0, !!__game.mode.players[0].carrier]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

@@ -126,10 +126,10 @@ export default {
     return false;
   },
 
-  lethalAt(lane, x) {
+  lethalAt(lane, x, player) {
     const m = lane.moverAt(x, 0.35);
     if (!m || lane.onBed(m, x)) return null;
-    return lane.rearOf(m, x) ? 'bounce' : 'train';
+    return lane.rearOf(m, x) || lane.riding(m, player) ? 'bounce' : 'train';
   },
   onLand(lane, player) {
     const m = lane.moverAt(player.x, 0.35);

@@ -68,6 +68,11 @@ export class Player {
       return;
     }
     this.from = { x: this.x, z: this.z, y: this.y };
+    // A hop that starts on a carrier moves with it (a sideways hop along a deck
+    // lands on the deck, not where the deck used to be).
+    this.hopCarrier = dr === 0 && this.carrier ? this.carrier : null;
+    this.hopCarrierX = this.hopCarrier?.x ?? 0;
+    this.hopDir = [dc, dr];
     // Leaving something tall: the hop keeps its altitude, then comes the drop.
     const high = this.y > 0.6;
     this.to = { x: tc, z: -tr, y: high ? this.y : 0 };
@@ -94,8 +99,10 @@ export class Player {
   }
 
   // Shoved one cell back by a bumper. Nowhere to go means a splat after all.
+  // A rider bumping into the cab goes back to the deck cell it came from.
   bounce(lane) {
-    const col = Math.round(this.x) - lane.dir;
+    const fromDeck = this.moving && this.hopCarrier;
+    const col = fromDeck ? Math.round(this.from.x) : Math.round(this.x) - lane.dir;
     const row = this.moving ? this.trow : this.row;
     if (Math.abs(col) > W || this.world.isBlocked(col, row, row) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
     this.row = row; this.col = col;
@@ -135,6 +142,7 @@ export class Player {
     const wing = this.world.wingAt(this.x, this.row);
     if (wing) { this.mount(wing); this.onLanded?.(); this.onLandedHint?.(); return; }
     const cause = lane.scenario.onLand?.(lane, this);
+    if (cause === 'bounce') { this.moving = true; this.t = 1; this.bounce(lane); return; }
     if (cause) { this.die(cause); return; }
     if (this.carrier) this.carrierOffset = this.x - this.carrier.x;
     if (lane.takeCoin(this.col)) this.gotCoin();
@@ -194,6 +202,10 @@ export class Player {
     if (this.moving) {
       this.t += dt / HOP;
       const t = Math.min(1, this.t);
+      if (this.hopCarrier) {
+        const dx = this.hopCarrier.x - this.hopCarrierX;
+        this.from.x += dx; this.to.x += dx; this.hopCarrierX = this.hopCarrier.x;
+      }
       this.x = lerp(this.from.x, this.to.x, t);
       this.z = lerp(this.from.z, this.to.z, t);
       const s = Math.sin(Math.PI * t);
@@ -231,7 +243,7 @@ export class Player {
     if (!this.carrier?.wing && !this.airborne) {
       const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
       const lane = this.world.laneAt(checkRow);
-      const cause = lane?.scenario.lethalAt?.(lane, this.x);
+      const cause = lane?.scenario.lethalAt?.(lane, this.x, this);
       if (cause === 'bounce') this.bounce(lane);
       else if (cause) this.die(cause);
     }
