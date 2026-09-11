@@ -11,6 +11,8 @@
     #score { position: absolute; top: 14px; left: 18px; font-size: 40px; font-weight: 700; letter-spacing: 2px; }
     #coins { position: absolute; top: 18px; right: 18px; font-size: 26px; font-weight: 700; }
     #best  { position: absolute; top: 62px; left: 18px; font-size: 16px; opacity: .85; }
+    #level { position: absolute; top: 52px; right: 18px; font-size: 16px; opacity: .85; }
+    #card  { position: absolute; top: 18px; left: 0; right: 0; text-align: center; font-size: 26px; font-weight: 700; }
     #hint  { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 14px; opacity: .85; }
     #view  { position: absolute; bottom: 44px; right: 18px; pointer-events: auto; font: inherit; font-size: 16px; font-weight: 700; color: #fff; background: #1b3a5a; border: 3px solid #fff; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
     #view.on { background: #d9702a; }
@@ -33,6 +35,8 @@
   <div id="hud">
     <div id="score">0</div>
     <div id="best">BEST 0</div>
+    <div id="level">LV 1 · DAY</div>
+    <div id="card" hidden></div>
     <div id="coins">● 0</div>
     <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE peek in 3D (burns coins) &nbsp;·&nbsp; P pixel size &nbsp;·&nbsp; M mute music</div>
     <button id="view">TILT</button>

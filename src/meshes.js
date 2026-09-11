@@ -145,3 +145,80 @@ export function makeTunnel() {
 export function makeGround(width, color, top = 0, thick = 0.5) {
   return box(width, thick, 1, color, 0, top - thick, 0, false);
 }
+
+// ---- battle targets and night props ----
+
+// Boats are modeled sailing toward +x, sitting on the water surface (-0.3).
+export function makeBoat() {
+  const color = pick(...CAR_COLORS);
+  const g = new THREE.Group();
+  g.add(box(2.2, 0.5, 0.9, color, 0, -0.4));               // hull
+  g.add(box(0.9, 0.5, 0.7, 0xf4f4f4, -0.2, 0.1));          // cabin
+  g.add(box(0.4, 0.3, 0.6, GLASS, 0.3, 0.15));             // windshield
+  g.add(box(0.12, 0.5, 0.12, 0x333333, -0.5, 0.6));        // stack
+  return { mesh: g, len: 2.2 };
+}
+
+// Planes are modeled flying toward +x.
+export function makePlane() {
+  const color = pick(...CAR_COLORS);
+  const g = new THREE.Group();
+  g.add(box(2.4, 0.5, 0.5, color, 0, 0));                  // fuselage
+  g.add(box(0.7, 0.35, 2.4, 0xf4f4f4, 0.1, 0.05));         // wings
+  g.add(box(0.5, 0.5, 0.9, color, -1.0, 0.3));             // tail
+  g.add(box(0.4, 0.5, 0.15, color, -1.05, 0.5));           // fin
+  g.add(box(0.5, 0.3, 0.45, GLASS, 0.6, 0.45));            // cockpit
+  return { mesh: g, len: 2.4 };
+}
+
+const eggMat = new THREE.MeshLambertMaterial({ color: 0xfff6e0, emissive: 0x332a10 });
+export function makeEgg() {
+  const g = new THREE.Group();
+  g.add(box(0.3, 0.38, 0.3, eggMat, 0, 0.2));
+  g.add(box(0.2, 0.12, 0.2, eggMat, 0, 0.56));
+  return g;
+}
+
+const coneMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.35, depthWrite: false });
+// Additive-looking light spill in front of a vehicle, facing +x.
+export function makeHeadlightCone(len = 2.2) {
+  const m = new THREE.Mesh(unit, coneMat);
+  m.scale.set(len, 0.06, 1.3);
+  m.position.set(len / 2 + 0.85, 0.05, 0);
+  return m;
+}
+
+const fireflyMat = new THREE.MeshBasicMaterial({ color: 0xd8ff5a });
+export function makeFirefly() {
+  const m = new THREE.Mesh(unit, fireflyMat);
+  m.scale.set(0.12, 0.12, 0.12);
+  return m;
+}
+
+export function makeFlag(color) {
+  const g = new THREE.Group();
+  g.add(box(0.12, 1.8, 0.12, 0xdddddd));
+  g.add(box(0.06, 0.5, 0.8, color, 0, 1.3, 0.4));
+  return g;
+}
+
+export function makeCheckerTile(c) {
+  return box(1, 0.06, 1, c % 2 ? 0xf2f2f2 : 0x222222, 0, 0, 0, false);
+}
+
+// Flatbed truck: the cab kills, the low bed behind it carries you like a log.
+// Modeled driving toward +x; bed spans local x in [-1.55, 0.55].
+export function makeFlatbed() {
+  const color = pick(...CAR_COLORS);
+  const g = new THREE.Group();
+  g.add(box(0.9, 0.85, 0.9, color, 1.05, 0.25, 0));           // cab
+  g.add(box(0.3, 0.35, 0.8, GLASS, 1.36, 0.7, 0));            // windshield
+  g.add(box(2.1, 0.2, 0.95, 0x5a4634, -0.5, 0.25, 0));        // bed
+  g.add(box(2.1, 0.12, 0.08, 0x3a2c20, -0.5, 0.45, 0.44));    // side rails
+  g.add(box(2.1, 0.12, 0.08, 0x3a2c20, -0.5, 0.45, -0.44));
+  g.add(box(0.08, 0.5, 0.95, 0x3a2c20, 0.52, 0.45, 0));       // headboard
+  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 1.52, 0.35, 0.3));
+  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 1.52, 0.35, -0.3));
+  for (const sx of [-1.2, -0.4, 1.05]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
+  return { mesh: g, len: 3.1, bed: [-1.55, 0.55], rideY: 0.45, offCause: 'hauled' };
+}

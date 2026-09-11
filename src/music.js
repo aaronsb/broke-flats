@@ -18,12 +18,14 @@ const LYDIAN = [57, 59, 61, 63, 64, 66, 68, 69, 71, 73, 75, 76]; // A lydian
 const MOODS = {
   calm: { bpm: 92, cutoff: 700 },
   danger: { bpm: 150, cutoff: 1800 },
+  battle: { bpm: 164, cutoff: 2600 },
 };
+const BATTLE_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [57, 60, 64]]; // C F G Am
 
 let ctx, master, bus, delayBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
-let mood = { danger: false, tilted: false, dead: false };
+let mood = { danger: false, tilted: false, dead: false, battle: false };
 let muted = false;
 
 function setup() {
@@ -109,14 +111,14 @@ const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, {
 
 // ---------- step sequencer ----------
 function scheduleStep(s, t) {
-  const target = MOODS[mood.danger && !mood.dead ? 'danger' : 'calm'];
+  const target = MOODS[mood.dead ? 'calm' : mood.battle ? 'battle' : mood.danger ? 'danger' : 'calm'];
   bpm += (target.bpm - bpm) * 0.12;
   const beat = 60 / bpm, sixteenth = beat / 4;
-  const prog = mood.tilted ? PEEK_PROG : CALM_PROG;
+  const prog = mood.battle ? BATTLE_PROG : mood.tilted ? PEEK_PROG : CALM_PROG;
   const chord = prog[bar % prog.length];
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
-  const danger = mood.danger && !mood.dead;
+  const danger = (mood.danger || mood.battle) && !mood.dead;
 
   filter.frequency.setTargetAtTime(mood.tilted ? 4000 : target.cutoff, t, 0.2);
 

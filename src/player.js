@@ -41,7 +41,7 @@ export class Player {
       sfx.bump();
       return;
     }
-    this.from = { x: this.x, z: this.z };
+    this.from = { x: this.x, z: this.z, y: this.y };
     this.to = { x: tc, z: -tr };
     this.tcol = tc; this.trow = tr;
     this.moving = true; this.t = 0;
@@ -102,7 +102,7 @@ export class Player {
       this.x = lerp(this.from.x, this.to.x, t);
       this.z = lerp(this.from.z, this.to.z, t);
       const s = Math.sin(Math.PI * t);
-      this.y = s * 0.55;
+      this.y = lerp(this.from.y, 0, t) + s * 0.55;
       sy = 1 + 0.25 * s; sx = 1 - 0.12 * s;
       if (this.t >= 1) {
         this.moving = false;
@@ -115,7 +115,8 @@ export class Player {
       if (this.carrier && lane) {
         this.x += lane.dir * lane.speed * dt;
         this.col = Math.round(this.x);
-        if (Math.abs(this.x) > W + 0.6) { this.die('water'); return; }
+        this.y = this.carrier.rideY ?? 0;
+        if (Math.abs(this.x) > W + 0.6) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
     }
