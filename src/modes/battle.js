@@ -2,8 +2,11 @@
 // and lobs eggs up-screen at cars, boats and planes crossing at three depths.
 // Timed. Ends the level and hands the run record to the next one.
 import * as THREE from 'three';
-import { makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone, makeTree, makeHedge } from '../meshes.js';
-import { Lane } from '../lane.js';
+import {
+  makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone,
+  makeTree, makeHedge, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
+} from '../meshes.js';
+import { Footprints } from '../scenery/footprints.js';
 import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
@@ -16,6 +19,16 @@ const TILTS = ['land', 'sea', 'air'];                 // each tilt aims at one r
 // [camera preset, ground point the camera looks at]
 const VIEW = { land: ['battleLand', 3.5], sea: ['battleSea', 8.7], air: ['battleAir', 13.7] };
 const FIELD_W = 400;   // wide enough to reach the fog at every tilt
+const GRID_X = 40;     // props are placed on cells out to ±GRID_X
+// Field themes: prop mix (weighted by repetition), building style and how
+// often a footprint is attempted per side per row. One is picked per battle.
+const tall = () => makeTree(true);
+const THEMES = {
+  forest:      { props: [tall, tall, tall, makeTree, makeTree, makeHedge, makeHedge, makeShrub], building: 'house', buildProb: 0.08 },
+  residential: { props: [makeFence, makeFence, makeShrub, makeShrub, makeTree, tall, makeParkedCar], building: 'house', buildProb: 0.5 },
+  city:        { props: [makeDumpster, makePlanter, makePlanter, makeParkedCar, makeParkedCar, makeTree], building: 'tower', buildProb: 0.7 },
+  parking:     { props: [makeParkedCar, makeParkedCar, makeParkedCar, makeFence, makePlanter, makeShrub], building: 'tower', buildProb: 0.15 },
+};
 const HEIGHT = { land: 0.6, sea: 0.6, air: 3.2 };
 const SLIDE = 7, EGG_SPEED = 14, COOLDOWN = 0.3;
 
@@ -39,29 +52,7 @@ export class BattleMode {
     this.cooldown = 0;
     this.ending = 0;
 
-    // The field borrows the level's scenery for the strip edges, and the far
-    // rows get trees and hedges so the horizon is not bare.
-    const scenery = this.game.scenery();
-    const fakeWorld = { data: {}, config: { sky, scenery } };
-    for (let r = -6; r <= 16; r++) {
-      const g = r === ROWS.land ? makeGround(FIELD_W, 0x4a4a52)
-        : r === ROWS.sea ? makeGround(FIELD_W, 0x3f8fd6, -0.3, 0.2)
-        : makeGround(FIELD_W, r % 2 ? 0x9ad24a : 0x8fca43);
-      g.position.z = -r;
-      this.group.add(g);
-      if (r === ROWS.land || r === ROWS.sea) continue;
-      const lane = new Lane(r, null, fakeWorld);
-      lane.edges();
-      if (r > 0 && r !== ROWS.air) for (let c = -W; c <= W; c++) {
-        if (r >= 13 && Math.random() < 0.5) lane.add(Math.random() < 0.6 ? makeTree(true) : makeHedge(), c);
-        else if (Math.random() < 0.06) lane.add(makeTree(), c);
-      }
-      for (let c = W + 8; c <= 40; c += 1) for (const s of [-1, 1]) if (Math.random() < 0.35) lane.add(makeTree(true), s * c);
-      this.group.add(lane.group);
-    }
-    const far = makeGround(FIELD_W, 0x8fca43);   // plain ground out to the fog line
-    far.scale.z = 120; far.position.z = -16.5 - 60;
-    this.group.add(far);
+    this.buildField(sky);
     this.chicken = makeChicken();
     this.group.add(this.chicken);
     this.cx = 0;
@@ -70,6 +61,48 @@ export class BattleMode {
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
     music.setMood({ battle: true, dead: false, tilted: false, danger: false });
     this.game.card(`LEVEL ${level.number} CLEAR · BATTLE`);
+  }
+
+  // Grid the field and fill it in one theme's style. Target rows and the
+  // chicken's row stay clear; buildings take tetromino footprints outside the
+  // strip; other cells roll for a prop.
+  buildField(sky) {
+    const fp = new Footprints();
+    const lit = !!sky.dark;
+    const theme = THEMES[pick(...Object.keys(THEMES))];
+    for (let r = -6; r <= 16; r++) {
+      const g = r === ROWS.land ? makeGround(FIELD_W, 0x4a4a52)
+        : r === ROWS.sea ? makeGround(FIELD_W, 0x3f8fd6, -0.3, 0.2)
+        : makeGround(FIELD_W, r % 2 ? 0x9ad24a : 0x8fca43);
+      g.position.z = -r;
+      this.group.add(g);
+      if (r === ROWS.land || r === ROWS.sea) continue;
+
+      const row = new THREE.Group();
+      row.position.z = -r;
+      const taken = new Set();
+      for (const s of [-1, 1]) {
+        const [a, b] = s < 0 ? [-GRID_X, -W - 2] : [W + 2, GRID_X];
+        for (let i = 0; i < 3; i++) if (Math.random() < theme.buildProb) fp.plan(r, a, b, buildingStyle(theme.building, lit));
+      }
+      for (const cell of fp.take(r)) {
+        const m = makeBuildingCell(cell.style, cell.x < 0 ? 1 : -1);
+        m.position.x = cell.x;
+        row.add(m);
+        taken.add(cell.x);
+      }
+      for (let c = -GRID_X; c <= GRID_X; c++) {
+        if (taken.has(c)) continue;
+        const inStrip = Math.abs(c) <= W + 1;
+        if (inStrip && r <= 3) continue;                  // clear sight lines in front of the chicken
+        const density = inStrip ? (r >= 13 ? 0.45 : 0.02) : 0.3;
+        if (Math.random() < density) { const m = pick(...theme.props)(); m.position.x = c; row.add(m); }
+      }
+      this.group.add(row);
+    }
+    const far = makeGround(FIELD_W, 0x8fca43);
+    far.scale.z = 120; far.position.z = -16.5 - 60;
+    this.group.add(far);
   }
 
   exit() {
@@ -105,7 +138,7 @@ export class BattleMode {
     egg.position.set(this.cx, 0.6, 0);
     this.group.add(egg);
     this.eggs.push({ mesh: egg, x: this.cx, z: 0, aim: this.aim });
-    sfx.hop();
+    sfx.plink();
   }
 
   spawn(kind) {
@@ -173,7 +206,8 @@ export class BattleMode {
         e.z = 99;
         this.points += POINTS[t.kind];
         game.run.coins += 1;
-        (t.kind === 'sea' ? sfx.splash : sfx.splat)();
+        sfx.boom(t.kind === 'air' ? 1.3 : t.kind === 'sea' ? 0.8 : 1);
+        if (t.kind === 'sea') sfx.splash();
         break;
       }
     }

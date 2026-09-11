@@ -67,10 +67,25 @@ function voice(opts) {
 }
 
 const N = (n) => 440 * Math.pow(2, (n - 69) / 12); // MIDI note to Hz
+const vary = (v, pct = 0.15) => v * (1 + (Math.random() * 2 - 1) * pct); // random variation
+
+// Two-part 8-bit explosion: a short "ba" click, then a low "doom" with a
+// pitch drop under a lowpassed noise wash. Every call varies a little.
+function boom(size = 1) {
+  const dur = vary(0.45, 0.2) * size;
+  voice({ wave: 'noise', freq: 3000, slideTo: 800, filter: 'highpass', attack: 0.001, decay: 0.02, sustain: 0.3, hold: 0.01, release: 0.03, vol: 0.14 });
+  setTimeout(() => {
+    voice({ wave: pick('sawtooth', 'square'), freq: vary(95, 0.25) / Math.sqrt(size), slideTo: 28, attack: 0.003, decay: 0.08, sustain: 0.6, hold: dur * 0.3, release: dur * 0.6, vol: 0.12 * Math.min(1.4, size) });
+    voice({ wave: 'noise', freq: vary(900, 0.3), slideTo: 90, filter: 'lowpass', attack: 0.002, decay: 0.1, sustain: 0.5, hold: dur * 0.25, release: dur * 0.7, vol: 0.2 });
+  }, 35);
+}
+const pick = (...xs) => xs[Math.floor(Math.random() * xs.length)];
 
 export const sfx = {
   unlock: () => ac(),
-  hop: () => voice({ wave: 'square', freq: N(72), slideTo: N(79), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.01, release: 0.05, vol: 0.06 }),
+  boom,
+  plink: () => voice({ wave: 'triangle', freq: vary(1500, 0.12), slideTo: 650, attack: 0.001, decay: 0.03, sustain: 0.3, hold: 0.01, release: 0.05, vol: 0.06 }),
+  hop: () => voice({ wave: 'square', freq: vary(N(72), 0.03), slideTo: N(79), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.01, release: 0.05, vol: 0.06 }),
   bump: () => voice({ wave: 'square', freq: N(45), slideTo: N(40), attack: 0.002, decay: 0.05, sustain: 0.3, hold: 0.02, release: 0.06, vol: 0.07 }),
   coin: () => voice({ wave: 'square', freq: N(88), arp: [N(93), N(93), N(93)], arpStep: 0.06, attack: 0.002, decay: 0.05, sustain: 0.7, hold: 0.12, release: 0.12, vol: 0.07 }),
   hatch: () => voice({ wave: 'square', freq: N(84), arp: [N(88), N(91), N(96)], arpStep: 0.05, attack: 0.002, decay: 0.03, sustain: 0.7, hold: 0.12, release: 0.1, vol: 0.07 }),
