@@ -121,13 +121,16 @@ export class World {
     }
   }
 
-  // A wall with an obvious gap at one edge and a hidden tunnel near the path.
+  // A wall with one visible gap and one hidden tunnel, both placed at random
+  // and kept far apart so the tunnel is a real shortcut. The meadow rows on
+  // either side are treeless, so every column is reachable.
   buildHedge(lane) {
     lane.group.add(makeGround(GW, 0x8fca43));
     this.addForestEdges(lane);
-    const gap = pick(-W, W);
-    this.pathCol = clamp(this.pathCol + randInt(-1, 1), -W + 2, W - 2);
-    const tunnel = this.pathCol;
+    const tunnel = randInt(-W + 1, W - 1);
+    let gap;
+    do gap = randInt(-W, W); while (Math.abs(gap - tunnel) < 6);
+    this.pathCol = tunnel;
     for (let c = -W; c <= W; c++) {
       if (c === gap) continue;
       const m = c === tunnel ? makeTunnel() : makeHedge();
