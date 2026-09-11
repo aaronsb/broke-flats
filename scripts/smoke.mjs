@@ -56,6 +56,23 @@ if (script === 'lives') {
   await key('KeyR', 'r'); await sleep(600);
   console.log('new session', await evaluate(`[__game.run.coins, __game.run.lives, !document.getElementById('title').classList.contains('hide')]`));
 }
+if (script === 'touch') {
+  await send('Page.navigate', { url: 'http://localhost:5173/?touch=1' }); await sleep(2500);
+  const tap = async (sel) => {
+    const box = await evaluate(`(() => { const r = document.querySelector('${sel}').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box[0], y: box[1], button: 'left', clickCount: 1 });
+    await sleep(60);
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box[0], y: box[1], button: 'left', clickCount: 1 });
+  };
+  console.log('bar', await evaluate(`[!!document.getElementById('touchbar'), document.querySelectorAll('#touchbar button').length]`));
+  await tap('#touchbar .act.s'); await sleep(4500);
+  console.log('started', await evaluate(`[__game.run.lives, !!__game.mode?.players]`));
+  for (let i = 0; i < 3; i++) { await tap('#touchbar .pad.u'); await sleep(250); }
+  console.log('hopped', await evaluate(`__game.mode.players[0].row`));
+  const fsT = await import('node:fs');
+  const r = await send('Page.captureScreenshot', { format: 'png' });
+  fsT.writeFileSync(`${process.env.OUT ?? '.'}/touch.png`, Buffer.from(r.data, 'base64'));
+}
 if (script === 'respawn') {
   await start();
   await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch()`);

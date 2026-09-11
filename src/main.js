@@ -7,6 +7,7 @@ import { sfx } from './sfx.js';
 import { music } from './music.js';
 import { installDebug } from './debug.js';
 import { Select } from './select.js';
+import { installTouch } from './touch.js';
 
 // ---------- renderer ----------
 const canvas = document.getElementById('c');
@@ -40,6 +41,7 @@ const ui = {
 const game = new Game({ scene, camera, sky, ui, headlights });
 if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
 const debugKey = installDebug(game, ui);
+installTouch(document.getElementById('hud'));
 let started = false;
 game.preview();
 let select = new Select(scene, camera);

@@ -21,6 +21,22 @@
     #view.on { background: #d9702a; }
     #view.broke { opacity: .45; }
     #debug { position: absolute; bottom: 40px; left: 16px; font-size: 9px; line-height: 2; background: rgba(20, 40, 70, .8); border: 2px solid #fff; border-radius: 4px; padding: 8px 12px; }
+    /* Touch control bar: d-pad left, action cluster right. Only on coarse pointers. */
+    #touchbar { position: absolute; left: 0; right: 0; bottom: 0; height: 150px; display: grid; grid-template-columns: 1fr 1fr; padding: 8px 14px 12px; box-sizing: border-box; pointer-events: none; }
+    #touchbar button { pointer-events: auto; font: inherit; font-size: 18px; color: #fff; background: rgba(12, 24, 44, .82); border: 3px solid #fff; border-radius: 8px; width: 52px; height: 52px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #touchbar button.down { background: #d9702a; }
+    #touchbar .pad { position: absolute; bottom: 12px; }
+    #touchbar .pad.l { left: 14px; bottom: 56px; }
+    #touchbar .pad.r { left: 126px; bottom: 56px; }
+    #touchbar .pad.u { left: 70px; bottom: 100px; }
+    #touchbar .pad.d { left: 70px; bottom: 12px; }
+    #touchbar .act { position: absolute; bottom: 12px; border-radius: 50%; }
+    #touchbar .act.a { right: 70px; bottom: 56px; width: 64px; height: 64px; background: rgba(217, 112, 42, .85); }
+    #touchbar .act.b { right: 14px; bottom: 100px; }
+    #touchbar .act.c { right: 14px; bottom: 12px; }
+    #touchbar .act.s { right: 150px; bottom: 12px; font-size: 14px; }
+    body.touch #hint, body.touch #view, body.touch #debug { bottom: 158px; }
+    body.touch #title { padding-bottom: 170px; }
     #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
     #over.show { display: flex; }
     #over h1 { font-size: 32px; margin: 0 0 12px; }
