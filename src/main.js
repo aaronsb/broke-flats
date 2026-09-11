@@ -30,9 +30,10 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), level: $('level'), card: $('card'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
-  title: $('title'), view: $('view'), hint: $('hint'),
+  title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'),
 };
 const game = new Game({ scene, camera, sky, ui });
+if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
 let started = false;
 
 function begin() {

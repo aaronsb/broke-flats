@@ -73,6 +73,7 @@ export const sfx = {
   hop: () => voice({ wave: 'square', freq: N(72), slideTo: N(79), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.01, release: 0.05, vol: 0.06 }),
   bump: () => voice({ wave: 'square', freq: N(45), slideTo: N(40), attack: 0.002, decay: 0.05, sustain: 0.3, hold: 0.02, release: 0.06, vol: 0.07 }),
   coin: () => voice({ wave: 'square', freq: N(88), arp: [N(93), N(93), N(93)], arpStep: 0.06, attack: 0.002, decay: 0.05, sustain: 0.7, hold: 0.12, release: 0.12, vol: 0.07 }),
+  hatch: () => voice({ wave: 'square', freq: N(84), arp: [N(88), N(91), N(96)], arpStep: 0.05, attack: 0.002, decay: 0.03, sustain: 0.7, hold: 0.12, release: 0.1, vol: 0.07 }),
   tilt: () => voice({ wave: 'triangle', freq: N(60), arp: [N(64), N(67), N(72)], arpStep: 0.035, attack: 0.005, decay: 0.03, sustain: 0.8, hold: 0.1, release: 0.1, vol: 0.08 }),
   splat: () => {
     voice({ wave: 'noise', freq: 2500, slideTo: 200, attack: 0.002, decay: 0.08, sustain: 0.5, hold: 0.05, release: 0.2, vol: 0.18 });

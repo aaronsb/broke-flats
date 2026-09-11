@@ -20,7 +20,9 @@ export default {
         shade = c;
         lane.add(makeUmbrellaTree(), c);
         lane.block(c);
-        lane.coin(c + pick(-1, 1));
+        // Under the canopy only, so the egg is never visible from straight above.
+        const cc = c + pick(-1, 1);
+        if (Math.random() < 0.4) lane.egg(cc); else lane.coin(cc);
       }
     }
     for (let c = -W; c <= W; c++) {

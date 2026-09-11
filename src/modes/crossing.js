@@ -2,10 +2,12 @@
 // and the player; tears both down on exit. Only the run record survives.
 import { World } from '../world.js';
 import { Player, BACK_LIMIT } from '../player.js';
+import { Train } from '../train.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 
 const TILT_COST = 1; // coins per second while peeking
+const CHICK_BONUS = 25;
 
 const KEYS = {
   ArrowUp: [0, 1], KeyW: [0, 1],
@@ -28,6 +30,8 @@ export class CrossingMode {
     });
     this.player = new Player(scene, this.world);
     this.player.coins = this.game.run.coins;
+    this.train = new Train(scene, this.world, this.player);
+    this.player.onEgg = () => this.train.hatch();
     this.world.ensure(26);
     this.finished = false;
     this.tilted = false;
@@ -38,6 +42,7 @@ export class CrossingMode {
 
   exit() {
     this.world.dispose();
+    this.train.dispose();
     this.game.scene.remove(this.player.mesh);
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
@@ -75,6 +80,7 @@ export class CrossingMode {
   update(dt, time) {
     const { game, player, world } = this;
     player.update(dt);
+    this.train.update(dt);
     world.update(dt, time);
     world.ensure(player.row + 26);
     world.cull(player.maxRow - BACK_LIMIT - 2);
@@ -97,9 +103,12 @@ export class CrossingMode {
 
     game.run.coins = player.coins;
     game.hud(game.run.score + player.maxRow);
+    game.ui.chicks.textContent = this.train.count ? `🐥 ${this.train.count}` : '';
 
     if (this.finished) {
-      game.run.score += player.maxRow;
+      // Every chick led home is worth a bonus.
+      game.run.score += player.maxRow + this.train.count * CHICK_BONUS;
+      game.run.coins += this.train.count;
       game.stageClear();
     } else if (!player.alive && player.deadFor > 0.9) {
       game.run.score += player.maxRow;

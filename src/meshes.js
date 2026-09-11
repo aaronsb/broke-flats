@@ -222,3 +222,17 @@ export function makeFlatbed() {
   for (const sx of [-1.2, -0.4, 1.05]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
   return { mesh: g, len: 3.1, bed: [-1.55, 0.55], rideY: 0.45, offCause: 'hauled' };
 }
+
+// Baby chick follower. Modeled facing -z like the chicken.
+export function makeChick() {
+  const g = new THREE.Group();
+  const y = 0xffd93a, o = 0xf2a33a;
+  g.add(box(0.36, 0.32, 0.4, y, 0, 0.12, 0));            // body
+  g.add(box(0.3, 0.3, 0.28, y, 0, 0.4, -0.12));          // head
+  g.add(box(0.1, 0.08, 0.12, o, 0, 0.5, -0.3));          // beak
+  g.add(box(0.05, 0.06, 0.05, 0x111111, 0.1, 0.58, -0.2));
+  g.add(box(0.05, 0.06, 0.05, 0x111111, -0.1, 0.58, -0.2));
+  g.add(box(0.06, 0.14, 0.06, o, 0.08, 0, 0.02));        // legs
+  g.add(box(0.06, 0.14, 0.06, o, -0.08, 0, 0.02));
+  return g;
+}

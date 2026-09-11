@@ -24,6 +24,8 @@ export class Player {
     this.alive = true; this.deadBy = null; this.deadFor = 0;
     this.maxRow = 0;
     this.carrier = null;      // mover currently carrying the player (a log, say)
+    this.onLanded = null;     // hook: called after every landing
+    this.isOccupied = null;   // hook: (col, row) => true blocks a hop
     this.bump = 0;
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
@@ -36,7 +38,7 @@ export class Player {
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     const tc = Math.round(this.x) + dc;
     const tr = this.row + dr;
-    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr)) {
+    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr) || this.isOccupied?.(tc, tr)) {
       this.bump = 0.12;
       sfx.bump();
       return;
@@ -72,6 +74,8 @@ export class Player {
     if (lane.takeCoin(this.col)) this.gotCoin();
     if (this.carrier && Math.abs(this.x - this.carrier.x) < 0.6 && lane.takeMoverCoin(this.carrier)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
+    this.onLanded?.();
+    if (lane.takeEgg(this.col)) this.onEgg?.();
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
   }
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeGround, makeTree, makeCoin } from './meshes.js';
+import { makeGround, makeTree, makeCoin, makeEgg } from './meshes.js';
 import { rand } from './util.js';
 
 export const W = 8;          // playable columns run -W..W
@@ -16,6 +16,7 @@ export class Lane {
     this.group.position.z = -r;
     this.blocked = new Set();
     this.coins = new Map();
+    this.eggs = new Map();
     this.movers = [];
     this.dir = 0;
     this.speed = 0;
@@ -42,6 +43,16 @@ export class Lane {
   }
 
   coin(c) { this.coins.set(c, this.add(makeCoin(), c)); }
+
+  egg(c) { this.eggs.set(c, this.add(makeEgg(), c)); }
+
+  takeEgg(c) {
+    const egg = this.eggs.get(c);
+    if (!egg) return false;
+    this.group.remove(egg);
+    this.eggs.delete(c);
+    return true;
+  }
 
   takeCoin(c) {
     const coin = this.coins.get(c);
