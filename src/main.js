@@ -8,6 +8,7 @@ import { music } from './music.js';
 import { installDebug } from './debug.js';
 import { Select } from './select.js';
 import { installTouch } from './touch.js';
+import { readPlaytest, applyBeforeStart, applyAfterStart } from './playtest.js';
 
 // ---------- renderer ----------
 const canvas = document.getElementById('c');
@@ -43,6 +44,8 @@ if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
 const debugKey = installDebug(game, ui);
 installTouch(document.getElementById('hud'));
 let started = false;
+const playtest = readPlaytest();
+if (playtest) applyBeforeStart(game, playtest);
 game.preview();
 let select = new Select(scene, camera);
 select.setPicks(game.picks);
@@ -76,6 +79,20 @@ function toTitle() {
 let inserting = false;
 game.onTimeout = toTitle;
 
+// Playtest URLs can skip the title: straight into the run with the options applied.
+if (playtest?.start) {
+  started = true;
+  select.dispose();
+  select = null;
+  ui.title.classList.add('hide');
+  game.run.lives = 4;
+  game.start();
+  applyAfterStart(game, playtest);
+  if (playtest.debug) debugKey({ code: 'Backquote' });
+} else if (playtest?.debug) {
+  debugKey({ code: 'Backquote' });
+}
+
 // Attract music from the start: scheduled now, audible as soon as the
 // browser lets audio play (immediately, or on the first key or tap).
 music.start();
@@ -88,6 +105,7 @@ addEventListener('pointerdown', unlock);
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (!started) {
+    if (e.code === 'Backquote') { debugKey(e); return; }
     if (select.confirming) return;
     const changed = game.select(e);
     if (changed !== false) { select.setPicks(game.picks, changed); e.preventDefault(); return; }

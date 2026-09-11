@@ -139,6 +139,12 @@ if (script === 'traffic') {
     console.log('level ' + lv, await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road'); let minGap = 99, stallers = 0, n = 0, speed = 0; for (const l of rows) { const o = [...l.movers].sort((a, b) => a.x * l.dir - b.x * l.dir); n += o.length; speed += l.speed; for (const m of o) if (m.staller) stallers++; for (let i = 0; i + 1 < o.length; i++) { const g = (o[i+1].x - o[i].x) * l.dir - (o[i+1].len + o[i].len) / 2; minGap = Math.min(minGap, g); } } return { rows: rows.length, perLane: +(n / rows.length).toFixed(1), avgSpeed: +(speed / rows.length).toFixed(1), minGap: +minGap.toFixed(2), stallers }; })()`));
   }
 }
+if (script === 'playtest') {
+  await send('Page.navigate', { url: 'http://localhost:5173/?start&level=3&force=rail&god&coins=42&lives=7&chars=goose,pig' }); await sleep(3500);
+  console.log('playtest', await evaluate(`[__game.run.level, __game.run.coins, __game.run.lives, __game.roster.map(c => c.id).join('+'), __game.mode.players[0].invincible, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 12).map(l => l.scenario.id))].join(','), document.getElementById('level').textContent]`));
+  await send('Page.navigate', { url: 'http://localhost:5173/?battle&level=2' }); await sleep(3500);
+  console.log('battle url', await evaluate(`[__game.mode.constructor.name, __game.run.level]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

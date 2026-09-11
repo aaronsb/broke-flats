@@ -21,6 +21,7 @@ export function installDebug(game, ui) {
     if (e.code === 'Backquote') {
       game.debug.on = !game.debug.on;
       panel.hidden = !game.debug.on;
+      if (game.level) game.setLevel(game.run.level);   // refresh the DEBUG tag in the bar
       render();
       return true;
     }

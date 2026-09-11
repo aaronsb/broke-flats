@@ -44,6 +44,8 @@ make            # list all targets
 
 Pushes to `main` build and deploy to GitHub Pages.
 
+For jumping straight to a level, scenario, sky or character while playtesting, see [docs/playtest.md](docs/playtest.md).
+
 ## Layout
 
 - `src/game.js` holds the run record and switches modes.
