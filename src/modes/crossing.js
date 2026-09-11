@@ -2,11 +2,12 @@
 // the players and their chick trains; tears them down on exit. Only the run
 // record survives. Co-op: every roster entry is a player on the same board.
 import { World } from '../world.js';
-import { Player, BACK_LIMIT } from '../player.js';
+import { Player, BACK_LIMIT, DEATH_FLAP } from '../player.js';
 import { Train } from '../train.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
+import { rollVariant } from '../characters.js';
 
 const TILT_COST = 1;   // coins per second while peeking
 const LED_BONUS = 50;    // per follower led across the line
@@ -52,7 +53,8 @@ export class CrossingMode {
   buildPlayers() {
     const { scene, roster, run, debug } = this.game;
     this.players = roster.map((c, i) => {
-      const p = new Player(scene, this.world, c);
+      const variant = (run.variants[i] ??= rollVariant(c));
+      const p = new Player(scene, this.world, c, variant);
       p.index = i;
       p.invincible = debug.god;
       p.onCoin = () => { run.coins += 1; };
@@ -62,7 +64,7 @@ export class CrossingMode {
       return p;
     });
     this.trains = this.players.map((p, i) => {
-      const t = new Train(scene, this.world, p, roster[i].young, p.voice);
+      const t = new Train(scene, this.world, p, () => roster[i].young(p.variant), p.voice);
       p.onEgg = () => t.hatch();
       const flock = this.game.flockFor(i);
       t.waiting = flock.waiting;
@@ -208,7 +210,7 @@ export class CrossingMode {
 
     if (this.tally) { this.updateTally(dt); return; }
     if (this.finished) { this.startTally(front); return; }
-    for (const p of this.players) if (!p.alive && p.deadFor > 0.9) { this.respawn(p); return; }
+    for (const p of this.players) if (!p.alive && p.deadFor > DEATH_FLAP + 0.9) { this.respawn(p); return; }
   }
 
   // Crossing the line freezes the score tiers, then leaves a few seconds to

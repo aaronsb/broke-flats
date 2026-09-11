@@ -3,6 +3,7 @@
 // followers ride the same log or flatbed the leader did. A follower that gets
 // hit is not lost: it runs ahead to wait at the finish line and rejoins there.
 import { W, OFF_EDGE } from './lane.js';
+import { setFrame } from './characters.js';
 import { sfx } from './sfx.js';
 import { lerp, randInt } from './util.js';
 
@@ -121,7 +122,8 @@ export class Train {
         const s = Math.sin(Math.PI * t);
         k.mesh.position.set(lerp(k.from.x, tx, t), lerp(k.from.y, ty, t) + s * 0.4, lerp(k.from.z, tz, t));
         sy = 1 + 0.2 * s;
-        if (k.t >= 1) k.moving = false;
+        setFrame(k.mesh, t > 0.2 && t < 0.85 ? 1 : 0);
+        if (k.t >= 1) { k.moving = false; setFrame(k.mesh, 0); }
       } else {
         k.mesh.position.set(tx, ty, tz);
       }

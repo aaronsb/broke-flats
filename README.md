@@ -53,3 +53,7 @@ Pushes to `main` build and deploy to GitHub Pages.
 - `src/music.js` is an adaptive chiptune sequencer, `src/sfx.js` a tiny ADSR synth, `src/headlights.js` a fixed spotlight pool.
 
 Built with [three.js](https://threejs.org/) and Vite.
+
+## License
+
+[AGPL-3.0](LICENSE). Derivatives, including ones hosted as a service, must stay open source. The Press Start 2P font is bundled under its own [OFL](public/fonts/OFL.txt).

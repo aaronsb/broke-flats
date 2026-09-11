@@ -8,6 +8,7 @@ import {
 } from '../meshes.js';
 import { Footprints } from '../scenery/footprints.js';
 import { Debris } from '../debris.js';
+import { setFrame } from '../characters.js';
 import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
@@ -66,7 +67,7 @@ export class BattleMode {
     this.buildField(sky);
     const roster = this.game.roster;
     this.pilots = roster.map((c, i) => {
-      const mesh = c.make();
+      const mesh = c.make(this.game.run.variants[i]);
       this.group.add(mesh);
       return { mesh, cx: roster.length > 1 ? (i === 0 ? -2 : 2) : 0, cz: 0, cooldown: 0, keys: PILOT_KEYS[i] };
     });
@@ -209,6 +210,8 @@ export class BattleMode {
     egg.position.set(pilot.cx, 0.6, -pilot.cz);
     this.group.add(egg);
     this.eggs.push({ mesh: egg, x: pilot.cx, z: pilot.cz, z0: pilot.cz, aim: this.aim });
+    setFrame(pilot.mesh, 1);
+    setTimeout(() => setFrame(pilot.mesh, 0), 180);
     sfx.plink();
   }
 

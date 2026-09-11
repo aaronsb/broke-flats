@@ -27,25 +27,6 @@ export const HEDGE = 0x2f7a2f;
 const GREENS = [0x2e8b3d, 0x3da34a, 0x27703a, 0x46a852];
 const CAR_COLORS = [0xe0473a, 0x3a7be0, 0xf2c53d, 0xffffff, 0x8f3ae0, 0x3ac9a8, 0xf07f2b];
 
-// Modeled facing -z (screen-up in the top-down view).
-export function makeChicken() {
-  const g = new THREE.Group();
-  const white = 0xffffff, cream = 0xe8e8e8, orange = 0xf2a33a, red = 0xe03a2f;
-  g.add(box(0.6, 0.55, 0.75, white, 0, 0.25, 0));          // body
-  g.add(box(0.5, 0.5, 0.45, white, 0, 0.65, -0.25));        // head
-  g.add(box(0.15, 0.25, 0.3, red, 0, 1.15, -0.25));         // comb
-  g.add(box(0.16, 0.14, 0.2, orange, 0, 0.85, -0.55));      // beak
-  g.add(box(0.12, 0.2, 0.12, red, 0, 0.66, -0.5));          // wattle
-  g.add(box(0.08, 0.1, 0.08, 0x111111, 0.27, 0.95, -0.35)); // eyes
-  g.add(box(0.08, 0.1, 0.08, 0x111111, -0.27, 0.95, -0.35));
-  g.add(box(0.1, 0.3, 0.45, cream, 0.33, 0.35, 0.05));      // wings
-  g.add(box(0.1, 0.3, 0.45, cream, -0.33, 0.35, 0.05));
-  g.add(box(0.3, 0.25, 0.15, cream, 0, 0.5, 0.42));         // tail
-  g.add(box(0.1, 0.25, 0.1, orange, 0.15, 0, 0.05));        // legs
-  g.add(box(0.1, 0.25, 0.1, orange, -0.15, 0, 0.05));
-  return g;
-}
-
 const GLASS = 0x8fd0ff, TIRE = 0x222222;
 // Lamps are unlit so they read as glowing at night without any effect.
 const HEADLAMP = new THREE.MeshBasicMaterial({ color: 0xfff6c8 });
@@ -144,6 +125,17 @@ export function makeTunnel() {
   g.add(box(0.98, HEDGE_H - 1.0, 0.98, HEDGE, 0, 1.0));
   greeble(g, HEDGE_H);
   g.add(box(1, 0.05, 1, 0x4a2f14, 0, 0, 0, false));
+  return g;
+}
+
+const haloMat = new THREE.MeshBasicMaterial({ color: 0xffe36b });
+// A ring of eight little cubes.
+export function makeHalo() {
+  const g = new THREE.Group();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    g.add(box(0.14, 0.08, 0.14, haloMat, Math.cos(a) * 0.32, 0, Math.sin(a) * 0.32, false));
+  }
   return g;
 }
 

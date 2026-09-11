@@ -1,4 +1,5 @@
-import { makeChicken } from './meshes.js';
+import { makeChicken, setFrame } from './characters.js';
+import { makeHalo } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { DEATHS } from './deaths.js';
 import { sfx, voices } from './sfx.js';
@@ -9,11 +10,13 @@ export const BACK_LIMIT = 12; // rows allowed behind the furthest row reached
 
 const BURST_GAP = 0.32;   // hops closer than this count toward a burst
 const BURST_HOPS = 4;     // burst length that earns a call
+export const DEATH_FLAP = 0.8; // seconds of frame-flapping before the death pose
 
 export class Player {
-  constructor(scene, world, character = { make: makeChicken, voice: 'chicken' }) {
+  constructor(scene, world, character = { make: makeChicken, voice: 'chicken' }, variant) {
     this.world = world;
-    this.mesh = character.make();
+    this.variant = variant;
+    this.mesh = character.make(variant);
     this.voice = voices[character.voice];
     scene.add(this.mesh);
     this.reset();
@@ -36,6 +39,8 @@ export class Player {
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
     this.mesh.rotation.set(0, 0, 0);
+    if (this.halo) { this.mesh.remove(this.halo); this.halo = null; }
+    setFrame(this.mesh, 0);
   }
 
   hop(dc, dr) {
@@ -79,7 +84,10 @@ export class Player {
     this.deadFor = 0;
     this.moving = false;
     const spec = DEATHS[cause];
-    if (spec?.sfx) sfx[spec.sfx]?.();
+    // Sometimes the 80s way out: a stepped spin and a halo instead of the usual pose.
+    this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'squash');
+    if (this.deathAnim === 'halo') sfx.halo(); else if (spec?.sfx) sfx[spec.sfx]?.();
+    this.voice?.(0.85);
   }
 
   land() {
@@ -95,19 +103,35 @@ export class Player {
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
   }
 
+  // Flap between the two frames for a moment, then play the death pose.
   updateDead(dt) {
     const m = this.mesh;
     this.deadFor += dt;
-    const anim = DEATHS[this.deadBy]?.anim ?? 'squash';
-    if (anim === 'squash') {
-      const k = Math.min(1, this.deadFor / 0.12);
+    if (this.deadFor < DEATH_FLAP) {
+      setFrame(m, Math.floor(this.deadFor / 0.1) % 2);
+      m.position.y = this.y + Math.abs(Math.sin(this.deadFor * 30)) * 0.15;
+      return;
+    }
+    setFrame(m, 0);
+    const t = this.deadFor - DEATH_FLAP;
+    const anim = this.deathAnim;
+    if (anim === 'halo') {
+      // Quarter-turn steps, a slow rise, and a halo that climbs above the head.
+      m.rotation.y = this.facing + Math.floor(t / 0.16) * (Math.PI / 2);
+      m.position.y = this.y + t * 0.5;
+      if (!this.halo) { this.halo = makeHalo(); m.add(this.halo); }
+      this.halo.position.y = 1.35 + Math.min(0.6, t * 0.8);
+      this.halo.rotation.y = t * 2;
+    } else if (anim === 'squash') {
+      const k = Math.min(1, t / 0.12);
+      m.position.y = this.y;
       m.scale.set(1 + 0.5 * k, 1 - 0.88 * k, 1 + 0.5 * k);
     } else if (anim === 'sink') {
-      m.position.y = -Math.min(1.2, this.deadFor * 2.5);
-      m.rotation.z = this.deadFor * 3;
+      m.position.y = -Math.min(1.2, t * 2.5);
+      m.rotation.z = t * 3;
     } else if (anim === 'launch') {
-      m.position.y = this.deadFor * 12 - this.deadFor * this.deadFor * 9;
-      m.rotation.x = this.deadFor * 8;
+      m.position.y = t * 12 - t * t * 9;
+      m.rotation.x = t * 8;
     }
   }
 
@@ -126,6 +150,7 @@ export class Player {
       const s = Math.sin(Math.PI * t);
       this.y = lerp(this.from.y, 0, t) + s * 0.55;
       sy = 1 + 0.25 * s; sx = 1 - 0.12 * s;
+      setFrame(m, t > 0.2 && t < 0.85 ? 1 : 0);
       if (this.t >= 1) {
         this.moving = false;
         this.x = this.to.x; this.z = this.to.z; this.y = 0;

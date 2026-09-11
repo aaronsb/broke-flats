@@ -17,5 +17,6 @@
   },
   "allowScripts": {
     "esbuild@0.25.12": true
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

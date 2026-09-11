@@ -4,7 +4,7 @@
 // cards with a chime before the game begins.
 import * as THREE from 'three';
 import { box } from './meshes.js';
-import { CHARACTERS } from './characters.js';
+import { CHARACTERS, setFrame, rollVariant } from './characters.js';
 import { sfx } from './sfx.js';
 import { damp, lerp } from './util.js';
 
@@ -25,16 +25,16 @@ export class Select {
       g.add(box(1.7, 1.9, 0.12, CARD[i % CARD.length], 0, 0, -0.6));      // backdrop
       g.add(box(1.8, 0.1, 0.12, 0xffffff, 0, 1.9, -0.6));                  // top edge
       g.add(box(1.4, 0.15, 1.3, 0xdddddd, 0, 0, 0.1));                     // pedestal
-      const mesh = c.make();
+      const mesh = c.make(rollVariant(c));
       mesh.scale.setScalar(1.25);
-      mesh.position.set(0, 0.15, 0.1);
+      mesh.position.set(0, 0.22, 0.1);
       g.add(mesh);
       const ring1 = box(1.9, 0.06, 1.5, P1, 0, -0.06, 0.05);
       const ring2 = box(2.1, 0.06, 1.7, P2, 0, -0.1, 0.05);
       ring1.visible = ring2.visible = false;
       g.add(ring1, ring2);
       this.row.add(g);
-      return { group: g, mesh, ring1, ring2, spin: 0, blink: 0 };
+      return { group: g, mesh, ring1, ring2, spin: 0, blink: 0, flap: Math.random() * 3 };
     });
     scene.add(this.row);
     this.targetX = 0;
@@ -96,7 +96,9 @@ export class Select {
         const on = Math.floor((1 - c.blink) * 6) % 2 === 0;
         c.group.scale.setScalar(on ? 1.08 : 1);
       }
-      c.mesh.rotation.y = Math.sin(performance.now() / 700 + c.group.position.x) * 0.25;
+      c.mesh.rotation.y = Math.PI + Math.sin(performance.now() / 700 + c.group.position.x) * 0.25;   // face the camera
+      c.flap -= dt;
+      if (c.flap < 0) { c.flap = 2 + Math.random() * 3; setFrame(c.mesh, 1); setTimeout(() => setFrame(c.mesh, 0), 220); }
     }
     this.camera.update(dt, 0, ROW_Z - 0.4);
     if (this.confirming) {

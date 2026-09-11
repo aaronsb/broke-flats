@@ -23,7 +23,7 @@ export class Game {
     this.over = false;
     this.best = Number(localStorage.getItem('rc-best') || 0);
     this.ui.best.textContent = this.best;
-    this.run = { level: 1, score: 0, coins: START_COINS, flock: [], tries: 0 };
+    this.run = { level: 1, score: 0, coins: START_COINS, flock: [], tries: 0, variants: [] };
     this.debug = { on: false, force: null, sky: null, scenery: null, god: false };
     this.picks = [0];          // roster indices into CHARACTERS, one per player
   }
@@ -63,7 +63,7 @@ export class Game {
   flockFor(i) { return (this.run.flock[i] ??= { count: 0, waiting: 0 }); }
 
   start() {
-    this.run = { level: 1, score: 0, coins: START_COINS, flock: [], tries: 0 };
+    this.run = { level: 1, score: 0, coins: START_COINS, flock: [], tries: 0, variants: [] };
     this.over = false;
     this.ui.over.classList.remove('show');
     this.setLevel(1);
