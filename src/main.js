@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
 import { sfx } from './sfx.js';
+import { music } from './music.js';
 import { damp, lerp, clamp } from './util.js';
 
 // ---------- renderer ----------
@@ -89,6 +90,7 @@ function restart() {
   rig.position.set(0, 0, -3);
   player.coins = START_COINS;
   setTilt(false);
+  music.setMood({ dead: false, danger: false });
 }
 world.ensure(26);
 rig.position.set(0, 0, -3);
@@ -98,6 +100,7 @@ function begin() {
   started = true;
   sfx.unlock();
   sfx.start();
+  music.start();
   ui.title.classList.add('hide');
 }
 
@@ -121,6 +124,7 @@ addEventListener('keydown', (e) => {
   if (!started) { begin(); if (!KEYS[e.code]) return; }
   if (e.code === 'Space') { e.preventDefault(); setTilt(!tilted); return; }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { setTilt(true); return; }
+  if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
   if (e.code === 'KeyR' && over) { restart(); return; }
   const d = KEYS[e.code];
@@ -166,9 +170,15 @@ function frame(now) {
       ui.overCoins.textContent = `coins ${Math.floor(player.coins)}`;
       ui.over.classList.add('show');
       sfx.over();
+      music.setMood({ dead: true });
     }
   } else if (started) {
     world.update(dt, time);
+  }
+
+  if (started && !over) {
+    const lane = world.laneAt(player.moving ? player.trow : player.row);
+    music.setMood({ danger: !!lane && (lane.type === 'road' || lane.type === 'river'), tilted });
   }
 
   if (tilted && started && !over) {

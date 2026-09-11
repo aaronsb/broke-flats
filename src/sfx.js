@@ -4,7 +4,7 @@
 let ctx = null;
 let noiseBuf = null;
 
-function ac() {
+export function ac() {
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
