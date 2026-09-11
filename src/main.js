@@ -35,7 +35,7 @@ const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), coinCount: $('coin-count'), level: $('level'), card: $('card'), tries: $('tries'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'),
-  p1: $('p1'), p2: $('p2'),
+  p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
 };
 const game = new Game({ scene, camera, sky, ui, headlights });
 if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
@@ -45,18 +45,33 @@ game.preview();
 let select = new Select(scene, camera);
 select.setPicks(game.picks);
 
+// Insert coin: lives clink in, the picked cards blink, and the run starts.
 function begin() {
-  if (started) return;
+  if (started || select.confirming || inserting) return;
   sfx.unlock();
-  select.confirm(game.picks, () => {
+  inserting = true;
+  game.insertCoin(() => select.confirm(game.picks, () => {
     started = true;
+    inserting = false;
     select.dispose();
     select = null;
     music.start();
     ui.title.classList.add('hide');
     game.start();
-  });
+  })) || (inserting = false);
 }
+
+// Game over with no continue: back to the title, fresh coins.
+function toTitle() {
+  started = false;
+  game.mode?.exit();
+  game.mode = null;
+  game.newSession();
+  ui.title.classList.remove('hide');
+  select = new Select(scene, camera);
+  select.setPicks(game.picks);
+}
+let inserting = false;
 
 // ---------- input ----------
 addEventListener('keydown', (e) => {
@@ -65,18 +80,23 @@ addEventListener('keydown', (e) => {
     if (select.confirming) return;
     const changed = game.select(e);
     if (changed !== false) { select.setPicks(game.picks, changed); e.preventDefault(); return; }
-    if (e.code === 'Enter' || e.code === 'Space') begin();
+    if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyC') begin();
     return;
   }
   if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
   if (debugKey(e)) { e.preventDefault(); return; }
-  if (game.over) { if (e.code === 'KeyR') game.start(); return; }
+  if (game.over) {
+    if (e.code === 'KeyC') game.buyLife();
+    else if (e.code === 'Enter' || e.code === 'Space') game.resume();
+    else if (e.code === 'KeyR') toTitle();
+    return;
+  }
   if (game.mode.onKey(e)) e.preventDefault();
 });
 addEventListener('keyup', (e) => { if (started && !game.over) game.mode.onKeyUp(e); });
 ui.view.addEventListener('click', () => { begin(); if (!game.over) game.mode.onViewButton(); });
-$('retry').addEventListener('click', () => game.start());
+$('retry').addEventListener('click', () => { if (game.run.lives > 0) game.resume(); else if (!game.buyLife()) toTitle(); });
 
 let touchStart = null;
 canvas.addEventListener('pointerdown', (e) => { begin(); touchStart = { x: e.clientX, y: e.clientY }; });

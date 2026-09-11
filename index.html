@@ -25,6 +25,7 @@
     #over.show { display: flex; }
     #over h1 { font-size: 32px; margin: 0 0 12px; }
     #over p { font-size: 12px; margin: 8px 0; }
+    #over p.keys { font-size: 9px; opacity: .8; }
     #over button { margin-top: 22px; font: inherit; font-size: 12px; color: #fff; background: #d9702a; border: 3px solid #fff; border-radius: 4px; padding: 12px 18px; cursor: pointer; }
     #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; flex-direction: column; padding: 56px 0 60px; box-sizing: border-box; pointer-events: auto; }
     #title.hide { display: none; }
@@ -41,6 +42,7 @@
       <span>SCORE <b id="score">0</b></span>
       <span id="coins">● <b id="coin-count">0</b></span>
       <span id="level">LV <b>1</b> DAY</span>
+      <span>LIVES <b id="lives">0</b></span>
       <span>TRIES <b id="tries">0</b></span>
       <span id="chicks">FLOCK <b>0</b></span>
       <span>BEST <b id="best">0</b></span>
@@ -54,14 +56,15 @@
       <div class="picks">
         <p id="p1">P1  ◀ CHICKEN ▶   arrows</p>
         <p id="p2">P2  press A or D to join</p>
-        <p class="go">ENTER or tap to start</p>
+        <p class="go">INSERT COIN · ENTER or tap · 25 coins a life, 4 lives</p>
       </div>
     </div>
     <div id="over">
-      <h1 id="over-title">SPLAT</h1>
-      <p id="over-score">score 0</p>
-      <p id="over-coins">coins 0</p>
-      <button id="retry">AGAIN (R)</button>
+      <h1 id="over-title">GAME OVER</h1>
+      <p id="over-score">SCORE 0</p>
+      <p id="over-coins"></p>
+      <p class="keys">C insert coin · ENTER resume · R new game</p>
+      <button id="retry">INSERT COIN (C)</button>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

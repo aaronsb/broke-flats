@@ -24,7 +24,7 @@ await send('Runtime.enable');
 await send('Page.enable');
 await send('Page.navigate', { url: 'http://localhost:5173/' });
 await sleep(2500);
-const start = async () => { await key('Enter', 'Enter'); await sleep(2500); console.log('start', await state()); };
+const start = async () => { await key('Enter', 'Enter'); await sleep(4500); console.log('start', await state()); };
 const script = process.argv[2] ?? 'hops';
 if (script === 'hops') {
   await start();
@@ -35,6 +35,24 @@ if (script === 'hops') {
   await key('Space', ' ');  await sleep(300);
   for (let i = 0; i < 40; i++) { await key('ArrowUp'); await sleep(200); if ((await state()).over) break; }
   console.log('after run', await state());
+}
+if (script === 'lives') {
+  console.log('title', await evaluate(`[__game.run.coins, __game.run.lives]`));
+  await start();
+  console.log('started', await evaluate(`[__game.run.coins, __game.run.lives]`));
+  await evaluate(`__game.run.lives = 1; __game.run.coins = 30`);
+  await evaluate(`__game.mode.players[0].die('car')`); await sleep(3000);
+  console.log('one death', await evaluate(`[__game.run.lives, __game.over]`));
+  await evaluate(`__game.mode.players[0].die('car')`); await sleep(3000);
+  console.log('out of lives', await evaluate(`[__game.run.lives, __game.over, document.getElementById('over-coins').textContent]`));
+  await key('KeyC', 'c'); await sleep(300); await key('KeyC', 'c'); await sleep(300);
+  console.log('bought', await evaluate(`[__game.run.lives, __game.run.coins, __game.over, document.getElementById('retry').textContent]`));
+  await key('Enter', 'Enter'); await sleep(600);
+  console.log('resumed', await evaluate(`[__game.run.lives, __game.over]`));
+  await evaluate(`__game.run.lives = 0; __game.run.coins = 3; __game.mode.players[0].die('car')`); await sleep(3000);
+  console.log('broke', await evaluate(`[__game.over, document.getElementById('retry').textContent]`));
+  await key('KeyR', 'r'); await sleep(600);
+  console.log('new session', await evaluate(`[__game.run.coins, __game.run.lives, !document.getElementById('title').classList.contains('hide')]`));
 }
 if (script === 'respawn') {
   await start();

@@ -112,6 +112,9 @@ export const voices = Object.fromEntries(Object.keys(CALLS).map((k) => [k, (pitc
 export const sfx = {
   unlock: () => ac(),
   boom,
+  // Coin drop into the slot: two bright metallic blips.
+  clink: () => { voice({ wave: 'square', freq: N(91), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.03, release: 0.05, vol: 0.06 });
+                 setTimeout(() => voice({ wave: 'square', freq: N(96), attack: 0.002, decay: 0.04, sustain: 0.5, hold: 0.06, release: 0.08, vol: 0.06 }), 70); },
   // Ascending-soul chime: a slow descending triangle arpeggio with a shimmer.
   halo: () => { [84, 79, 76, 72].forEach((n, i) => setTimeout(() => voice({ wave: 'triangle', freq: N(n), attack: 0.01, decay: 0.05, sustain: 0.7, hold: 0.18, release: 0.25, vol: 0.06 }), i * 170));
                 voice({ wave: 'sine', freq: N(96), slideTo: N(100), attack: 0.2, decay: 0.2, sustain: 0.5, hold: 0.4, release: 0.4, vol: 0.03 }); },

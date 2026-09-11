@@ -86,6 +86,8 @@ export class CrossingMode {
     flock.count = 0; flock.waiting = t.waiting;
     const partner = this.alive()[0];
     if (!partner) { this.game.splat(p.deadBy); return; }
+    // With a partner still going, coming back costs a life; none left means sitting out.
+    if (!this.game.spendLife()) { p.gone = true; return; }
     let row = Math.max(0, partner.row - 2);
     while (row > 0 && this.world.laneAt(row)?.scenario.danger) row--;
     p.reset();
@@ -217,7 +219,7 @@ export class CrossingMode {
 
     if (this.tally) { this.updateTally(dt); return; }
     if (this.finished) { this.startTally(front); return; }
-    for (const p of this.players) if (!p.alive && p.deadFor > DEATH_FLAP + 0.9) { this.respawn(p); return; }
+    for (const p of this.players) if (!p.alive && !p.gone && p.deadFor > DEATH_FLAP + 0.9) { this.respawn(p); return; }
   }
 
   // Crossing the line freezes the score tiers, then leaves a few seconds to
