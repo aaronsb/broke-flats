@@ -133,7 +133,7 @@ export class Player {
     if (!lane) return;
     // A wing over this cell catches you before whatever is below can.
     const wing = this.world.wingAt(this.x, this.row);
-    if (wing) { this.mount(wing); this.onLanded?.(); return; }
+    if (wing) { this.mount(wing); this.onLanded?.(); this.onLandedHint?.(); return; }
     const cause = lane.scenario.onLand?.(lane, this);
     if (cause) { this.die(cause); return; }
     if (this.carrier) this.carrierOffset = this.x - this.carrier.x;
@@ -141,6 +141,7 @@ export class Player {
     if (this.carrier && Math.abs(this.x - this.carrier.x) < 0.6 && lane.takeMoverCoin(this.carrier)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
     this.onLanded?.();
+    this.onLandedHint?.();
     if (lane.takeEgg(this.col)) this.onEgg?.();
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
   }

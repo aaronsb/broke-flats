@@ -160,6 +160,12 @@ if (script === 'wing') {
   console.log('landed', await evaluate(`[!!__game.mode.players[0].airborne, Math.round(__game.mode.players[0].y * 10) / 10, __game.mode.players[0].row]`));
   console.log('spacing', await evaluate(`(() => { const rs = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'runway').map(l => l.r).sort((a, b) => a - b); let min = 99; for (let i = 1; i < rs.length; i++) min = Math.min(min, rs[i] - rs[i - 1]); return [rs.length, min]; })()`));
 }
+if (script === 'hint') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'hedge'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(220); }
+  console.log('hint', await evaluate(`[[...__game.mode.hinted], document.getElementById('view').classList.contains('hint')]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

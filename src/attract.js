@@ -10,7 +10,8 @@ const ROWS = 7;            // rows up the wall
 const ROW_BASE = -11;      // lowest row; the select camera sees the wall from about -11 to +3
 const ROW_GAP = 2.4;       // vertical spacing
 const HALF_W = 60;         // scroll span each side; wraps beyond this
-const SPACING = 4.2;       // along the row
+const SPACING = 7.5;       // along the row
+const DESATURATE = 0.3;    // pull backdrop colours 30% toward grey
 const WALL_Z = -13;
 
 const MAKERS = [
@@ -20,21 +21,40 @@ const MAKERS = [
   ...CHARACTERS.map((c) => () => c.make(rollVariant(c))),
 ];
 
+// A per-mesh material copy with its colour pulled toward its own grey.
+const toGrey = (c) => { const l = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b; c.lerp(new THREE.Color(l, l, l), DESATURATE); };
+function desaturate(material) {
+  const m = material.clone();
+  if (m.color) toGrey(m.color);
+  if (m.emissive) toGrey(m.emissive);
+  return m;
+}
+
 export class Attract {
   constructor(scene) {
     this.scene = scene;
     this.group = new THREE.Group();
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), new THREE.MeshBasicMaterial({ color: 0x27469a, fog: false }));
+    // Lit so the entities in front throw shadows onto it.
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(400, 80), new THREE.MeshLambertMaterial({ color: 0x3558b8, fog: false }));
     wall.position.set(0, 0, WALL_Z - 1.5);
+    wall.receiveShadow = true;
     this.group.add(wall);
     this.rows = [];
     for (let r = 0; r < ROWS; r++) {
       const dir = r % 2 ? -1 : 1;
       const row = { y: ROW_BASE + r * ROW_GAP, dir, speed: rand(1.4, 2.6), spin: rand(0.5, 1.1) * dir, phase: rand(0, 6.28), items: [] };
+      let last = -1;
       for (let x = -HALF_W; x < HALF_W; x += SPACING) {
-        const m = pick(...MAKERS)();
+        let i;
+        do i = Math.floor(Math.random() * MAKERS.length); while (i === last);   // no two alike in a row
+        last = i;
+        const m = MAKERS[i]();
         m.position.set(x + rand(-0.6, 0.6), row.y, WALL_Z);
-        m.traverse((o) => { o.castShadow = false; o.receiveShadow = false; });
+        m.traverse((o) => {
+          if (!o.isMesh) return;
+          o.castShadow = true; o.receiveShadow = false;
+          o.material = desaturate(o.material);
+        });
         this.group.add(m);
         row.items.push(m);
       }

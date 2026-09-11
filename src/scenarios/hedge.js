@@ -19,6 +19,7 @@ export default {
     let gap;
     do gap = randInt(-W, W); while (Math.abs(gap - tunnel) < 6);
     world.pathCol = tunnel;
+    lane.data.hidden = true;            // the tunnel only shows from the side
     for (let c = -W; c <= W; c++) {
       if (c === gap) continue;
       lane.add(c === tunnel ? makeTunnel() : makeHedge(), c);

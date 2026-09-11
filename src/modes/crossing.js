@@ -50,6 +50,7 @@ export class CrossingMode {
     this.tally = null;
     this.tilted = false;
     this.sinceTilt = 0;
+    this.hinted = new Set();     // rows already dinged for
     this.focus = { x: 0, z: 0 };
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
@@ -65,6 +66,8 @@ export class CrossingMode {
       p.index = i;
       p.invincible = debug.god;
       p.onCoin = () => { run.coins += 1; };
+      const landed = () => this.hintNearby(p);
+      p.onLandedHint = landed;
       p.onDie = (cause) => { if (cause === 'water') this.fx.splash(p.mesh.position); };
       p.isOccupied = (col, row) => this.blocked(p, col, row);
       const col = roster.length > 1 ? (i === 0 ? -1 : 1) : 0;
@@ -168,6 +171,21 @@ export class CrossingMode {
   }
 
   onViewButton() { this.setTilt(!this.tilted); }
+
+  // Once per hidden row: the TILT placard blinks twice and dings twice as the
+  // player comes within two rows of it.
+  hintNearby(p) {
+    for (const r of [p.row + 1, p.row + 2]) {
+      const lane = this.world.laneAt(r);
+      if (!lane?.data.hidden || this.hinted.has(r)) continue;
+      this.hinted.add(r);
+      const v = this.game.ui.view;
+      v.classList.remove('hint'); void v.offsetWidth; v.classList.add('hint');
+      setTimeout(() => v.classList.remove('hint'), 1000);
+      sfx.dingding();
+      return;
+    }
+  }
 
   // Vehicles on nearby road rows, for the headlight pool.
   emitters(focusRow) {

@@ -75,7 +75,22 @@ export default {
       if (m.kind !== 'taxi' && m.prevP !== undefined && m.prevP < 0.5 && p >= 0.5 && near) sfx.jet(m.kind === 'takeoff');
       m.prevP = p;
       m.y = y;
-      m.x += lane.dir * lane.speed * speed * dt;
+      m.v = speed;
+    }
+    // No overrunning on the ground: a plane closing on the one ahead matches its
+    // speed. Anything airborne may pass over.
+    const ordered = [...lane.movers].sort((a, b) => a.x * lane.dir - b.x * lane.dir);
+    for (let i = 0; i < ordered.length; i++) {
+      const m = ordered[i], ahead = ordered[(i + 1) % ordered.length];
+      if (ordered.length > 1 && m.y < 1 && ahead.y < 1) {
+        let gap = (ahead.x - m.x) * lane.dir - (ahead.len + m.len) / 2;
+        if (i === ordered.length - 1) gap += 2 * SPAN;
+        if (gap < 1.2) m.v = Math.min(m.v, ahead.v);
+      }
+    }
+    for (const m of lane.movers) {
+      const y = m.y;
+      m.x += lane.dir * lane.speed * m.v * dt;
       if (m.x > SPAN) m.x -= 2 * SPAN;
       if (m.x < -SPAN) m.x += 2 * SPAN;
       m.mesh.position.set(m.x, y, 0);

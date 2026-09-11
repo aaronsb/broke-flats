@@ -24,6 +24,7 @@ export default {
         // Under the canopy only, so the egg is never visible from straight above.
         const cc = c + pick(-1, 1);
         if (Math.random() < 0.4) lane.egg(cc); else lane.coin(cc);
+        lane.data.hidden = true;        // something under a roof: worth a peek
       }
     }
     for (let c = -W; c <= W; c++) {
