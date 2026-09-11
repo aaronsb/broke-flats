@@ -84,6 +84,7 @@ function restart() {
   over = false;
   ui.over.classList.remove('show');
   rig.position.set(0, 0, -3);
+  setTilt(false);
 }
 world.ensure(26);
 rig.position.set(0, 0, -3);
