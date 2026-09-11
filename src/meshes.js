@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { pick, rand } from './util.js';
+import { pick, rand, randInt } from './util.js';
 
 const unit = new THREE.BoxGeometry(1, 1, 1);
 const mats = new Map();
@@ -114,17 +114,30 @@ export function makeCoin() {
   return g;
 }
 
+const HEDGE_H = 1.5;
+
+// Random top clutter. Both hedge variants call this so the roofline is
+// indistinguishable from straight above.
+function greeble(g, top) {
+  const n = randInt(2, 4);
+  for (let i = 0; i < n; i++) {
+    const s = rand(0.18, 0.36);
+    g.add(box(s, rand(0.1, 0.22), s, pick(0x3a8c3a, 0x2a6e2a, 0x45a045), rand(-0.32, 0.32), top, rand(-0.32, 0.32)));
+  }
+}
+
 export function makeHedge() {
   const g = new THREE.Group();
-  g.add(box(0.98, 0.95, 0.98, HEDGE));
-  g.add(box(0.3, 0.12, 0.3, 0x3a8c3a, rand(-0.3, 0.3), 0.95, rand(-0.3, 0.3)));
+  g.add(box(0.98, HEDGE_H, 0.98, HEDGE));
+  greeble(g, HEDGE_H);
   return g;
 }
 
-// Roof matches the hedge so the gap is invisible from straight above.
+// Same footprint and roofline as a hedge, with a walk-through gap underneath.
 export function makeTunnel() {
   const g = new THREE.Group();
-  g.add(box(1, 0.35, 0.98, HEDGE, 0, 0.95));
+  g.add(box(0.98, HEDGE_H - 1.0, 0.98, HEDGE, 0, 1.0));
+  greeble(g, HEDGE_H);
   g.add(box(1, 0.05, 1, 0x4a2f14, 0, 0, 0, false));
   return g;
 }
