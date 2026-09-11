@@ -5,7 +5,7 @@ import { makeLog, makeRiverBoat, makeSub, makeGator, makeFirefly, makeFleck } fr
 import { W, SPAN } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { rand, randInt, pick, damp } from '../util.js';
-import { traffic } from '../tuning.js';
+import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
 registerDeath('chomped', { anim: 'flat', title: 'CHOMP', sfx: 'crack' });
 
@@ -16,16 +16,15 @@ const KINDS = {
   sub:   () => makeSub(),
   gator: () => makeGator(),
 };
-const COMPOSITIONS = [
-  { kinds: ['log'], w: 4 }, { kinds: ['boat'], w: 2 }, { kinds: ['gator'], w: 2 }, { kinds: ['sub'], w: 1 },
-  { kinds: ['log', 'boat', 'gator', 'sub'], w: 2 },
-];
+const WEIGHT = { log: 4, boat: 2, gator: 2, sub: 1 };
 const DIVE_CHANCE = { log: 0.35, sub: 1, gator: 0.4, boat: 0 };
 
-function pickComposition() {
-  let roll = Math.random() * COMPOSITIONS.reduce((a, c) => a + c.w, 0);
-  for (const c of COMPOSITIONS) { roll -= c.w; if (roll <= 0) return c.kinds; }
-  return ['log'];
+function pickComposition(level) {
+  const kinds = kindsFor('river', level);
+  if (mixesAllowed(level) && kinds.length > 1 && Math.random() < 0.25) return kinds;
+  let roll = Math.random() * kinds.reduce((a, k) => a + WEIGHT[k], 0);
+  for (const k of kinds) { roll -= WEIGHT[k]; if (roll <= 0) return [k]; }
+  return [kinds[0]];
 }
 
 // World-space test of a local x span on a mover, honouring its heading.
@@ -39,18 +38,18 @@ export default {
   danger: true,
   weight: 2,
   band: [1, 3],
-  build(lane, { sky, difficulty, gauntlet }) {
+  build(lane, { sky, difficulty, gauntlet, level }) {
     lane.ground(0x3f8fd6, -0.3, 0.2);
     lane.dir = pick(-1, 1);
     const tr = traffic(difficulty + lane.r / 120);
     lane.speed = rand(1.2, 2.2) * tr.speed;
-    const kinds = pickComposition();
+    const kinds = pickComposition(level);
     const diveBoost = Math.min(0.3, difficulty * 0.08);
     lane.spawnSpaced(randInt(...tr.count), () => {
       const kind = pick(...kinds);
       const m = KINDS[kind]();
       m.kind = kind;
-      if (Math.random() < DIVE_CHANCE[kind] + (kind === 'boat' ? 0 : diveBoost)) {
+      if (level >= 2 && Math.random() < DIVE_CHANCE[kind] + (kind === 'boat' ? 0 : diveBoost)) {
         m.diver = { period: rand(3.5, 6), phase: rand(0, 6), down: rand(1.0, 1.6) };
       }
       m.submerged = false;

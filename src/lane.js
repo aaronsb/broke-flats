@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { makeGround, makeCoin, makeEgg } from './meshes.js';
 import { rand } from './util.js';
+import { sfx } from './sfx.js';
 
 export const W = 8;          // playable columns run -W..W
 export const SPAN = W + 5;   // movers wrap at ±SPAN
@@ -90,7 +91,7 @@ export class Lane {
   // Place movers nose to tail with random gaps of gapMin..gapMin+gapVar,
   // dropping any that would not fit around the wrap. Stallers (per `stall`
   // chance) ease to a halt now and then and pull away again.
-  spawnSpaced(n, make, { gapMin, gapVar, stall = 0 }) {
+  spawnSpaced(n, make, { gapMin, gapVar, stall = 0, reckless = 0 }) {
     let x = -SPAN + rand(0, gapVar);
     for (let i = 0; i < n; i++) {
       const m = make(i);
@@ -98,6 +99,7 @@ export class Lane {
       if (x + m.len / 2 > SPAN - gapMin) break;
       m.x = x; m.v = 1;
       if (Math.random() < stall) m.staller = { phase: 'go', wait: rand(2, 7) };
+      else if (Math.random() < (reckless ?? 0)) m.reckless = true;   // never brakes: will rear-end a staller
       if (this.dir < 0) m.mesh.rotation.y = Math.PI;
       this.add(m.mesh, m.x);
       this.movers.push(m);
@@ -163,13 +165,24 @@ export class Lane {
       if (n > 1 && gapMin > 0) {
         let gap = (ahead.x - m.x) * this.dir - (ahead.len + m.len) / 2;
         if (i === n - 1) gap += 2 * SPAN;
-        if (gap < gapMin) v = Math.min(v, ahead.v ?? 1);
+        if (gap < gapMin && !m.reckless) v = Math.min(v, ahead.v ?? 1);
+        else if (gap < 0.05 && m.reckless && v > (ahead.v ?? 1) + 0.2) { this.crash(m, ahead); break; }
       }
       m.x += this.dir * this.speed * v * dt;
       if (m.x > SPAN) m.x -= 2 * SPAN;
       if (m.x < -SPAN) m.x += 2 * SPAN;
       m.mesh.position.x = m.x;
     }
+  }
+
+  // Two vehicles meet: both break apart and the lane runs one short for a while.
+  crash(a, b) {
+    const fx = this.world?.config?.fx;
+    for (const m of [a, b]) {
+      if (fx) fx.explode(m.mesh, 1.1); else this.group.remove(m.mesh);
+      this.movers = this.movers.filter((o) => o !== m);
+    }
+    sfx.boom(1.2);
   }
 
   spinCoins(time) {

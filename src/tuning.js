@@ -10,5 +10,19 @@ export function traffic(difficulty) {
     gapVar: lerp(3.0, 1.2, k),                 // random extra gap on top
     count: [Math.round(lerp(2, 3, k)), Math.round(lerp(3, 5, k))],
     stall: lerp(0.05, 0.55, k),                // chance a vehicle is a staller
+    reckless: lerp(-0.25, 0.35, k),            // chance a vehicle never brakes (negative = none yet)
   };
 }
+
+// Which kinds a lane may use at a given level, and whether it may mix them.
+// Level one is plain: logs and cars. The rest unlock as the levels climb.
+const UNLOCK = {
+  road:   { car: 1, truck: 2, flatbed: 3 },
+  river:  { log: 1, boat: 2, gator: 3, sub: 4 },
+  runway: { taxi: 1, takeoff: 2, landing: 3 },
+  rail:   { diesel: 1, steam: 2, bullet: 4 },
+};
+export function kindsFor(scenario, level) {
+  return Object.entries(UNLOCK[scenario]).filter(([, at]) => level >= at).map(([k]) => k);
+}
+export const mixesAllowed = (level) => level >= 3;

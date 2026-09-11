@@ -136,6 +136,15 @@ if (script === 'bounce') {
   await sleep(250);
   console.log('bounce', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].bounces ?? 0, Math.round(__game.mode.players[0].x)]`));
 }
+if (script === 'unlock') {
+  await start();
+  for (const lv of [1, 3, 6]) {
+    await evaluate(`__game.debug.on = true; __game.debug.god = true; __game.debug.force = null; __game.jumpLevel(${lv})`); await sleep(1500);
+    console.log('level ' + lv, await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()]; const kinds = {}; for (const l of rows) for (const m of l.movers) { const k = m.kind ?? m.type ?? (m.bed ? 'flatbed' : m.len > 2 ? 'truck' : 'car'); kinds[l.scenario.id + ':' + k] = (kinds[l.scenario.id + ':' + k] ?? 0) + 1; } return kinds; })()`));
+  }
+  await evaluate(`__game.debug.force = 'road'; __game.jumpLevel(9)`); await sleep(9000);
+  console.log('crashes', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road'); return [rows.reduce((a, l) => a + l.movers.filter(m => m.reckless).length, 0), __game.mode.fx.pieces.length + __game.mode.fx.puffs.length]; })()`));
+}
 if (script === 'traffic') {
   await start();
   for (const lv of [1, 6]) {

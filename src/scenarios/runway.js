@@ -8,7 +8,7 @@ import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
 import { sfx } from '../sfx.js';
-import { traffic } from '../tuning.js';
+import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
 registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat' });
 registerDeath('flown', { anim: 'launch', title: 'FLOWN OFF', sfx: 'splat' });
@@ -16,14 +16,13 @@ registerDeath('flown', { anim: 'launch', title: 'FLOWN OFF', sfx: 'splat' });
 const CLIMB = 4;          // height reached at the end of the row
 const LETHAL_BELOW = 1.0; // plane height under which it can hit you
 
-const COMPOSITIONS = [
-  { kinds: ['taxi'], w: 3 }, { kinds: ['takeoff'], w: 2 }, { kinds: ['landing'], w: 2 },
-  { kinds: ['taxi', 'takeoff', 'landing'], w: 2 },
-];
-function pickComposition() {
-  let roll = Math.random() * COMPOSITIONS.reduce((a, c) => a + c.w, 0);
-  for (const c of COMPOSITIONS) { roll -= c.w; if (roll <= 0) return c.kinds; }
-  return ['taxi'];
+const WEIGHT = { taxi: 3, takeoff: 2, landing: 2 };
+function pickComposition(level) {
+  const kinds = kindsFor('runway', level);
+  if (mixesAllowed(level) && kinds.length > 1 && Math.random() < 0.3) return kinds;
+  let roll = Math.random() * kinds.reduce((a, k) => a + WEIGHT[k], 0);
+  for (const k of kinds) { roll -= WEIGHT[k]; if (roll <= 0) return [k]; }
+  return [kinds[0]];
 }
 
 // Progress 0..1 along the row in the direction of travel.
@@ -45,7 +44,7 @@ export default {
   minGap: 3,
   keepGap: true,    // even when forced or in a gauntlet
   flank: ['meadow', 'road', 'road', 'river'],   // wings need flat rows either side
-  build(lane, { prev, sky, difficulty, gauntlet }) {
+  build(lane, { prev, sky, difficulty, gauntlet, level }) {
     lane.ground(0x3e3e46);
     for (let x = -GW / 2; x < GW / 2; x += 2) lane.add(box(1.1, 0.02, 0.12, 0xe8e8e8, x, 0, 0, false));   // centreline
     if (!prev || prev.scenario.id !== 'runway') {
@@ -54,7 +53,7 @@ export default {
     lane.dir = pick(-1, 1);
     const tr = traffic(difficulty + lane.r / 120);
     lane.speed = rand(2.5, 3.5) * tr.speed;
-    const kinds = pickComposition();
+    const kinds = pickComposition(level);
     lane.spawnMovers(Math.min(3, randInt(...tr.count)), () => {
       const m = makePlane();
       m.kind = pick(...kinds);

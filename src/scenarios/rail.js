@@ -8,7 +8,7 @@ import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { sfx } from '../sfx.js';
 import { rand, randInt, pick, damp } from '../util.js';
-import { traffic } from '../tuning.js';
+import { traffic, kindsFor } from '../tuning.js';
 import * as THREE from 'three';
 import { LEFT_HAND } from '../locale.js';
 
@@ -21,10 +21,11 @@ const TYPES = {
   diesel: { speed: [8, 11],  cars: ['flat', 'box', 'closed'], w: 4 },
   bullet: { speed: [13, 16], cars: ['closed'], w: 2 },
 };
-function pickType() {
-  let roll = Math.random() * Object.values(TYPES).reduce((a, t) => a + t.w, 0);
-  for (const [k, t] of Object.entries(TYPES)) { roll -= t.w; if (roll <= 0) return k; }
-  return 'diesel';
+function pickType(level) {
+  const allowed = kindsFor('rail', level);
+  let roll = Math.random() * allowed.reduce((a, k) => a + TYPES[k].w, 0);
+  for (const k of allowed) { roll -= TYPES[k].w; if (roll <= 0) return k; }
+  return allowed[0];
 }
 
 const puffMat = new THREE.MeshBasicMaterial({ color: 0xdedede, transparent: true, opacity: 0.85, depthWrite: false });
@@ -37,12 +38,12 @@ export default {
   band: [1, 1],
   minGap: 2,        // never back to back, even when forced: gates need a row between
   keepGap: true,
-  build(lane, { sky, difficulty, gauntlet }) {
+  build(lane, { sky, difficulty, gauntlet, level }) {
     lane.ground(0x6a645c);
     for (let x = -GW / 2; x < GW / 2; x += 0.7) lane.add(box(0.3, 0.06, 0.9, 0x5a3d24, x, 0, 0, false));   // sleepers
     for (const z of [-0.3, 0.3]) lane.add(box(GW, 0.08, 0.08, 0xb8b8b8, 0, 0.05, z, false));                // rails
     lane.dir = pick(-1, 1);
-    const type = pickType();
+    const type = pickType(level);
     const spec = TYPES[type];
     lane.speed = rand(...spec.speed) * (0.85 + traffic(difficulty).speed * 0.25);
     const n = randInt(2, 5);

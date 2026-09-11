@@ -36,14 +36,16 @@ export class CrossingMode {
 
   enter() {
     const { scene, level, sky } = this.game;
+    this.fx = new Debris(scene);
     this.world = new World(scene, {
       weights: this.game.stageWeights(), bands: level.bands, difficulty: level.difficulty, sky,
       scenery: this.game.scenery(),
+      level: level.number,
+      fx: this.fx,
       ignoreGaps: !!this.game.debug.force || !!this.game.run.gauntlet,
       gauntlet: this.game.run.gauntlet,
       onFinish: () => { this.finished = true; },
     });
-    this.fx = new Debris(scene);
     this.buildPlayers();
     this.world.ensure(26);
     this.finished = false;

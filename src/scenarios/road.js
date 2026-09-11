@@ -4,20 +4,19 @@ import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { W, GW } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
-import { traffic } from '../tuning.js';
+import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
 registerDeath('hauled', { anim: 'flat', title: 'HAULED OFF', sfx: 'splat' });
 
-// Lane compositions: usually one kind, sometimes a mix.
+// Lane compositions: usually one kind, sometimes a mix once the level allows it.
 const MAKERS = { car: makeCar, truck: makeTruck, flatbed: makeFlatbed };
-const COMPOSITIONS = [
-  { kinds: ['car'], w: 5 }, { kinds: ['truck'], w: 2 }, { kinds: ['flatbed'], w: 0.5 },
-  { kinds: ['car', 'truck'], w: 2 }, { kinds: ['car', 'truck', 'flatbed'], w: 1 },
-];
-function pickComposition() {
-  let roll = Math.random() * COMPOSITIONS.reduce((a, c) => a + c.w, 0);
-  for (const c of COMPOSITIONS) { roll -= c.w; if (roll <= 0) return c.kinds; }
-  return ['car'];
+const WEIGHT = { car: 5, truck: 2, flatbed: 0.5 };
+function pickComposition(level) {
+  const kinds = kindsFor('road', level);
+  if (mixesAllowed(level) && kinds.length > 1 && Math.random() < 0.28) return kinds;
+  let roll = Math.random() * kinds.reduce((a, k) => a + WEIGHT[k], 0);
+  for (const k of kinds) { roll -= WEIGHT[k]; if (roll <= 0) return [k]; }
+  return [kinds[0]];
 }
 
 export default {
@@ -25,7 +24,7 @@ export default {
   danger: true,
   weight: 4,
   band: [1, 4],
-  build(lane, { prev, sky, difficulty, gauntlet }) {
+  build(lane, { prev, sky, difficulty, gauntlet, level }) {
     lane.ground(0x4a4a52);
     if (prev && prev.scenario.id === 'road') {
       for (let x = -GW / 2; x < GW / 2; x += 1.5) lane.add(box(0.7, 0.02, 0.1, 0xdedede, x, 0, 0.5, false));
@@ -33,7 +32,7 @@ export default {
     lane.dir = pick(-1, 1);
     const tr = traffic(difficulty + lane.r / 120);
     lane.speed = rand(2, 4) * tr.speed;
-    const kinds = pickComposition();
+    const kinds = pickComposition(level);
     lane.spawnSpaced(randInt(...tr.count), () => MAKERS[pick(...kinds)](), tr);
     if (sky.headlights) for (const m of lane.movers) m.mesh.add(makeHeadlightCone(m.len * CONE));
     if (Math.random() < 0.3) lane.coin(randInt(-W + 1, W - 1));
