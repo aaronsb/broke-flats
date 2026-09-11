@@ -10,6 +10,7 @@ import { sfx } from '../sfx.js';
 import { rand, randInt, pick, damp } from '../util.js';
 import { traffic } from '../tuning.js';
 import * as THREE from 'three';
+import { LEFT_HAND } from '../locale.js';
 
 registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat' });
 
@@ -54,9 +55,13 @@ export default {
     Object.assign(lane.data, { train: t, wait: rand(3, 8), state: 'idle', puffs: [], puffClock: 0 });
     if (gauntlet) lane.bonusDrop();
     lane.data.signals = [-W - 1, W + 1].map((x) => { const s = lane.add(makeRailSignal(), x); s.position.z = 0.6; return s; });
+    // Each gate guards the lane approaching the track: with right-hand traffic
+    // the near-side (bottom) gate is on the right and the far-side gate on the
+    // left. Left-hand-traffic locales mirror that.
     lane.data.gates = [-1, 1].map((side) => {
       const g = lane.add(makeGate(GATE_ARM), side * (W + 0.6));
-      g.position.z = 0.55;
+      const nearSide = LEFT_HAND ? side < 0 : side > 0;
+      g.position.z = nearSide ? 0.55 : -0.55;
       if (side > 0) g.rotation.y = Math.PI;       // arm swings toward the centre from each side
       return g;
     });
