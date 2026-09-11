@@ -8,7 +8,7 @@ import * as THREE from 'three';
 export const SKIES = {
   day:    { bg: 0x8fd3ff, hemi: [0xcfe9ff, 0x6a8f3a, 0.7],  sun: [0xfff4e0, 1.6], sunPos: [-8, 22, 10], fog: [6, 34], label: 'DAY',
             horizon: { sea: 0x2f7fc9, far: 0x6d8fb8, near: 0x4d7a5a, cloud: 0xffffff, disc: 0xfff2a8, discY: 46 } },
-  sunset: { bg: 0xff9a5c, hemi: [0xffb37a, 0x5a4a3a, 0.6],  sun: [0xffb070, 1.4], sunPos: [-16, 9, 8],  fog: [6, 32], label: 'SUNSET',
+  sunset: { bg: 0xff9a5c, hemi: [0xffb37a, 0x5a4a3a, 0.5],  sun: [0xffb070, 1.0], sunPos: [-16, 9, 8],  fog: [6, 32], label: 'SUNSET', dusk: true,
             horizon: { sea: 0xd9683a, far: 0x7a3a6a, near: 0x4a2a4a, cloud: 0xffc9a0, disc: 0xffd36b, discY: 22 } },
   night:  { bg: 0x0b1230, hemi: [0x2a3a70, 0x0c1418, 0.45], sun: [0x8090ff, 0.35], sunPos: [6, 22, -4], fog: [4, 26], label: 'NIGHT', dark: true,
             horizon: { sea: 0x0e1e4a, far: 0x141c3e, near: 0x0a1028, cloud: 0x263258, disc: 0xe8ecff, discY: 50, stars: true } },
@@ -92,6 +92,7 @@ export class Sky {
   }
 
   get dark() { return !!SKIES[this.name].dark; }
+  get headlights() { const s = SKIES[this.name]; return !!(s.dark || s.dusk); }
 
   apply(name) {
     const s = SKIES[name];

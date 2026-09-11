@@ -47,6 +47,9 @@ export function makeChicken() {
 }
 
 const GLASS = 0x8fd0ff, TIRE = 0x222222;
+// Lamps are unlit so they read as glowing at night without any effect.
+const HEADLAMP = new THREE.MeshBasicMaterial({ color: 0xfff6c8 });
+const TAILLAMP = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
 
 // Vehicles are modeled driving toward +x.
 export function makeCar() {
@@ -56,10 +59,10 @@ export function makeCar() {
   g.add(box(0.85, 0.35, 0.78, GLASS, -0.05, 0.7, 0));
   g.add(box(0.9, 0.08, 0.82, color, -0.05, 1.05, 0));
   for (const sx of [-0.55, 0.55]) for (const sz of [-0.42, 0.42]) g.add(box(0.35, 0.3, 0.15, TIRE, sx, 0.05, sz));
-  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 0.86, 0.4, 0.28));  // headlights
-  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 0.86, 0.4, -0.28));
-  g.add(box(0.06, 0.12, 0.2, 0xff3b30, -0.86, 0.4, 0.28)); // tail lights
-  g.add(box(0.06, 0.12, 0.2, 0xff3b30, -0.86, 0.4, -0.28));
+  g.add(box(0.06, 0.15, 0.2, HEADLAMP, 0.86, 0.4, 0.28));  // headlights
+  g.add(box(0.06, 0.15, 0.2, HEADLAMP, 0.86, 0.4, -0.28));
+  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -0.86, 0.4, 0.28)); // tail lights
+  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -0.86, 0.4, -0.28));
   return { mesh: g, len: 1.7 };
 }
 
@@ -69,8 +72,10 @@ export function makeTruck() {
   g.add(box(0.9, 0.85, 0.9, color, 0.95, 0.25, 0));           // cab
   g.add(box(0.3, 0.35, 0.8, GLASS, 1.26, 0.7, 0));            // windshield
   g.add(box(1.9, 1.05, 0.95, 0xe6e6e6, -0.5, 0.25, 0));       // trailer
-  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 1.42, 0.35, 0.3));
-  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 1.42, 0.35, -0.3));
+  g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.42, 0.35, 0.3));
+  g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.42, 0.35, -0.3));
+  g.add(box(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, 0.35));
+  g.add(box(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, -0.35));
   for (const sx of [-1.15, -0.45, 1.0]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
   return { mesh: g, len: 2.9 };
 }
@@ -156,9 +161,9 @@ export function makeBoat() {
   g.add(box(0.9, 0.5, 0.7, 0xf4f4f4, -0.2, 0.1));          // cabin
   g.add(box(0.4, 0.3, 0.6, GLASS, 0.3, 0.15));             // windshield
   g.add(box(0.12, 0.5, 0.12, 0x333333, -0.5, 0.6));        // stack
-  g.add(box(0.14, 0.14, 0.14, lantern, 0.95, 0.15));        // bow lantern
-  g.add(box(0.12, 0.12, 0.12, navRed, -1.0, 0.25, 0.3));    // stern lights
-  g.add(box(0.12, 0.12, 0.12, navGreen, -1.0, 0.25, -0.3));
+  g.add(box(0.12, 0.12, 0.12, navRed, 0.95, 0.15, 0.3));    // bow: red port, green starboard
+  g.add(box(0.12, 0.12, 0.12, navGreen, 0.95, 0.15, -0.3));
+  g.add(box(0.14, 0.14, 0.14, lantern, -0.5, 1.1));         // masthead lantern
   return { mesh: g, len: 2.2 };
 }
 
@@ -173,7 +178,7 @@ export function makePlane() {
   g.add(box(0.5, 0.3, 0.45, GLASS, 0.6, 0.45));            // cockpit
   g.add(box(0.15, 0.12, 0.15, navRed, 0.1, 0.2, 1.15));     // wingtip lights
   g.add(box(0.15, 0.12, 0.15, navGreen, 0.1, 0.2, -1.15));
-  g.add(box(0.12, 0.12, 0.12, lantern, -1.05, 1.0, 0));     // tail beacon
+  g.add(box(0.12, 0.12, 0.12, navRed, -1.05, 1.0, 0));      // tail beacon
   return { mesh: g, len: 2.4 };
 }
 
@@ -188,12 +193,12 @@ export function makeEgg() {
 const navRed = new THREE.MeshBasicMaterial({ color: 0xff4040 });
 const navGreen = new THREE.MeshBasicMaterial({ color: 0x40ff60 });
 const lantern = new THREE.MeshBasicMaterial({ color: 0xfff0a0 });
-const coneMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.35, depthWrite: false });
-// Additive-looking light spill in front of a vehicle, facing +x.
-export function makeHeadlightCone(len = 2.2) {
+const coneMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.18, depthWrite: false });
+// Translucent light spill facing +x. Defaults sit it in front of a car.
+export function makeHeadlightCone(len = 2.2, x = len / 2 + 0.85, y = 0.05, z = 0, width = 1.3) {
   const m = new THREE.Mesh(unit, coneMat);
-  m.scale.set(len, 0.06, 1.3);
-  m.position.set(len / 2 + 0.85, 0.05, 0);
+  m.scale.set(len, 0.06, width);
+  m.position.set(x, y, z);
   return m;
 }
 
@@ -226,8 +231,10 @@ export function makeFlatbed() {
   g.add(box(2.1, 0.12, 0.08, 0x3a2c20, -0.5, 0.45, 0.44));    // side rails
   g.add(box(2.1, 0.12, 0.08, 0x3a2c20, -0.5, 0.45, -0.44));
   g.add(box(0.08, 0.5, 0.95, 0x3a2c20, 0.52, 0.45, 0));       // headboard
-  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 1.52, 0.35, 0.3));
-  g.add(box(0.06, 0.15, 0.2, 0xfff2a8, 1.52, 0.35, -0.3));
+  g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.52, 0.35, 0.3));
+  g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.52, 0.35, -0.3));
+  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, 0.35));
+  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, -0.35));
   for (const sx of [-1.2, -0.4, 1.05]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
   return { mesh: g, len: 3.1, bed: [-1.55, 0.55], rideY: 0.45, offCause: 'hauled' };
 }

@@ -79,6 +79,16 @@ export class CrossingMode {
 
   onViewButton() { this.setTilt(!this.tilted); }
 
+  // Vehicles on nearby road rows, for the headlight pool.
+  emitters() {
+    const out = [];
+    for (const lane of this.world.rows.values()) {
+      if (lane.scenario.id !== 'road' || Math.abs(lane.r - this.player.row) > 11) continue;
+      for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len });
+    }
+    return out;
+  }
+
   update(dt, time) {
     const { game, player, world } = this;
     player.update(dt);
@@ -102,6 +112,7 @@ export class CrossingMode {
     const lead = 3 + cam.tilt * 3;
     cam.update(dt, Math.max(-3, Math.min(3, player.x)) * 0.35, player.z - lead);
     game.sky.update(dt, player.x, player.z, cam.distance);
+    game.headlights.update(this.emitters(), player.z);
 
     game.run.coins = player.coins;
     game.hud(game.run.score + player.maxRow);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CameraRig } from './camera.js';
 import { Sky } from './sky.js';
+import { Headlights } from './headlights.js';
 import { Game } from './game.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
@@ -17,6 +18,7 @@ let pixelScale = 2; // render at 1/pixelScale resolution, upscale with nearest-n
 const scene = new THREE.Scene();
 const camera = new CameraRig(scene);
 const sky = new Sky(scene);
+const headlights = new Headlights(scene);
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -33,7 +35,7 @@ const ui = {
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'),
 };
-const game = new Game({ scene, camera, sky, ui });
+const game = new Game({ scene, camera, sky, ui, headlights });
 if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
 const debugKey = installDebug(game, ui);
 let started = false;

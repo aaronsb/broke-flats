@@ -11,10 +11,11 @@ import { music } from './music.js';
 const START_COINS = 4;
 
 export class Game {
-  constructor({ scene, camera, sky, ui }) {
+  constructor({ scene, camera, sky, ui, headlights }) {
     this.scene = scene;
     this.camera = camera;
     this.sky = sky;
+    this.headlights = headlights;
     this.ui = ui;
     this.mode = null;
     this.over = false;
@@ -38,6 +39,7 @@ export class Game {
     this.run.level = n;
     const skyName = this.debug.sky ?? this.level.sky;
     this.sky.apply(skyName);
+    this.headlights.enabled = this.sky.headlights;
     this.ui.level.textContent = `LV ${n} · ${SKIES[skyName].label}${this.debug.on ? ' · DEBUG' : ''}`;
   }
 

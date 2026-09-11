@@ -1,6 +1,7 @@
 // Traffic lanes. Cars and trucks wrap around; touching one is fatal.
 import { box, makeCar, makeTruck, makeFlatbed, makeHeadlightCone } from '../meshes.js';
 import { registerDeath } from '../deaths.js';
+import { CONE } from '../headlights.js';
 import { W, GW } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
 
@@ -33,7 +34,7 @@ export default {
     lane.dir = pick(-1, 1);
     lane.speed = rand(2, 4.5) + Math.min(3, difficulty + lane.r / 80);
     lane.spawnMovers(randInt(2, 4), pickVehicle);
-    if (sky.dark) for (const m of lane.movers) m.mesh.add(makeHeadlightCone(m.len < 2 ? 2.2 : 2.6));
+    if (sky.headlights) for (const m of lane.movers) m.mesh.add(makeHeadlightCone(m.len * CONE));
     if (Math.random() < 0.3) lane.coin(randInt(-W + 1, W - 1));
   },
   update(lane, dt) { lane.advance(dt); },

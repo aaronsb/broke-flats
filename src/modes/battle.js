@@ -6,6 +6,7 @@ import { makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeE
 import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
+import { CONE } from '../headlights.js';
 import { rand, pick, clamp } from '../util.js';
 
 const ROWS = { land: 4, sea: 8, air: 12 };            // z depth of each target row
@@ -36,7 +37,6 @@ export class BattleMode {
     this.keys = {};
     this.cooldown = 0;
     this.ending = 0;
-    this.dark = sky.dark;
 
     for (let r = -6; r <= 16; r++) {
       const g = r === ROWS.land ? makeGround(FIELD_W, 0x4a4a52)
@@ -105,7 +105,12 @@ export class BattleMode {
     t.x = -t.dir * (SPAN + 2);
     t.mesh.position.set(t.x, kind === 'air' ? 3.2 : 0, -t.z);
     if (t.dir < 0) t.mesh.rotation.y = Math.PI;
-    if (this.dark && kind === 'land') t.mesh.add(makeHeadlightCone(2.2));
+    if (this.game.sky.headlights) {
+      const reach = t.len * CONE;
+      if (kind === 'land') t.mesh.add(makeHeadlightCone(reach));
+      else if (kind === 'sea') t.mesh.add(makeHeadlightCone(reach, reach / 2 + 1.1, 0.1, 0, 0.9));
+      else for (const dz of [-1.15, 1.15]) t.mesh.add(makeHeadlightCone(reach, reach / 2 + 0.2, 0.15, dz, 0.5));
+    }
     this.group.add(t.mesh);
     this.targets.push(t);
   }
@@ -163,6 +168,11 @@ export class BattleMode {
     const tz = -VIEW[this.aim][1];
     game.camera.update(dt, this.cx * 0.3, tz);
     game.sky.update(dt, this.cx * 0.3, tz, game.camera.distance);
+    game.headlights.update(this.targets.filter((t) => t.dying === undefined).map((t) => (
+      t.kind === 'air' ? { x: t.x, z: -t.z, dir: t.dir, len: t.len, y: 3.35, front: 0.2, lateral: [-1.15, 1.15] }
+      : t.kind === 'sea' ? { x: t.x, z: -t.z, dir: t.dir, len: t.len, y: 0.15, front: 1.1 }
+      : { x: t.x, z: -t.z, dir: t.dir, len: t.len }
+    )), -ROWS.sea);
     game.hud(game.run.score + this.points);
 
     if (this.ending) {
