@@ -2,6 +2,10 @@
 
 Captured by `make shots` on 2026-09-11.
 
+## about
+
+![about.png](screenshots/about.png)
+
 ## battle-air
 
 ![battle-air.png](screenshots/battle-air.png)

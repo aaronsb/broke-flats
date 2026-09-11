@@ -37,7 +37,7 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), coinCount: $('coin-count'), level: $('level'), card: $('card'), tries: $('tries'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
-  title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'),
+  title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'), about: $('about'),
   p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
 };
 const game = new Game({ scene, camera, sky, ui, headlights });
@@ -100,6 +100,21 @@ if (playtest?.start) {
   debugKey({ code: 'Backquote' });
 }
 
+// About: a crawl over the title with its own epilogue theme.
+function openAbout() {
+  if (started || ui.about.classList.contains('show')) return;
+  sfx.unlock();
+  ui.about.classList.add('show');
+  music.reset({ epilogue: true });
+}
+function closeAbout() {
+  if (!ui.about.classList.contains('show')) return;
+  ui.about.classList.remove('show');
+  music.reset({ attract: true });
+}
+$('about-open').addEventListener('click', openAbout);
+$('about-close').addEventListener('click', closeAbout);
+
 // Attract music from the start: scheduled now, audible as soon as the
 // browser lets audio play (immediately, or on the first key or tap).
 music.start();
@@ -112,6 +127,8 @@ addEventListener('pointerdown', unlock);
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (!started) {
+    if (ui.about.classList.contains('show')) { if (e.code === 'Escape' || e.code === 'KeyI' || e.code === 'Enter') closeAbout(); return; }
+    if (e.code === 'KeyI') { openAbout(); return; }
     if (e.code === 'Backquote') { debugKey(e); return; }
     if (select.confirming) return;
     const changed = game.select(e);

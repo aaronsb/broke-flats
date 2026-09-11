@@ -6,29 +6,32 @@
   <title>Road Crosser</title>
   <style>
     @font-face { font-family: 'Arcade'; src: url('fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: swap; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; font-family: 'Arcade', ui-monospace, Menlo, Consolas, monospace; }
+    /* One text scale for the whole HUD: everything reads at --ui, the TILT placard at 2x. */
+    :root { --ui: 12px; --ui-big: 24px; --ink: #fff; --panel: #0c182c; --edge: #1b3a5a; --accent: #ffd23f; --hot: #d9702a; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; font-family: 'Arcade', ui-monospace, Menlo, Consolas, monospace; font-size: var(--ui); }
     canvas#c { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
-    #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 2px 2px 0 #1b3a5a; user-select: none; }
+    #hud { position: fixed; inset: 0; pointer-events: none; color: var(--ink); text-shadow: 2px 2px 0 var(--edge); user-select: none; font-size: var(--ui); line-height: 1.8; }
+    #hud button { font: inherit; font-size: var(--ui); color: var(--ink); background: var(--edge); border: 3px solid var(--ink); border-radius: 6px; padding: 10px 14px; cursor: pointer; pointer-events: auto; }
     /* Status bar across the top */
-    #bar { position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #0c182c; border-bottom: 3px solid #1b3a5a; font-size: 12px; letter-spacing: 1px; }
+    #bar { position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--panel); border-bottom: 3px solid var(--edge); letter-spacing: 1px; }
     #bar span { white-space: nowrap; }
-    #bar b { color: #ffd23f; font-weight: normal; }
+    #bar b { color: var(--accent); font-weight: normal; }
     #coins.draining b { animation: pulse .5s infinite alternate; display: inline-block; }
     @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
-    #card  { position: absolute; top: 58px; left: 0; right: 0; text-align: center; font-size: 16px; line-height: 1.8; }
-    #hint  { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 9px; opacity: .85; }
-    #view  { position: absolute; bottom: 40px; right: 16px; pointer-events: auto; font: inherit; font-size: 18px; color: #fff; background: #1b3a5a; border: 4px solid #fff; border-radius: 6px; padding: 16px 22px; cursor: pointer; }
-    #view.on { background: #d9702a; }
+    #card  { position: absolute; top: 58px; left: 0; right: 0; text-align: center; }
+    #hint  { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; opacity: .85; }
+    #hud #view { position: absolute; bottom: 44px; right: 16px; font-size: var(--ui-big); border-width: 4px; padding: 14px 20px; }
+    #view.on { background: var(--hot); }
     #view.broke { opacity: .45; }
     #view.nudge { animation: nudge .6s infinite alternate; }
+    @keyframes nudge { from { background: var(--edge); transform: scale(1); } to { background: var(--accent); color: var(--edge); transform: scale(1.1); } }
     #view.hint { animation: hintblink .25s 4 alternate; }
-    @keyframes hintblink { from { background: #1b3a5a; } to { background: #ffd23f; color: #1b3a5a; } }
-    @keyframes nudge { from { background: #1b3a5a; transform: scale(1); } to { background: #ffd23f; color: #1b3a5a; transform: scale(1.1); } }
-    #debug { position: absolute; bottom: 40px; left: 16px; font-size: 9px; line-height: 2; background: rgba(20, 40, 70, .8); border: 2px solid #fff; border-radius: 4px; padding: 8px 12px; }
+    @keyframes hintblink { from { background: var(--edge); } to { background: var(--accent); color: var(--edge); } }
+    #debug { position: absolute; bottom: 44px; left: 16px; background: rgba(20, 40, 70, .8); border: 2px solid var(--ink); border-radius: 4px; padding: 8px 12px; }
     /* Touch control bar: d-pad left, action cluster right. Only on coarse pointers. */
     #touchbar { position: absolute; left: 0; right: 0; bottom: 0; height: 150px; display: grid; grid-template-columns: 1fr 1fr; padding: 8px 14px 12px; box-sizing: border-box; pointer-events: none; }
-    #touchbar button { pointer-events: auto; font: inherit; font-size: 18px; color: #fff; background: rgba(12, 24, 44, .82); border: 3px solid #fff; border-radius: 8px; width: 52px; height: 52px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
-    #touchbar button.down { background: #d9702a; }
+    #touchbar button { font-size: var(--ui-big); background: rgba(12, 24, 44, .82); border-radius: 8px; width: 52px; height: 52px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #touchbar button.down { background: var(--hot); }
     #touchbar .pad { position: absolute; bottom: 12px; }
     #touchbar .pad.l { left: 14px; bottom: 56px; }
     #touchbar .pad.r { left: 126px; bottom: 56px; }
@@ -38,21 +41,33 @@
     #touchbar .act.a { right: 70px; bottom: 56px; width: 64px; height: 64px; background: rgba(217, 112, 42, .85); }
     #touchbar .act.b { right: 14px; bottom: 100px; }
     #touchbar .act.c { right: 14px; bottom: 12px; }
-    #touchbar .act.s { right: 150px; bottom: 12px; font-size: 14px; }
+    #touchbar .act.s { right: 150px; bottom: 12px; font-size: var(--ui); }
     body.touch #hint, body.touch #view, body.touch #debug { bottom: 158px; }
     body.touch #title { padding-bottom: 170px; }
+    /* Overlays */
     #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
     #over.show { display: flex; }
-    #over h1 { font-size: 32px; margin: 0 0 12px; }
-    #over p { font-size: 12px; margin: 8px 0; }
-    #over p.keys { font-size: 9px; opacity: .8; }
-    #over button { margin-top: 22px; font: inherit; font-size: 12px; color: #fff; background: #d9702a; border: 3px solid #fff; border-radius: 4px; padding: 12px 18px; cursor: pointer; }
+    #over h1 { font-size: var(--ui-big); margin: 0 0 12px; }
+    #over p { margin: 8px 0; }
+    #over p.keys { opacity: .8; }
+    #over button { margin-top: 22px; background: var(--hot); }
     #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; flex-direction: column; padding: 56px 0 60px; box-sizing: border-box; pointer-events: auto; }
     #title.hide { display: none; }
-    #title h1 { font-size: 36px; margin: 0; letter-spacing: 2px; text-shadow: 4px 4px 0 #1b3a5a; }
+    #title h1 { font-size: 36px; margin: 0; letter-spacing: 2px; text-shadow: 4px 4px 0 var(--edge); }
     #title .picks { text-align: center; }
-    #title p { font-size: 12px; margin: 14px 0 0; }
-    #title p.go { margin-top: 26px; opacity: .85; font-size: 10px; }
+    #title p { margin: 14px 0 0; }
+    #title p.go { margin-top: 26px; opacity: .85; }
+    #title button.about { position: absolute; bottom: 44px; left: 16px; }
+    /* About: a scrolling crawl in a panel */
+    #about { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8, 16, 32, .8); pointer-events: auto; }
+    #about.show { display: flex; }
+    #about .panel { width: min(680px, 90vw); height: min(70vh, 520px); background: var(--panel); border: 4px solid var(--ink); border-radius: 8px; overflow: hidden; position: relative; }
+    #about .crawl { position: absolute; left: 32px; right: 32px; top: 100%; line-height: 2.2; animation: crawl 75s linear infinite; }
+    #about.show .crawl { animation-play-state: running; }
+    #about .crawl p { margin: 0 0 1.6em; }
+    #about .crawl h2 { font-size: var(--ui); margin: 0 0 1.6em; color: var(--accent); }
+    @keyframes crawl { from { transform: translateY(0); } to { transform: translateY(calc(-100% - min(70vh, 520px))); } }
+    #about .close { position: absolute; bottom: 12px; right: 12px; }
   </style>
 </head>
 <body>
@@ -77,6 +92,27 @@
         <p id="p1">P1  ◀ CHICKEN ▶   arrows</p>
         <p id="p2">P2  press A or D to join</p>
         <p class="go">INSERT COIN · ENTER or tap · 25 coins a life, 4 lives</p>
+      </div>
+      <button class="about" id="about-open">ABOUT (I)</button>
+    </div>
+    <div id="about">
+      <div class="panel">
+        <div class="crawl">
+          <h2>ROAD CROSSER</h2>
+          <p>One afternoon a family went to the roller rink. In the corner, under the disco lights, stood a Crossy Road arcade cabinet.</p>
+          <p>Dad watched the kids play a round and thought: I bet I could build my own game like that with Claude, in a single session.</p>
+          <p>So that evening he did. The chicken hopped, the cars came, and the first version was playable before dinner was cold.</p>
+          <p>Then the kids got to play it. And the kids had ideas.</p>
+          <p>A tilt to peek in 3D. Coins that pay for the peeking. Hidden tunnels through the hedges. Eggs that hatch into followers who trail you like a snake. Boats, submarines, alligators. Planes you can ride on the wing. Trains with crossing gates. An arcade battle at the end of every level. Insert coin to continue.</p>
+          <p>Most of it went in the same day.</p>
+          <h2>MADE WITH</h2>
+          <p>three.js for the voxels. Vite for the build. Press Start 2P for the letters. Every sound and every note is synthesized in your browser as you play.</p>
+          <p>Written with Claude. Directed by a dad. Play-tested by the people who mattered.</p>
+          <h2>LICENSE</h2>
+          <p>AGPL-3.0. Fork it, change it, share it back.</p>
+          <p>Thanks for playing.</p>
+        </div>
+        <button class="close" id="about-close">CLOSE (ESC)</button>
       </div>
     </div>
     <div id="over">

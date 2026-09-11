@@ -181,6 +181,12 @@ if (script === 'cab') {
   if (r !== 'no flatbed') for (let i = 0; i < 2; i++) { await key(r[1] > 0 ? 'ArrowRight' : 'ArrowLeft'); await sleep(450); }
   console.log('cab', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].bounces ?? 0, !!__game.mode.players[0].carrier]`));
 }
+if (script === 'about') {
+  await key('KeyI', 'i'); await sleep(400);
+  console.log('about open', await evaluate(`[document.getElementById('about').classList.contains('show'), getComputedStyle(document.querySelector('#about .crawl p')).fontSize, getComputedStyle(document.getElementById('bar')).fontSize, getComputedStyle(document.getElementById('hint')).fontSize, getComputedStyle(document.getElementById('view')).fontSize]`));
+  await key('Escape', 'Escape'); await sleep(200);
+  console.log('about closed', await evaluate(`document.getElementById('about').classList.contains('show')`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);
@@ -235,6 +241,9 @@ if (script === 'shots') {
   const fs0 = await import('node:fs');
   await sleep(800);
   { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select.png`, Buffer.from(r.data, 'base64')); }
+  await key('KeyI', 'i'); await sleep(6000);
+  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/about.png`, Buffer.from(r.data, 'base64')); }
+  await key('Escape', 'Escape'); await sleep(300);
   await key('ArrowRight'); await sleep(400);
   { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select-spin.png`, Buffer.from(r.data, 'base64')); }
   await start();
