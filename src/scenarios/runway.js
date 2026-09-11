@@ -7,6 +7,7 @@ import { W, SPAN, GW } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
+import { sfx } from '../sfx.js';
 
 registerDeath('plane', { anim: 'squash', title: 'FLATTENED', sfx: 'splat' });
 
@@ -58,8 +59,13 @@ export default {
   },
 
   update(lane, dt) {
+    const near = Math.abs(lane.r - (lane.world?.focusRow ?? lane.r)) <= 7;
     for (const m of lane.movers) {
-      const { y, speed } = profile(m.kind, progress(lane, m));
+      const p = progress(lane, m);
+      const { y, speed } = profile(m.kind, p);
+      // Whoosh at the moment of lift-off or touchdown, if the row is close enough to hear.
+      if (m.kind !== 'taxi' && m.prevP !== undefined && m.prevP < 0.5 && p >= 0.5 && near) sfx.jet(m.kind === 'takeoff');
+      m.prevP = p;
       m.y = y;
       m.x += lane.dir * lane.speed * speed * dt;
       if (m.x > SPAN) m.x -= 2 * SPAN;

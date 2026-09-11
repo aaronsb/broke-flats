@@ -209,6 +209,7 @@ export class CrossingMode {
     cam.update(dt, tx, this.focus.z - lead);
     game.sky.update(dt, this.focus.x, this.focus.z, cam.distance);
     game.headlights.update(this.emitters(-this.focus.z), this.focus.z);
+    world.focusRow = -this.focus.z;
 
     const chicks = this.trains.reduce((a, t) => a + t.count, 0);
     const waiting = this.trains.reduce((a, t) => a + t.waiting, 0);
