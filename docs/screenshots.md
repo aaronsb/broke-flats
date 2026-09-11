@@ -38,6 +38,10 @@ Captured by `make shots` on 2026-09-11.
 
 ![night-top.png](screenshots/night-top.png)
 
+## rail-top
+
+![rail-top.png](screenshots/rail-top.png)
+
 ## rain-iso
 
 ![rain-iso.png](screenshots/rain-iso.png)
@@ -81,4 +85,8 @@ Captured by `make shots` on 2026-09-11.
 ## top
 
 ![top.png](screenshots/top.png)
+
+## touch
+
+![touch.png](screenshots/touch.png)
 

@@ -7,6 +7,7 @@ import { sfx } from './sfx.js';
 import { music } from './music.js';
 import { installDebug } from './debug.js';
 import { Select } from './select.js';
+import { Attract } from './attract.js';
 import { installTouch } from './touch.js';
 import { readPlaytest, applyBeforeStart, applyAfterStart } from './playtest.js';
 
@@ -49,6 +50,7 @@ if (playtest) applyBeforeStart(game, playtest);
 game.preview();
 let select = new Select(scene, camera);
 select.setPicks(game.picks);
+let attract = new Attract(scene);
 
 // Insert coin: lives clink in, the picked cards blink, and the run starts.
 function begin() {
@@ -60,6 +62,8 @@ function begin() {
     inserting = false;
     select.dispose();
     select = null;
+    attract.dispose();
+    attract = null;
     ui.title.classList.add('hide');
     game.start();
   })) || (inserting = false);
@@ -75,6 +79,7 @@ function toTitle() {
   ui.title.classList.remove('hide');
   select = new Select(scene, camera);
   select.setPicks(game.picks);
+  attract = new Attract(scene);
 }
 let inserting = false;
 game.onTimeout = toTitle;
@@ -84,6 +89,8 @@ if (playtest?.start) {
   started = true;
   select.dispose();
   select = null;
+  attract.dispose();
+  attract = null;
   ui.title.classList.add('hide');
   game.run.lives = 4;
   game.start();
@@ -143,7 +150,11 @@ function frame(now) {
   last = now;
   time += dt;
   if (started) game.update(dt, time);
-  else { select.update(dt); sky.update(dt, 0, -2, camera.distance); }
+  else if (select) {
+    attract.update(dt, time);
+    sky.update(dt, 0, -2, camera.distance);
+    select.update(dt);          // may end the title screen and null both
+  }
   renderer.render(scene, camera.camera);
   requestAnimationFrame(frame);
 }
