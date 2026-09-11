@@ -6,6 +6,11 @@ export const W = 8;          // playable columns run -W..W
 export const SPAN = W + 5;   // movers wrap at ±SPAN
 const GW = 44;               // ground width
 
+function spin(coin, time) {
+  coin.rotation.y = time * 1.4;
+  coin.position.y = Math.sin(time * 2.5) * 0.06;
+}
+
 export class World {
   constructor(scene) {
     this.scene = scene;
@@ -29,6 +34,13 @@ export class World {
 
   laneAt(r) { return this.rows.get(r); }
   isBlocked(c, r) { const lane = this.rows.get(r); return !!lane && lane.blocked.has(c); }
+
+  placeCoin(lane, c) {
+    const coin = makeCoin();
+    coin.position.x = c;
+    lane.group.add(coin);
+    lane.coins.set(c, coin);
+  }
 
   takeCoin(lane, c) {
     const coin = lane.coins.get(c);
@@ -94,11 +106,7 @@ export class World {
         t.position.x = c;
         lane.group.add(t);
         lane.blocked.add(c);
-        const cc = c + pick(-1, 1);
-        const coin = makeCoin();
-        coin.position.x = cc;
-        lane.group.add(coin);
-        lane.coins.set(cc, coin);
+        this.placeCoin(lane, c + pick(-1, 1));
       }
     }
     for (let c = -W; c <= W; c++) {
@@ -109,7 +117,7 @@ export class World {
         t.position.x = c;
         lane.group.add(t);
         lane.blocked.add(c);
-      }
+      } else if (Math.random() < 0.04) this.placeCoin(lane, c);
     }
   }
 
@@ -147,6 +155,7 @@ export class World {
       lane.group.add(mesh);
       lane.movers.push({ mesh, x, len });
     }
+    if (Math.random() < 0.3) this.placeCoin(lane, randInt(-W + 1, W - 1));
   }
 
   buildRiver(lane) {
@@ -161,8 +170,20 @@ export class World {
       const x = -SPAN + i * slot + rand(0.3, slot - len - 0.3);
       mesh.position.x = x;
       lane.group.add(mesh);
-      lane.movers.push({ mesh, x, len });
+      const mover = { mesh, x, len, coin: null };
+      if (Math.random() < 0.3) {
+        mover.coin = makeCoin();
+        mesh.add(mover.coin);          // rides along with the log
+      }
+      lane.movers.push(mover);
     }
+  }
+
+  takeLogCoin(mover) {
+    if (!mover.coin) return false;
+    mover.mesh.remove(mover.coin);
+    mover.coin = null;
+    return true;
   }
 
   moverAt(lane, x, pad) {
@@ -180,10 +201,8 @@ export class World {
         if (m.x < -SPAN) m.x += 2 * SPAN;
         m.mesh.position.x = m.x;
       }
-      for (const coin of lane.coins.values()) {
-        coin.rotation.y = time * 3;
-        coin.position.y = Math.sin(time * 4) * 0.06;
-      }
+      for (const coin of lane.coins.values()) spin(coin, time);
+      for (const m of lane.movers) if (m.coin) spin(m.coin, time);
     }
   }
 }

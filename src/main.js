@@ -33,6 +33,9 @@ rig.add(pivot);
 scene.add(rig);
 let tilted = false;
 let view = { tilt: 0, yaw: 0 };
+// Tilting costs time. Coins buy more.
+const START_TILT = 6, COIN_TILT = 3, MAX_TILT = 30;
+let tiltTime = START_TILT;
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -72,7 +75,9 @@ const ui = {
   overCoins: document.getElementById('over-coins'),
   title: document.getElementById('title'),
   view: document.getElementById('view'),
+  meter: document.getElementById('meter'),
 };
+player.onCoin = () => { tiltTime = Math.min(MAX_TILT, tiltTime + COIN_TILT); };
 ui.best.textContent = `BEST ${best}`;
 
 function restart() {
@@ -84,6 +89,7 @@ function restart() {
   over = false;
   ui.over.classList.remove('show');
   rig.position.set(0, 0, -3);
+  tiltTime = START_TILT;
   setTilt(false);
 }
 world.ensure(26);
@@ -99,6 +105,7 @@ function begin() {
 
 function setTilt(on) {
   if (on === tilted) return;
+  if (on && tiltTime <= 0) { sfx.bump(); return; }
   tilted = on;
   ui.view.classList.toggle('on', tilted);
   sfx.tilt();
@@ -165,6 +172,13 @@ function frame(now) {
   } else if (started) {
     world.update(dt, time);
   }
+
+  if (tilted && started && !over) {
+    tiltTime -= dt;
+    if (tiltTime <= 0) { tiltTime = 0; setTilt(false); }
+  }
+  ui.meter.style.width = `${(tiltTime / MAX_TILT) * 100}%`;
+  ui.meter.parentElement.classList.toggle('empty', tiltTime <= 0);
 
   // camera follow + view blend
   const goal = tilted ? ISO : TOP;

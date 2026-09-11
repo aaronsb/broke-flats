@@ -48,6 +48,12 @@ export class Player {
     sfx.hop();
   }
 
+  gotCoin() {
+    this.coins++;
+    sfx.coin();
+    if (this.onCoin) this.onCoin();
+  }
+
   die(how) {
     if (!this.alive) return;
     this.alive = false;
@@ -63,8 +69,9 @@ export class Player {
     if (lane.type === 'river') {
       this.onLog = this.world.logAt(lane, this.x);
       if (!this.onLog) { this.die('water'); return; }
+      if (Math.abs(this.x - this.onLog.x) < 0.6 && this.world.takeLogCoin(this.onLog)) this.gotCoin();
     }
-    if (this.world.takeCoin(lane, this.col)) { this.coins++; sfx.coin(); }
+    if (this.world.takeCoin(lane, this.col)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
   }
