@@ -11,7 +11,8 @@ import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
 import { GAUNTLET_BONUS } from '../game.js';
 
-const TILT_COST = 1;   // coins per second while peeking
+const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
+const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
 const LED_BONUS = 50;    // per follower led across the line
 const FOUND_BONUS = 20;  // per follower that made its own way to the finish
 const TALLY_TIME = 6;    // seconds to run around while the score counts up
@@ -48,6 +49,7 @@ export class CrossingMode {
     this.finished = false;
     this.tally = null;
     this.tilted = false;
+    this.sinceTilt = 0;
     this.focus = { x: 0, z: 0 };
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
@@ -134,6 +136,7 @@ export class CrossingMode {
     if (on === this.tilted) return;
     if (on && this.game.run.coins < 1) { sfx.bump(); return; }
     this.tilted = on;
+    this.sinceTilt = 0;
     this.game.ui.view.classList.toggle('on', on);
     this.game.camera.setGoal(on ? 'iso' : 'top');
     sfx.tilt();
@@ -200,6 +203,8 @@ export class CrossingMode {
     }
     game.ui.coins.classList.toggle('draining', this.tilted);
     game.ui.view.classList.toggle('broke', game.run.coins < 1);
+    this.sinceTilt += dt;
+    game.ui.view.classList.toggle('nudge', !this.tilted && game.run.coins >= 1 && this.sinceTilt > NUDGE_AFTER);
 
     // Camera: centre of the living players. Top-down barely follows x since
     // the whole width is on screen; tilted, it follows fully and keeps the
