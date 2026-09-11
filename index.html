@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Road Crosser</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+    canvas#c { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+    #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 2px 2px 0 #1b3a5a; user-select: none; }
+    #score { position: absolute; top: 14px; left: 18px; font-size: 40px; font-weight: 700; letter-spacing: 2px; }
+    #coins { position: absolute; top: 18px; right: 18px; font-size: 26px; font-weight: 700; }
+    #best  { position: absolute; top: 62px; left: 18px; font-size: 16px; opacity: .85; }
+    #hint  { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 14px; opacity: .85; }
+    #view  { position: absolute; bottom: 44px; right: 18px; pointer-events: auto; font: inherit; font-size: 16px; font-weight: 700; color: #fff; background: #1b3a5a; border: 3px solid #fff; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
+    #view.on { background: #d9702a; }
+    #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
+    #over.show { display: flex; }
+    #over h1 { font-size: 56px; margin: 0 0 8px; }
+    #over p { font-size: 22px; margin: 4px 0; }
+    #over button { margin-top: 22px; font: inherit; font-size: 20px; font-weight: 700; color: #fff; background: #d9702a; border: 3px solid #fff; border-radius: 6px; padding: 12px 22px; cursor: pointer; }
+    #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: auto; }
+    #title.hide { display: none; }
+    #title h1 { font-size: 64px; margin: 0; letter-spacing: 4px; }
+    #title p { font-size: 20px; margin: 10px 0 0; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div id="score">0</div>
+    <div id="best">BEST 0</div>
+    <div id="coins">● 0</div>
+    <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE tilt view &nbsp;·&nbsp; P pixel size</div>
+    <button id="view">TILT</button>
+    <div id="title">
+      <h1>ROAD CROSSER</h1>
+      <p>press any key or tap to start</p>
+    </div>
+    <div id="over">
+      <h1 id="over-title">SPLAT</h1>
+      <p id="over-score">score 0</p>
+      <p id="over-coins">coins 0</p>
+      <button id="retry">AGAIN (R)</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
