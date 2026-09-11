@@ -51,6 +51,7 @@ if (script === 'lives') {
   console.log('resumed', await evaluate(`[__game.run.lives, __game.over]`));
   await evaluate(`__game.run.lives = 0; __game.run.coins = 3; __game.mode.players[0].die('car')`); await sleep(3000);
   console.log('broke', await evaluate(`[__game.over, document.getElementById('retry').textContent, document.getElementById('over-title').textContent, !!__game.mode.players[0].xMark]`));
+  console.log('stray marks', await evaluate(`__game.scene.children.filter(o => o.children?.length === 2 && o.children.every(c => c.scale.x === 1.5)).length`));
   await evaluate(`__game.countdown = 0.05`); await sleep(800);
   console.log('timed out', await evaluate(`[__game.over, !document.getElementById('title').classList.contains('hide')]`));
   await key('KeyR', 'r'); await sleep(600);

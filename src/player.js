@@ -45,6 +45,13 @@ export class Player {
     setFrame(this.mesh, 0);
   }
 
+  // Remove everything this player put in the scene.
+  dispose() {
+    if (this.halo) { this.mesh.remove(this.halo); this.halo = null; }
+    if (this.xMark) { this.scene.remove(this.xMark); this.xMark = null; }
+    this.scene.remove(this.mesh);
+  }
+
   hop(dc, dr) {
     if (!this.alive) return;
     if (this.moving) { this.buffered = [dc, dr]; return; }

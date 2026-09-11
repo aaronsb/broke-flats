@@ -102,7 +102,7 @@ export class CrossingMode {
 
   // Swap characters while the title card is up.
   setRoster() {
-    for (const p of this.players) this.game.scene.remove(p.mesh);
+    for (const p of this.players) p.dispose();
     for (const t of this.trains) t.dispose();
     this.buildPlayers();
   }
@@ -111,7 +111,7 @@ export class CrossingMode {
     this.fx.dispose();
     this.world.dispose();
     for (const t of this.trains) t.dispose();
-    for (const p of this.players) this.game.scene.remove(p.mesh);
+    for (const p of this.players) p.dispose();
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
   }
