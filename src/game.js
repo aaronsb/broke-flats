@@ -11,6 +11,7 @@ import { sfx } from './sfx.js';
 import { music } from './music.js';
 
 const START_COINS = 4;
+const ODD_WEATHER = 0.1;   // chance the first level opens under a different sky
 
 export class Game {
   constructor({ scene, camera, sky, ui, headlights }) {
@@ -64,6 +65,8 @@ export class Game {
 
   start() {
     this.run = { level: 1, score: 0, coins: START_COINS, flock: [], tries: 0, variants: [] };
+    const others = Object.keys(SKIES).filter((k) => k !== levelFor(1).sky);
+    this.run.oddSky = Math.random() < ODD_WEATHER ? others[Math.floor(Math.random() * others.length)] : null;
     this.over = false;
     this.ui.over.classList.remove('show');
     this.setLevel(1);
@@ -74,7 +77,7 @@ export class Game {
   setLevel(n) {
     this.level = levelFor(n);
     this.run.level = n;
-    const skyName = this.debug.sky ?? this.level.sky;
+    const skyName = this.debug.sky ?? (n === 1 ? this.run.oddSky : null) ?? this.level.sky;
     this.sky.apply(skyName);
     this.headlights.enabled = this.sky.headlights;
     this.ui.level.innerHTML = `LV <b>${n}</b> ${SKIES[skyName].label}${this.debug.on ? ' <b>DEBUG</b>' : ''}`;
