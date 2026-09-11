@@ -104,6 +104,16 @@ if (script === 'runway') {
   await sleep(3000);
   console.log('runway', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'runway'); const kinds = {}; let high = 0; for (const l of rows) for (const m of l.movers) { kinds[m.kind] = (kinds[m.kind] ?? 0) + 1; if (m.y > 1) high++; } return [rows.length, kinds, high] })()`));
 }
+if (script === 'rail') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'rail'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
+  for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(180); }
+  await sleep(9000);
+  console.log('rail', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'rail'); const types = {}; for (const l of rows) types[l.data.train.type] = (types[l.data.train.type] ?? 0) + 1; return [rows.length, types, rows.filter(l => l.data.train.beds.length).length, rows.filter(l => l.blocked.size).length, rows.reduce((a, l) => a + l.data.puffs.length, 0)] })()`));
+  const fsR = await import('node:fs');
+  const r = await send('Page.captureScreenshot', { format: 'png' });
+  fsR.writeFileSync(`${process.env.OUT ?? '.'}/rail-top.png`, Buffer.from(r.data, 'base64'));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

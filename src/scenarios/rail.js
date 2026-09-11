@@ -1,0 +1,117 @@
+// Railway crossing. Empty most of the time; the gates drop over the outer
+// columns, the signal blinks and a horn sounds, then a train crosses. Steam
+// trains are slow and puff, diesels are middling, bullet trains are fast.
+// Flat cars and box-car doorways can be ridden; everything else is fatal.
+import { box, makeTrain, makeRailSignal, makeGate, makeHeadlightCone } from '../meshes.js';
+import { W, SPAN, GW } from '../lane.js';
+import { registerDeath } from '../deaths.js';
+import { CONE } from '../headlights.js';
+import { sfx } from '../sfx.js';
+import { rand, randInt, pick, damp } from '../util.js';
+import * as THREE from 'three';
+
+registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat' });
+
+const WARN = 2.0;         // seconds of gates and blinking before the train arrives
+const GATE_ARM = W - 2;   // arms leave the middle five columns open
+const TYPES = {
+  steam:  { speed: [5, 7],   cars: ['flat', 'box', 'closed', 'flat'], w: 3 },
+  diesel: { speed: [8, 11],  cars: ['flat', 'box', 'closed'], w: 4 },
+  bullet: { speed: [13, 16], cars: ['closed'], w: 2 },
+};
+function pickType() {
+  let roll = Math.random() * Object.values(TYPES).reduce((a, t) => a + t.w, 0);
+  for (const [k, t] of Object.entries(TYPES)) { roll -= t.w; if (roll <= 0) return k; }
+  return 'diesel';
+}
+
+const puffMat = new THREE.MeshBasicMaterial({ color: 0xdedede, transparent: true, opacity: 0.85, depthWrite: false });
+const unit = new THREE.BoxGeometry(1, 1, 1);
+
+export default {
+  id: 'rail',
+  danger: true,
+  weight: 1,
+  band: [1, 2],
+  minGap: 6,
+  build(lane, { sky, difficulty }) {
+    lane.ground(0x6a645c);
+    for (let x = -GW / 2; x < GW / 2; x += 0.7) lane.add(box(0.3, 0.06, 0.9, 0x5a3d24, x, 0, 0, false));   // sleepers
+    for (const z of [-0.3, 0.3]) lane.add(box(GW, 0.08, 0.08, 0xb8b8b8, 0, 0.05, z, false));                // rails
+    lane.dir = pick(-1, 1);
+    const type = pickType();
+    const spec = TYPES[type];
+    lane.speed = rand(...spec.speed) + Math.min(3, difficulty * 0.8);
+    const n = randInt(2, 5);
+    const t = makeTrain(type, Array.from({ length: n }, () => pick(...spec.cars)));
+    t.x = -lane.dir * (SPAN + t.len / 2 + 2);        // parked out of sight
+    if (lane.dir < 0) t.mesh.rotation.y = Math.PI;
+    t.mesh.position.x = t.x;
+    if (sky.headlights) t.mesh.add(makeHeadlightCone(t.len * CONE * 0.4, t.len / 2 + 0.9, 0.05, 0, 1.1));
+    lane.add(t.mesh);
+    lane.movers.push(t);
+    Object.assign(lane.data, { train: t, wait: rand(3, 8), state: 'idle', puffs: [], puffClock: 0 });
+    lane.data.signals = [-W - 1, W + 1].map((x) => { const s = lane.add(makeRailSignal(), x); s.position.z = 0.6; return s; });
+    lane.data.gates = [-1, 1].map((side) => {
+      const g = lane.add(makeGate(GATE_ARM), side * (W + 0.6));
+      g.position.z = 0.55;
+      if (side > 0) g.rotation.y = Math.PI;       // arm swings toward the centre from each side
+      return g;
+    });
+  },
+
+  update(lane, dt, time) {
+    const d = lane.data, t = d.train;
+    const near = Math.abs(lane.r - (lane.world?.focusRow ?? lane.r)) <= 7;
+    if (d.state === 'idle') {
+      d.wait -= dt;
+      if (d.wait <= 0) { d.state = 'warn'; d.wait = WARN; if (near) sfx.horn(); }
+    } else if (d.state === 'warn') {
+      d.wait -= dt;
+      if (d.wait <= 0) { d.state = 'run'; if (near) sfx.rumble(); }
+    } else {
+      t.x += lane.dir * lane.speed * dt;
+      t.mesh.position.x = t.x;
+      if (Math.abs(t.x) > SPAN + t.len / 2 + 2) {
+        t.x = -lane.dir * (SPAN + t.len / 2 + 2);
+        t.mesh.position.x = t.x;
+        d.state = 'idle';
+        d.wait = rand(5, 11);
+      }
+      if (t.type === 'steam' && (d.puffClock -= dt) <= 0) {
+        d.puffClock = 0.12;
+        const m = new THREE.Mesh(unit, puffMat);
+        m.scale.setScalar(0.25);
+        m.position.set(t.x + lane.dir * t.stackX, 1.75, 0);
+        lane.group.add(m);
+        d.puffs.push({ mesh: m, life: 1.1 });
+      }
+    }
+    for (const q of d.puffs) { q.life -= dt; q.mesh.position.y += dt * 1.4; q.mesh.position.x -= lane.dir * dt * 0.6; q.mesh.scale.setScalar(0.25 + (1.1 - q.life) * 0.5); }
+    d.puffs = d.puffs.filter((q) => { const gone = q.life <= 0; if (gone) lane.group.remove(q.mesh); return !gone; });
+
+    // Gates down while a train is due or passing; the outer columns are blocked.
+    const down = d.state !== 'idle';
+    const blink = down && Math.sin(time * 14) > 0;
+    for (const s of d.signals) s.lamp.material.color.set(blink ? 0xff2a1a : 0x3a0a0a);
+    for (const g of d.gates) {
+      g.pivot.rotation.z += ((down ? 0 : Math.PI / 2 - 0.15) - g.pivot.rotation.z) * damp(5, dt);
+      g.lamps.forEach((l, i) => l.material.color.set(down && (Math.sin(time * 14) > 0) === (i % 2 === 0) ? 0xff2a1a : 0x3a0a0a));
+    }
+    if (down !== d.wasDown) {
+      d.wasDown = down;
+      lane.blocked.clear();
+      if (down) for (let c = -W; c <= W; c++) if (Math.abs(c) > 2) lane.blocked.add(c);
+    }
+  },
+
+  lethalAt(lane, x) {
+    const m = lane.moverAt(x, 0.35);
+    return m && !lane.onBed(m, x) ? 'train' : null;
+  },
+  onLand(lane, player) {
+    const m = lane.moverAt(player.x, 0.35);
+    if (m && lane.onBed(m, player.x)) player.carrier = m;
+    return null;
+  },
+};

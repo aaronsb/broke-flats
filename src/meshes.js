@@ -399,3 +399,107 @@ export function makeFleck() {
   m.position.y = -0.27;
   return m;
 }
+
+// ---- trains (modeled moving toward +x) ----
+// type: 'steam' | 'diesel' | 'bullet'. Cars: 'flat' (ride anywhere on it),
+// 'box' (ride only through the open door), 'closed' (never). Returns the
+// rideable spans in local x so the rail scenario can test landings.
+const CAR_LEN = 1.9, GAP = 0.2;
+const wheels = (g, x, len, n = 2) => { for (let i = 0; i < n; i++) for (const sz of [-0.45, 0.45]) g.add(box(0.35, 0.35, 0.12, TIRE, x - len / 2 + 0.5 + i * (len - 1) / Math.max(1, n - 1), 0.05, sz)); };
+
+function engine(g, type, x, len) {
+  if (type === 'steam') {
+    g.add(box(len - 0.6, 0.8, 0.8, 0x1e1e22, x + 0.3, 0.3));       // boiler
+    g.add(box(0.9, 1.1, 0.9, 0x3a1e1e, x - len / 2 + 0.45, 0.2));    // cab at the back
+    g.add(box(0.28, 0.6, 0.28, 0x111111, x + len / 2 - 0.6, 1.1));   // stack
+    g.add(box(0.5, 0.5, 0.9, 0x555555, x + len / 2 - 0.1, 0.0));     // cowcatcher
+    g.add(box(0.08, 0.2, 0.2, HEADLAMP, x + len / 2 + 0.02, 0.8));
+    wheels(g, x, len, 3);
+    return { stackX: x + len / 2 - 0.6 };
+  }
+  if (type === 'diesel') {
+    g.add(box(len, 0.95, 0.9, 0x8a8f96, x, 0.25));                    // grey hood
+    g.add(box(0.9, 0.5, 0.92, 0xf2c53d, x - len / 2 + 0.6, 1.2));     // yellow cab roofline
+    g.add(box(len, 0.16, 0.94, 0xf2c53d, x, 0.55));                   // yellow stripe
+    g.add(box(0.6, 0.95, 0.94, 0xf2c53d, x + len / 2 - 0.3, 0.25));   // yellow nose
+    g.add(box(0.08, 0.2, 0.3, HEADLAMP, x + len / 2 + 0.02, 0.85));
+    wheels(g, x, len, 3);
+    return {};
+  }
+  g.add(box(len, 0.8, 0.86, 0xf4f4f4, x, 0.3));                       // bullet: white body
+  g.add(box(len, 0.14, 0.88, 0x2f5fb8, x, 0.55));                     // blue stripe
+  g.add(box(1.0, 0.5, 0.7, 0xf4f4f4, x + len / 2 - 0.2, 0.25));       // sloped nose
+  g.add(box(0.8, 0.25, 0.5, 0xf4f4f4, x + len / 2 + 0.3, 0.3));
+  g.add(box(0.08, 0.16, 0.2, HEADLAMP, x + len / 2 + 0.72, 0.4));
+  wheels(g, x, len, 2);
+  return {};
+}
+
+function car(g, kind, x, last) {
+  const beds = [];
+  if (kind === 'flat') {
+    g.add(box(CAR_LEN, 0.3, 0.9, 0x6b4a2f, x, 0.15));
+    g.add(box(CAR_LEN, 0.06, 0.6, 0x8a6a4a, x, 0.45));
+    beds.push([x - CAR_LEN / 2, x + CAR_LEN / 2]);
+  } else if (kind === 'box') {
+    const c = pick(0x8b2f2f, 0x2f4f8b, 0x6b4a2f, 0x3a6b3a);
+    g.add(box(CAR_LEN, 0.3, 0.9, 0x444444, x, 0.15));                 // floor
+    g.add(box(0.6, 0.85, 0.88, c, x - 0.65, 0.45));                    // walls either side of the door
+    g.add(box(0.6, 0.85, 0.88, c, x + 0.65, 0.45));
+    g.add(box(CAR_LEN, 0.1, 0.92, 0x333333, x, 1.3));                 // roof over the doorway
+    beds.push([x - 0.32, x + 0.32]);
+  } else {
+    const c = pick(0x555555, 0x8b6a2f, 0x2f4f8b);
+    g.add(box(CAR_LEN, 0.85, 0.88, c, x, 0.25));
+    g.add(box(CAR_LEN + 0.1, 0.08, 0.94, 0x333333, x, 1.1));
+  }
+  wheels(g, x, CAR_LEN, 2);
+  if (last) g.add(box(0.08, 0.16, 0.2, TAILLAMP, x - CAR_LEN / 2 - 0.02, 0.6));
+  return beds;
+}
+
+export function makeTrain(type = 'diesel', kinds = ['closed', 'closed']) {
+  const g = new THREE.Group();
+  const engineLen = type === 'bullet' ? 2.8 : 2.2;
+  const total = engineLen + kinds.length * (CAR_LEN + GAP);
+  let x = total / 2 - engineLen / 2;
+  const info = engine(g, type, x, engineLen);
+  x -= engineLen / 2 + GAP + CAR_LEN / 2;
+  const beds = [];
+  kinds.forEach((k, i) => { beds.push(...car(g, k, x, i === kinds.length - 1)); x -= CAR_LEN + GAP; });
+  return { mesh: g, len: total, beds, rideY: 0.45, offCause: 'hauled', type, stackX: info.stackX };
+}
+
+// Crossing gate: a post with an arm that swings down across the row, red
+// lamps alternating along the arm. The arm pivots at the post.
+export function makeGate(armLen) {
+  const g = new THREE.Group();
+  g.add(box(0.2, 1.3, 0.2, 0x555555, 0, 0));
+  g.add(box(0.4, 0.4, 0.3, 0x333333, 0, 1.3));
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 1.2, 0);
+  const arm = box(armLen, 0.12, 0.12, 0xffffff, armLen / 2, -0.06);
+  pivot.add(arm);
+  for (let x = 0.6; x < armLen; x += 0.7) pivot.add(box(0.3, 0.14, 0.14, 0xe0473a, x, -0.07));
+  const lamps = [];
+  for (let i = 0; i < 3; i++) {
+    const lamp = box(0.18, 0.18, 0.1, new THREE.MeshBasicMaterial({ color: 0x3a0a0a }), 0.9 + i * (armLen - 1.4) / 2, 0.06, 0.1, false);
+    pivot.add(lamp);
+    lamps.push(lamp);
+  }
+  g.add(pivot);
+  g.pivot = pivot;
+  g.lamps = lamps;
+  return g;
+}
+
+export function makeRailSignal() {
+  const g = new THREE.Group();
+  g.add(box(0.12, 1.6, 0.12, 0x555555, 0, 0));
+  g.add(box(0.5, 0.35, 0.16, 0x222222, 0, 1.6));
+  const lamp = box(0.22, 0.22, 0.1, new THREE.MeshBasicMaterial({ color: 0x3a0a0a }), 0, 1.66, 0.1, false);
+  g.add(lamp);
+  g.lamp = lamp;
+  g.add(box(0.7, 0.1, 0.06, 0xffffff, 0, 1.3, 0.08, false));  // crossbuck
+  return g;
+}

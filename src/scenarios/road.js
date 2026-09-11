@@ -19,13 +19,6 @@ function pickComposition() {
   return ['car'];
 }
 
-// World-space bed span of a flatbed, accounting for its heading.
-function onBed(lane, m, x) {
-  if (!m.bed) return false;
-  const a = m.x + lane.dir * m.bed[0], b = m.x + lane.dir * m.bed[1];
-  return x > Math.min(a, b) + 0.1 && x < Math.max(a, b) - 0.1;
-}
-
 export default {
   id: 'road',
   danger: true,
@@ -46,11 +39,11 @@ export default {
   update(lane, dt) { lane.advance(dt); },
   lethalAt(lane, x) {
     const m = lane.moverAt(x, 0.35);
-    return m && !onBed(lane, m, x) ? 'car' : null;
+    return m && !lane.onBed(m, x) ? 'car' : null;
   },
   onLand(lane, player) {
     const m = lane.moverAt(player.x, 0.35);
-    if (m && onBed(lane, m, player.x)) player.carrier = m;
+    if (m && lane.onBed(m, player.x)) player.carrier = m;
     return null;
   },
 };

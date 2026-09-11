@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {
   makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone,
-  makeTree, makeHedge, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
+  makeTrain, makeTree, makeHedge, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
 } from '../meshes.js';
 import { Footprints } from '../scenery/footprints.js';
 import { Debris } from '../debris.js';
@@ -13,7 +13,7 @@ import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { CONE } from '../headlights.js';
-import { rand, pick, clamp } from '../util.js';
+import { rand, randInt, pick, clamp } from '../util.js';
 
 const ROWS = { land: 4, sea: 8, air: 12 };            // z depth of each target row
 const POINTS = { land: 10, sea: 20, air: 30 };
@@ -216,14 +216,17 @@ export class BattleMode {
   }
 
   spawn(kind) {
-    const t = kind === 'land' ? (Math.random() < 0.3 ? makeTruck() : makeCar())
+    const train = kind === 'land' && Math.random() < 0.15;
+    const t = train ? makeTrain(pick('steam', 'diesel', 'bullet'), Array.from({ length: randInt(2, 4) }, () => 'closed'))
+      : kind === 'land' ? (Math.random() < 0.3 ? makeTruck() : makeCar())
       : kind === 'sea' ? makeBoat() : makePlane();
     t.kind = kind;
+    t.points = train ? 60 : POINTS[kind];
     t.dir = pick(-1, 1);
-    const base = kind === 'sea' ? rand(1.5, 2.5) : kind === 'air' ? rand(5, 7.5) : rand(3, 4.5);
+    const base = train ? rand(5, 7) : kind === 'sea' ? rand(1.5, 2.5) : kind === 'air' ? rand(5, 7.5) : rand(3, 4.5);
     t.speed = base + this.game.level.difficulty * 0.5;
     t.z = ROWS[kind];
-    t.x = -t.dir * (SPAN + 2);
+    t.x = -t.dir * (SPAN + 2 + t.len / 2);
     t.mesh.position.set(t.x, kind === 'air' ? 3.2 : 0, -t.z);
     if (t.dir < 0) t.mesh.rotation.y = Math.PI;
     if (this.game.sky.headlights) {
@@ -271,7 +274,7 @@ export class BattleMode {
       t.mesh.position.x = t.x;
     }
     this.targets = this.targets.filter((t) => {
-      const gone = Math.abs(t.x) > SPAN + 3;
+      const gone = Math.abs(t.x) > SPAN + 3 + t.len / 2;
       if (gone) this.group.remove(t.mesh);
       return !gone;
     });
@@ -291,7 +294,7 @@ export class BattleMode {
         this.debris.explode(t.mesh, 1.2);
         this.targets = this.targets.filter((q) => q !== t);
         e.z = 99;
-        this.points += POINTS[t.kind];
+        this.points += t.points;
         game.run.coins += 1;
         sfx.boom(t.kind === 'air' ? 1.3 : t.kind === 'sea' ? 0.8 : 1);
         if (t.kind === 'sea') sfx.splash();
