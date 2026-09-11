@@ -110,6 +110,8 @@ if (script === 'rail') {
   await evaluate(`__game.debug.on = true; __game.debug.force = 'rail'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(180); }
   await sleep(9000);
+  console.log('gate rules', await evaluate(`(() => { const l = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'rail'); l.data.down = true; const w = __game.mode.world; const r = l.r;
+    return { fromBelowLeftEnd: w.isBlocked(-6, r, r - 1), fromBelowRightEnd: w.isBlocked(6, r, r - 1), fromBelowMiddle: w.isBlocked(0, r, r - 1), fromAboveLeftEnd: w.isBlocked(-6, r, r + 1), fromAboveRightEnd: w.isBlocked(6, r, r + 1), exitUpRight: w.isBlocked(6, r + 1, r), exitUpLeft: w.isBlocked(-6, r + 1, r) }; })()`));
   console.log('gates', await evaluate(`(() => { const l = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'rail'); return l.data.gates.map(g => [Math.sign(g.position.x), g.position.z]); })()`));
   console.log('rail', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'rail'); const types = {}; for (const l of rows) types[l.data.train.type] = (types[l.data.train.type] ?? 0) + 1; return [rows.length, types, rows.filter(l => l.data.train.beds.length).length, rows.filter(l => l.blocked.size).length, rows.reduce((a, l) => a + l.data.puffs.length, 0)] })()`));
   const fsR = await import('node:fs');

@@ -45,7 +45,17 @@ export class World {
     }
     return null;
   }
-  isBlocked(c, r) { const lane = this.rows.get(r); return !!lane && lane.blocked.has(c); }
+  // Static blocks, plus scenario rules that depend on which row you come from
+  // (crossing gates block entry under an arm, and exit toward one).
+  isBlocked(c, r, fromRow = null) {
+    const lane = this.rows.get(r);
+    if (!lane) return false;
+    if (lane.blocked.has(c)) return true;
+    if (fromRow !== null && lane.scenario.blockedFrom?.(lane, c, fromRow)) return true;
+    const from = fromRow !== null ? this.rows.get(fromRow) : null;
+    if (from?.scenario.blockedExit?.(from, c, r)) return true;
+    return false;
+  }
 
   // ---- sequencer ----
   weightOf(s) { return this.config.weights[s.id] ?? 0; }

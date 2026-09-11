@@ -15,7 +15,7 @@ import { LEFT_HAND } from '../locale.js';
 registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat' });
 
 const WARN = 2.0;         // seconds of gates and blinking before the train arrives
-const GATE_ARM = W - 2;   // arms leave the middle five columns open
+const GATE_ARM = W + 1.6; // each arm reaches a cell past the centre: closed arms overlap two cells
 const TYPES = {
   steam:  { speed: [5, 7],   cars: ['flat', 'box', 'closed', 'flat'], w: 3 },
   diesel: { speed: [8, 11],  cars: ['flat', 'box', 'closed'], w: 4 },
@@ -34,8 +34,9 @@ export default {
   id: 'rail',
   danger: true,
   weight: 1,
-  band: [1, 2],
-  minGap: 6,
+  band: [1, 1],
+  minGap: 2,        // never back to back, even when forced: gates need a row between
+  keepGap: true,
   build(lane, { sky, difficulty, gauntlet }) {
     lane.ground(0x6a645c);
     for (let x = -GW / 2; x < GW / 2; x += 0.7) lane.add(box(0.3, 0.06, 0.9, 0x5a3d24, x, 0, 0, false));   // sleepers
@@ -105,11 +106,24 @@ export default {
       g.pivot.rotation.z += ((down ? 0 : Math.PI / 2 - 0.15) - g.pivot.rotation.z) * damp(5, dt);
       g.lamps.forEach((l, i) => l.material.color.set(down && (Math.sin(time * 14) > 0) === (i % 2 === 0) ? 0xff2a1a : 0x3a0a0a));
     }
-    if (down !== d.wasDown) {
-      d.wasDown = down;
-      lane.blocked.clear();
-      if (down) for (let c = -W; c <= W; c++) if (Math.abs(c) > 2) lane.blocked.add(c);
-    }
+    d.down = down;
+  },
+
+  // Columns under the near-side arm (guards entry from below) and the far-side arm.
+  // The arm on side s covers from its post to one cell past the centre.
+  covered(side, c) { return side > 0 ? c >= -1 : c <= 1; },
+  nearSide() { return LEFT_HAND ? -1 : 1; },
+  blockedFrom(lane, c, fromRow) {
+    if (!lane.data.down) return false;
+    if (fromRow === lane.r - 1) return this.covered(this.nearSide(), c);   // coming up from below
+    if (fromRow === lane.r + 1) return this.covered(-this.nearSide(), c);  // coming down from above
+    return false;
+  },
+  blockedExit(lane, c, toRow) {
+    if (!lane.data.down) return false;
+    if (toRow === lane.r - 1) return this.covered(this.nearSide(), c);
+    if (toRow === lane.r + 1) return this.covered(-this.nearSide(), c);
+    return false;
   },
 
   lethalAt(lane, x) {

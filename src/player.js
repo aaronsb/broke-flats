@@ -62,7 +62,7 @@ export class Player {
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     const tc = Math.round(this.x) + dc;
     const tr = this.row + dr;
-    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr) || this.isOccupied?.(tc, tr)) {
+    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr, this.row) || this.isOccupied?.(tc, tr)) {
       this.bump = 0.12;
       sfx.bump();
       return;
@@ -97,7 +97,7 @@ export class Player {
   bounce(lane) {
     const col = Math.round(this.x) - lane.dir;
     const row = this.moving ? this.trow : this.row;
-    if (Math.abs(col) > W || this.world.isBlocked(col, row) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
+    if (Math.abs(col) > W || this.world.isBlocked(col, row, row) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
     this.row = row; this.col = col;
     this.from = { x: this.x, z: this.z, y: this.y };
     this.to = { x: col, z: -row };
