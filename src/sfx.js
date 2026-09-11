@@ -112,6 +112,7 @@ export const voices = Object.fromEntries(Object.keys(CALLS).map((k) => [k, (pitc
 export const sfx = {
   unlock: () => ac(),
   boom,
+  tick: () => voice({ wave: 'square', freq: N(84), attack: 0.002, decay: 0.02, sustain: 0.3, hold: 0.02, release: 0.04, vol: 0.05 }),
   // Coin drop into the slot: two bright metallic blips.
   clink: () => { voice({ wave: 'square', freq: N(91), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.03, release: 0.05, vol: 0.06 });
                  setTimeout(() => voice({ wave: 'square', freq: N(96), attack: 0.002, decay: 0.04, sustain: 0.5, hold: 0.06, release: 0.08, vol: 0.06 }), 70); },

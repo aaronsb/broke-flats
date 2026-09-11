@@ -14,6 +14,7 @@ const SESSION_COINS = 100;   // every new session starts with a pocketful
 export const LIFE_COST = 25; // coins per life, at the slot or to continue
 const START_LIVES = 4;       // one coin buys this many
 const ODD_WEATHER = 0.1;     // chance the first level opens under a different sky
+const CONTINUE_TIME = 10;    // seconds to decide at game over
 
 export class Game {
   constructor({ scene, camera, sky, ui, headlights }) {
@@ -76,6 +77,7 @@ export class Game {
   resume() {
     if (this.run.lives <= 0) { sfx.bump(); return false; }
     this.over = false;
+    this.countdown = null;
     this.ui.over.classList.remove('show');
     this.restartStage();
     return true;
@@ -88,6 +90,7 @@ export class Game {
       ? `C INSERT COIN · ${LIFE_COST} OF YOUR ${coins} COINS BUYS A LIFE`
       : `NO COINS LEFT (${coins})`;
     this.ui.retry.textContent = lives > 0 ? 'RESUME (ENTER)' : coins >= LIFE_COST ? 'INSERT COIN (C)' : 'NEW GAME (R)';
+    if (this.countdown !== null && this.countdown !== undefined) this.ui.overTitle.textContent = `CONTINUE? ${Math.ceil(this.countdown)}`;
   }
 
   get roster() { return this.picks.map((i) => CHARACTERS[i]); }
@@ -183,10 +186,11 @@ export class Game {
     if (this.run.score > this.best) { this.best = this.run.score; localStorage.setItem('rc-best', this.best); }
     this.ui.best.textContent = this.best;
     this.ui.overTitle.textContent = 'GAME OVER';
+    this.countdown = CONTINUE_TIME;
     this.renderOver();
     this.ui.over.classList.add('show');
     sfx.over();
-    music.setMood({ dead: true });
+    music.setMood({ dead: true, countdown: 0 });
   }
 
   hud(score, flock = '') {
@@ -203,7 +207,17 @@ export class Game {
   }
 
   update(dt, time) {
-    if (this.over) { this.mode.world?.update(dt, time); return; }
+    if (this.over) {
+      this.mode.world?.update(dt, time);
+      if (this.countdown !== null) {
+        // The clock runs down and the music winds up with it.
+        this.countdown = Math.max(0, this.countdown - dt);
+        music.setMood({ dead: false, danger: true, countdown: 1 - this.countdown / CONTINUE_TIME });
+        if (Math.ceil(this.countdown) !== this.lastTick) { this.lastTick = Math.ceil(this.countdown); this.renderOver(); if (this.countdown > 0) sfx.tick(); }
+        if (this.countdown <= 0) { this.countdown = null; this.onTimeout?.(); }
+      }
+      return;
+    }
     this.mode.update(dt, time);
   }
 }

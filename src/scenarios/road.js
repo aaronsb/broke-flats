@@ -5,7 +5,7 @@ import { CONE } from '../headlights.js';
 import { W, GW } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
 
-registerDeath('hauled', { anim: 'squash', title: 'HAULED OFF', sfx: 'splat' });
+registerDeath('hauled', { anim: 'flat', title: 'HAULED OFF', sfx: 'splat' });
 
 // Lane compositions: usually one kind, sometimes a mix.
 const MAKERS = { car: makeCar, truck: makeTruck, flatbed: makeFlatbed };

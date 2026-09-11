@@ -72,6 +72,7 @@ function toTitle() {
   select.setPicks(game.picks);
 }
 let inserting = false;
+game.onTimeout = toTitle;
 
 // ---------- input ----------
 addEventListener('keydown', (e) => {

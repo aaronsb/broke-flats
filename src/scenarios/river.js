@@ -6,7 +6,7 @@ import { W, SPAN } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { rand, randInt, pick, damp } from '../util.js';
 
-registerDeath('chomped', { anim: 'squash', title: 'CHOMP', sfx: 'crack' });
+registerDeath('chomped', { anim: 'flat', title: 'CHOMP', sfx: 'crack' });
 
 // Lane compositions. One kind per lane is the norm; mixes are rarer.
 const KINDS = {

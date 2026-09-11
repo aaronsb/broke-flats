@@ -9,7 +9,7 @@ import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
 import { sfx } from '../sfx.js';
 
-registerDeath('plane', { anim: 'squash', title: 'FLATTENED', sfx: 'splat' });
+registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat' });
 
 const CLIMB = 4;          // height reached at the end of the row
 const LETHAL_BELOW = 1.0; // plane height under which it can hit you

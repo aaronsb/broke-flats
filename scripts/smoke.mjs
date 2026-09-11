@@ -50,7 +50,9 @@ if (script === 'lives') {
   await key('Enter', 'Enter'); await sleep(600);
   console.log('resumed', await evaluate(`[__game.run.lives, __game.over]`));
   await evaluate(`__game.run.lives = 0; __game.run.coins = 3; __game.mode.players[0].die('car')`); await sleep(3000);
-  console.log('broke', await evaluate(`[__game.over, document.getElementById('retry').textContent]`));
+  console.log('broke', await evaluate(`[__game.over, document.getElementById('retry').textContent, document.getElementById('over-title').textContent, !!__game.mode.players[0].xMark]`));
+  await evaluate(`__game.countdown = 0.05`); await sleep(800);
+  console.log('timed out', await evaluate(`[__game.over, !document.getElementById('title').classList.contains('hide')]`));
   await key('KeyR', 'r'); await sleep(600);
   console.log('new session', await evaluate(`[__game.run.coins, __game.run.lives, !document.getElementById('title').classList.contains('hide')]`));
 }

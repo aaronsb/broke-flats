@@ -25,7 +25,7 @@ const BATTLE_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [57, 60, 64]]; //
 let ctx, master, bus, delayBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
-let mood = { danger: false, tilted: false, dead: false, battle: false };
+let mood = { danger: false, tilted: false, dead: false, battle: false, countdown: 0 };
 let muted = false;
 
 function setup() {
@@ -112,7 +112,9 @@ const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, {
 // ---------- step sequencer ----------
 function scheduleStep(s, t) {
   const target = MOODS[mood.dead ? 'calm' : mood.battle ? 'battle' : mood.danger ? 'danger' : 'calm'];
-  bpm += (target.bpm - bpm) * 0.12;
+  // A running continue countdown pushes the tempo up toward the end.
+  const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : target.bpm;
+  bpm += (goalBpm - bpm) * 0.12;
   const beat = 60 / bpm, sixteenth = beat / 4;
   const prog = mood.battle ? BATTLE_PROG : mood.tilted ? PEEK_PROG : CALM_PROG;
   const chord = prog[bar % prog.length];
@@ -120,7 +122,7 @@ function scheduleStep(s, t) {
   const scale = mood.tilted ? LYDIAN : PENTA;
   const danger = (mood.danger || mood.battle) && !mood.dead;
 
-  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : target.cutoff, t, 0.2);
+  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff, t, 0.2);
 
   if (mood.dead) {
     if (s === 0) pad(chord, t, beat * 4);

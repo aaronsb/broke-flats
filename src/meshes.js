@@ -143,6 +143,19 @@ export function makeHalo() {
   return g;
 }
 
+const xMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
+// Two crossed bars lying flat, read from above.
+export function makeRedX(size = 1.5) {
+  const g = new THREE.Group();
+  for (const a of [Math.PI / 4, -Math.PI / 4]) {
+    const bar = new THREE.Mesh(unit, xMat);
+    bar.scale.set(size, 0.06, 0.16);
+    bar.rotation.y = a;
+    g.add(bar);
+  }
+  return g;
+}
+
 export function makeGround(width, color, top = 0, thick = 0.5) {
   return box(width, thick, 1, color, 0, top - thick, 0, false);
 }

@@ -1,5 +1,5 @@
 import { makeChicken, setFrame } from './characters.js';
-import { makeHalo } from './meshes.js';
+import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { DEATHS } from './deaths.js';
 import { sfx, voices } from './sfx.js';
@@ -14,6 +14,7 @@ export const DEATH_FLAP = 0.8; // seconds of frame-flapping before the death pos
 
 export class Player {
   constructor(scene, world, character = { make: makeChicken, voice: 'chicken' }, variant) {
+    this.scene = scene;
     this.world = world;
     this.variant = variant;
     this.mesh = character.make(variant);
@@ -40,6 +41,7 @@ export class Player {
     this.mesh.position.set(0, 0, 0);
     this.mesh.rotation.set(0, 0, 0);
     if (this.halo) { this.mesh.remove(this.halo); this.halo = null; }
+    if (this.xMark) { this.scene.remove(this.xMark); this.xMark = null; }
     setFrame(this.mesh, 0);
   }
 
@@ -85,7 +87,7 @@ export class Player {
     this.moving = false;
     const spec = DEATHS[cause];
     // Sometimes the 80s way out: a stepped spin and a halo instead of the usual pose.
-    this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'squash');
+    this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'flat');
     if (this.deathAnim === 'halo') sfx.halo(); else if (spec?.sfx) sfx[spec.sfx]?.();
     this.voice?.(0.85);
     this.onDie?.(cause);
@@ -123,10 +125,16 @@ export class Player {
       if (!this.halo) { this.halo = makeHalo(); m.add(this.halo); }
       this.halo.position.y = 1.35 + Math.min(0.6, t * 0.8);
       this.halo.rotation.y = t * 2;
-    } else if (anim === 'squash') {
-      const k = Math.min(1, t / 0.12);
-      m.position.y = this.y;
-      m.scale.set(1 + 0.5 * k, 1 - 0.88 * k, 1 + 0.5 * k);
+    } else if (anim === 'flat') {
+      // Knocked flat on its back, then a red X over it.
+      const k = Math.min(1, t / 0.15);
+      m.position.y = this.y + 0.05;
+      m.rotation.x = -k * (Math.PI / 2);
+      if (k >= 1 && !this.xMark) {
+        this.xMark = makeRedX();
+        this.xMark.position.set(this.x, this.y + 0.9, this.z);
+        this.scene.add(this.xMark);
+      }
     } else if (anim === 'sink') {
       m.position.y = -Math.min(1.2, t * 2.5);
       m.rotation.z = t * 3;
