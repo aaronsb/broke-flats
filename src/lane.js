@@ -4,6 +4,7 @@ import { rand } from './util.js';
 
 export const W = 8;          // playable columns run -W..W
 export const SPAN = W + 5;   // movers wrap at ±SPAN
+export const OFF_EDGE = 11.6; // carried this far is off screen and lost
 export const GW = 44;        // ground width
 
 // One board row. Scenarios fill it through these helpers; the board and the
@@ -43,7 +44,10 @@ export class Lane {
 
   coin(c) { this.coins.set(c, this.add(makeCoin(), c)); }
 
-  egg(c) { this.eggs.set(c, this.add(makeEgg(), c)); }
+  egg(c) {
+    this.eggs.set(c, this.add(makeEgg(), c));
+    if (this.world) this.world.data.eggsPlaced = (this.world.data.eggsPlaced ?? 0) + 1;
+  }
 
   takeEgg(c) {
     const egg = this.eggs.get(c);

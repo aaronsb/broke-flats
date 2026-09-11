@@ -46,9 +46,21 @@ Captured by `make shots` on 2026-09-11.
 
 ![rain-top.png](screenshots/rain-top.png)
 
+## select-spin
+
+![select-spin.png](screenshots/select-spin.png)
+
+## select
+
+![select.png](screenshots/select.png)
+
 ## sunset-iso
 
 ![sunset-iso.png](screenshots/sunset-iso.png)
+
+## tally
+
+![tally.png](screenshots/tally.png)
 
 ## top
 

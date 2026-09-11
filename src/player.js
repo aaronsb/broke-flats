@@ -1,16 +1,20 @@
 import { makeChicken } from './meshes.js';
-import { W } from './lane.js';
+import { W, OFF_EDGE } from './lane.js';
 import { DEATHS } from './deaths.js';
-import { sfx } from './sfx.js';
+import { sfx, voices } from './sfx.js';
 import { lerp } from './util.js';
 
 const HOP = 0.16;             // seconds per hop
 export const BACK_LIMIT = 12; // rows allowed behind the furthest row reached
 
+const BURST_GAP = 0.32;   // hops closer than this count toward a burst
+const BURST_HOPS = 4;     // burst length that earns a call
+
 export class Player {
-  constructor(scene, world) {
+  constructor(scene, world, character = { make: makeChicken, voice: 'chicken' }) {
     this.world = world;
-    this.mesh = makeChicken();
+    this.mesh = character.make();
+    this.voice = voices[character.voice];
     scene.add(this.mesh);
     this.reset();
   }
@@ -28,6 +32,7 @@ export class Player {
     this.isOccupied = null;   // hook: (col, row) => true blocks a hop
     this.invincible = false;
     this.bump = 0;
+    this.lastHop = -10; this.burst = 0; this.idle = 0;
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
     this.mesh.rotation.set(0, 0, 0);
@@ -50,11 +55,21 @@ export class Player {
     this.moving = true; this.t = 0;
     this.carrier = null;
     sfx.hop();
+    this.call();
+  }
+
+  // A run of quick hops earns a call from the character.
+  call() {
+    const now = performance.now() / 1000;
+    this.burst = now - this.lastHop < BURST_GAP ? this.burst + 1 : 1;
+    this.lastHop = now;
+    this.idle = 0;
+    if (this.burst >= BURST_HOPS && Math.random() < 0.6) { this.burst = 0; this.voice?.(); }
   }
 
   gotCoin() {
-    this.coins++;
     sfx.coin();
+    this.onCoin?.();
   }
 
   die(cause) {
@@ -100,6 +115,8 @@ export class Player {
     if (!this.alive) { this.updateDead(dt); return; }
     const m = this.mesh;
     let sx = 1, sy = 1;
+    this.idle += dt;
+    if (this.idle > 9 && Math.random() < dt * 0.15) { this.idle = 0; this.voice?.(); }
 
     if (this.moving) {
       this.t += dt / HOP;
@@ -121,7 +138,7 @@ export class Player {
         this.x += lane.dir * lane.speed * dt;
         this.col = Math.round(this.x);
         this.y = this.carrier.rideY ?? 0;
-        if (Math.abs(this.x) > W + 0.6) { this.die(this.carrier.offCause ?? 'water'); return; }
+        if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
     }

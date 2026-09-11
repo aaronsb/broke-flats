@@ -80,10 +80,48 @@ function boom(size = 1) {
   }, 35);
 }
 const pick = (...xs) => xs[Math.floor(Math.random() * xs.length)];
+const rand = (a, b) => a + Math.random() * (b - a);
+
+// Character calls. Each is a list of [delay, spec] steps; `pitch` scales
+// every frequency, so followers can chirp a baby version of the same call.
+const CALLS = {
+  chicken: [[0, { wave: 'square', freq: 620, slideTo: 900, attack: 0.004, decay: 0.03, sustain: 0.7, hold: 0.05, release: 0.04, vol: 0.07 }],
+            [110, { wave: 'square', freq: 820, slideTo: 480, attack: 0.004, decay: 0.05, sustain: 0.6, hold: 0.1, release: 0.08, vol: 0.07 }]],
+  goose:   [[0, { wave: 'sawtooth', freq: 210, slideTo: 320, attack: 0.02, decay: 0.05, sustain: 0.7, hold: 0.14, release: 0.08, vol: 0.07 }],
+            [180, { wave: 'sawtooth', freq: 300, slideTo: 190, attack: 0.01, decay: 0.05, sustain: 0.6, hold: 0.1, release: 0.1, vol: 0.06 }]],
+  duck:    [[0, { wave: 'sawtooth', freq: 330, slideTo: 210, attack: 0.005, decay: 0.04, sustain: 0.6, hold: 0.06, release: 0.06, vol: 0.06 }],
+            [140, { wave: 'sawtooth', freq: 330, slideTo: 210, attack: 0.005, decay: 0.04, sustain: 0.6, hold: 0.06, release: 0.06, vol: 0.06 }]],
+  frog:    [[0, { wave: 'square', freq: 140, slideTo: 260, attack: 0.02, decay: 0.05, sustain: 0.7, hold: 0.16, release: 0.1, vol: 0.07 }]],
+  pig:     [[0, { wave: 'sawtooth', freq: 260, slideTo: 170, attack: 0.01, decay: 0.05, sustain: 0.6, hold: 0.08, release: 0.06, vol: 0.06 }]],
+  cat:     [[0, { wave: 'triangle', freq: 720, slideTo: 460, attack: 0.03, decay: 0.1, sustain: 0.7, hold: 0.2, release: 0.15, vol: 0.07 }]],
+  robot:   [[0, { wave: 'square', freq: 880, attack: 0.002, decay: 0.02, sustain: 0.6, hold: 0.05, release: 0.02, vol: 0.05 }],
+            [90, { wave: 'square', freq: 1175, attack: 0.002, decay: 0.02, sustain: 0.6, hold: 0.07, release: 0.03, vol: 0.05 }]],
+};
+
+export function call(name, pitch = 1) {
+  for (const [delay, spec] of CALLS[name] ?? []) {
+    const v = { ...spec, freq: vary(spec.freq, 0.1) * pitch };
+    if (spec.slideTo) v.slideTo = spec.slideTo * pitch;
+    if (pitch > 1) { v.hold *= 0.7; v.release *= 0.7; }
+    setTimeout(() => voice(v), delay / (pitch > 1 ? 1.4 : 1));
+  }
+}
+
+export const voices = Object.fromEntries(Object.keys(CALLS).map((k) => [k, (pitch = 1) => call(k, pitch)]));
 
 export const sfx = {
   unlock: () => ac(),
   boom,
+  // Structural crack: a sharp noise snap over a low thud.
+  crack: () => { voice({ wave: 'noise', freq: vary(2400, 0.2), slideTo: 400, filter: 'bandpass', attack: 0.001, decay: 0.03, sustain: 0.4, hold: 0.02, release: 0.08, vol: 0.12 });
+                 voice({ wave: 'square', freq: vary(70, 0.2), slideTo: 40, attack: 0.002, decay: 0.05, sustain: 0.5, hold: 0.06, release: 0.12, vol: 0.08 }); },
+  // Smoke whoosh: a lowpassed noise swell that sinks.
+  puff: () => voice({ wave: 'noise', freq: vary(700, 0.2), slideTo: 160, filter: 'lowpass', attack: 0.04, decay: 0.1, sustain: 0.6, hold: 0.12, release: 0.3, vol: 0.09 }),
+  // Fire crackle: a handful of tiny bright noise ticks at random times.
+  crackle: () => { for (let i = 0; i < 5; i++) setTimeout(() => voice({ wave: 'noise', freq: vary(3500, 0.3), filter: 'highpass', attack: 0.001, decay: 0.01, sustain: 0.3, hold: 0.005, release: 0.02, vol: 0.05 }), rand(40, 520)); },
+  // "Dee-doo" confirmation chime.
+  confirm: () => { voice({ wave: 'square', freq: N(76), attack: 0.003, decay: 0.03, sustain: 0.7, hold: 0.08, release: 0.06, vol: 0.07 });
+                   setTimeout(() => voice({ wave: 'square', freq: N(83), attack: 0.003, decay: 0.03, sustain: 0.7, hold: 0.16, release: 0.12, vol: 0.07 }), 130); },
   plink: () => voice({ wave: 'triangle', freq: vary(1500, 0.12), slideTo: 650, attack: 0.001, decay: 0.03, sustain: 0.3, hold: 0.01, release: 0.05, vol: 0.06 }),
   hop: () => voice({ wave: 'square', freq: vary(N(72), 0.03), slideTo: N(79), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.01, release: 0.05, vol: 0.06 }),
   bump: () => voice({ wave: 'square', freq: N(45), slideTo: N(40), attack: 0.002, decay: 0.05, sustain: 0.3, hold: 0.02, release: 0.06, vol: 0.07 }),

@@ -3,10 +3,11 @@
 // Timed. Ends the level and hands the run record to the next one.
 import * as THREE from 'three';
 import {
-  makeChicken, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone,
+  makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone,
   makeTree, makeHedge, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
 } from '../meshes.js';
 import { Footprints } from '../scenery/footprints.js';
+import { Debris } from '../debris.js';
 import { W, SPAN } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
@@ -24,18 +25,27 @@ const GRID_X = 40;     // props are placed on cells out to ±GRID_X
 // often a footprint is attempted per side per row. One is picked per battle.
 const tall = () => makeTree(true);
 const THEMES = {
-  forest:      { props: [tall, tall, tall, makeTree, makeTree, makeHedge, makeHedge, makeShrub], building: 'house', buildProb: 0.08 },
-  residential: { props: [makeFence, makeFence, makeShrub, makeShrub, makeTree, tall, makeParkedCar], building: 'house', buildProb: 0.5 },
-  city:        { props: [makeDumpster, makePlanter, makePlanter, makeParkedCar, makeParkedCar, makeTree], building: 'tower', buildProb: 0.7 },
-  parking:     { props: [makeParkedCar, makeParkedCar, makeParkedCar, makeFence, makePlanter, makeShrub], building: 'tower', buildProb: 0.15 },
+  forest:      { props: [tall, tall, tall, makeTree, makeTree, makeHedge, makeHedge, makeShrub, makeShrub], building: 'house', buildProb: 0.08 },
+  residential: { props: [makeFence, makeFence, makeShrub, makeShrub, makeTree, tall, tall, makeHedge], building: 'house', buildProb: 0.5 },
+  city:        { props: [makeDumpster, makePlanter, makePlanter, makePlanter, makeTree, makeTree, makeHedge, makeParkedCar], building: 'tower', buildProb: 0.7 },
+  parking:     { props: [makeParkedCar, makeFence, makeFence, makePlanter, makePlanter, makeShrub, makeTree, makeHedge], building: 'tower', buildProb: 0.15 },
 };
 const HEIGHT = { land: 0.6, sea: 0.6, air: 3.2 };
+const PROP_POINTS = 5;
 const SLIDE = 7, EGG_SPEED = 14, COOLDOWN = 0.3;
+// Per-pilot keys: player 1 moves on the arrows and fires with Space, player 2
+// moves on WASD and fires with Q. Shift cycles the aim for everyone.
+const PILOT_KEYS = [
+  { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', fire: ['Space'] },
+  { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', fire: ['KeyQ'] },
+];
+const AIM_KEYS = ['ShiftLeft', 'ShiftRight', 'Tab'];
+const FORWARD = 2.5;   // how far up the field a pilot may advance
 
 export class BattleMode {
   constructor(game) {
     this.game = game;
-    this.hint = 'A/D slide · SPACE / W / UP fire · S / DOWN tilt to aim land, sea or air';
+    this.hint = 'arrows move · SPACE fire · SHIFT tilt to aim land, sea or air';
   }
 
   enter() {
@@ -49,13 +59,18 @@ export class BattleMode {
     this.eggs = [];
     this.spawnClock = { land: 1, sea: 2, air: 3 };
     this.keys = {};
-    this.cooldown = 0;
     this.ending = 0;
+    this.props = [];                 // breakable scenery inside the strip
+    this.debris = new Debris(scene);
 
     this.buildField(sky);
-    this.chicken = makeChicken();
-    this.group.add(this.chicken);
-    this.cx = 0;
+    const roster = this.game.roster;
+    this.pilots = roster.map((c, i) => {
+      const mesh = c.make();
+      this.group.add(mesh);
+      return { mesh, cx: roster.length > 1 ? (i === 0 ? -2 : 2) : 0, cz: 0, cooldown: 0, keys: PILOT_KEYS[i] };
+    });
+    if (roster.length > 1) this.hint = 'P1 arrows + SPACE · P2 WASD + Q · SHIFT tilt to aim';
 
     this.aim = 'land';
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
@@ -90,13 +105,19 @@ export class BattleMode {
         m.position.x = cell.x;
         row.add(m);
         taken.add(cell.x);
+        if (Math.abs(cell.x) <= W + 1) this.props.push({ mesh: m, x: cell.x, z: r, h: cell.style.h, hp: Math.max(1, Math.ceil(cell.style.h / 2.5)), lean: 0 });
       }
       for (let c = -GRID_X; c <= GRID_X; c++) {
         if (taken.has(c)) continue;
         const inStrip = Math.abs(c) <= W + 1;
         if (inStrip && r <= 3) continue;                  // clear sight lines in front of the chicken
         const density = inStrip ? (r >= 13 ? 0.45 : 0.02) : 0.3;
-        if (Math.random() < density) { const m = pick(...theme.props)(); m.position.x = c; row.add(m); }
+        if (Math.random() < density) {
+          const m = pick(...theme.props)();
+          m.position.x = c;
+          row.add(m);
+          if (inStrip) this.props.push({ mesh: m, x: c, z: r, h: 2.2, hp: 1, lean: 0 });
+        }
       }
       this.group.add(row);
     }
@@ -106,20 +127,70 @@ export class BattleMode {
   }
 
   exit() {
+    this.debris.dispose();
     this.game.scene.remove(this.group);
     this.game.card('');
   }
 
+  // An egg that clips scenery breaks it apart. Tall buildings take several
+  // hits: each one cracks, leans the tower further and sheds windows; the
+  // last tips it over before it shatters.
+  hitProps(e, y) {
+    for (const p of this.props) {
+      if (p.tipping || Math.abs(e.x - p.x) > 0.6 || Math.abs(e.z - p.z) > 0.5 || y > p.h) continue;
+      p.hp -= 1;
+      if (p.hp > 0) {
+        p.lean += 0.07;
+        p.mesh.rotation.z = p.lean * (e.x < p.x ? -1 : 1);
+        const windows = [];
+        p.mesh.traverse((o) => { if (o.userData.window) windows.push(o); });
+        for (const w of windows.sort(() => Math.random() - 0.5).slice(0, 2)) this.debris.shed(w);
+        sfx.crack();
+        return true;
+      }
+      if (p.h > 2.5) { p.tipping = { t: 0, dir: e.x < p.x ? -1 : 1 }; sfx.crack(); return true; }
+      this.smash(p);
+      return true;
+    }
+    return false;
+  }
+
+  smash(p) {
+    this.debris.explode(p.mesh, 0.8 + p.h * 0.1);
+    this.props = this.props.filter((q) => q !== p);
+    this.points += PROP_POINTS * Math.ceil(p.h / 2);
+    sfx.boom(0.6 + p.h * 0.1);
+  }
+
+  // Tip a doomed tower over from its base, then shatter it.
+  updateTipping(dt) {
+    for (const p of [...this.props]) {
+      if (!p.tipping) continue;
+      p.tipping.t += dt;
+      const k = Math.min(1, p.tipping.t / 0.7);
+      p.mesh.rotation.z = p.tipping.dir * (k * k) * (Math.PI / 2);
+      if (k >= 1) this.smash(p);
+    }
+  }
+
+  // Solo, both key sets drive pilot 0.
+  pilotFor(i) { return this.pilots[this.pilots.length === 1 ? 0 : i]; }
+
   onKey(e) {
     this.keys[e.code] = true;
-    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { this.fire(); return true; }
-    if (e.code === 'ArrowDown' || e.code === 'KeyS') { this.cycleAim(); return true; }
-    return e.code in { ArrowLeft: 1, ArrowRight: 1, KeyA: 1, KeyD: 1 };
+    if (AIM_KEYS.includes(e.code)) { this.cycleAim(); return true; }
+    for (let i = 0; i < PILOT_KEYS.length; i++) {
+      const k = PILOT_KEYS[i];
+      if (k.fire.includes(e.code)) { this.fire(this.pilotFor(i)); return true; }
+      if ([k.left, k.right, k.up, k.down].includes(e.code)) return true;
+    }
+    return false;
   }
   onKeyUp(e) { this.keys[e.code] = false; }
   onSwipe(dx, dy) {
-    if (Math.hypot(dx, dy) < 20) this.fire();
-    else if (Math.abs(dx) > Math.abs(dy)) this.cx = clamp(this.cx + Math.sign(dx) * 2, -W, W);
+    const p = this.pilots[0];
+    if (Math.hypot(dx, dy) < 20) this.fire(p);
+    else if (Math.abs(dx) > Math.abs(dy)) p.cx = clamp(p.cx + Math.sign(dx) * 2, -W, W);
     else this.cycleAim();
   }
   onViewButton() { this.cycleAim(); }
@@ -131,13 +202,13 @@ export class BattleMode {
     sfx.tilt();
   }
 
-  fire() {
-    if (this.cooldown > 0 || this.ending) return;
-    this.cooldown = COOLDOWN;
+  fire(pilot) {
+    if (pilot.cooldown > 0 || this.ending) return;
+    pilot.cooldown = COOLDOWN;
     const egg = makeEgg();
-    egg.position.set(this.cx, 0.6, 0);
+    egg.position.set(pilot.cx, 0.6, -pilot.cz);
     this.group.add(egg);
-    this.eggs.push({ mesh: egg, x: this.cx, z: 0, aim: this.aim });
+    this.eggs.push({ mesh: egg, x: pilot.cx, z: pilot.cz, z0: pilot.cz, aim: this.aim });
     sfx.plink();
   }
 
@@ -164,15 +235,24 @@ export class BattleMode {
 
   update(dt) {
     const { game } = this;
-    this.cooldown -= dt;
 
-    // Slide
-    let vx = 0;
-    if (this.keys.ArrowLeft || this.keys.KeyA) vx -= SLIDE;
-    if (this.keys.ArrowRight || this.keys.KeyD) vx += SLIDE;
-    this.cx = clamp(this.cx + vx * dt, -W, W);
-    this.chicken.position.x = this.cx;
-    this.chicken.rotation.y = vx < 0 ? Math.PI / 2 : vx > 0 ? -Math.PI / 2 : 0;
+    // Slide each pilot on its own keys
+    const solo = this.pilots.length === 1;
+    for (const p of this.pilots) {
+      p.cooldown -= dt;
+      let vx = 0, vz = 0;
+      for (const k of (solo ? PILOT_KEYS : [p.keys])) {
+        if (this.keys[k.left]) vx -= SLIDE;
+        if (this.keys[k.right]) vx += SLIDE;
+        if (this.keys[k.up]) vz += SLIDE * 0.7;
+        if (this.keys[k.down]) vz -= SLIDE * 0.7;
+      }
+      p.cx = clamp(p.cx + vx * dt, -W, W);
+      p.cz = clamp(p.cz + vz * dt, 0, FORWARD);
+      p.mesh.position.set(p.cx, 0, -p.cz);
+      p.mesh.rotation.y = vx < 0 ? Math.PI / 2 : vx > 0 ? -Math.PI / 2 : vz < 0 ? Math.PI : 0;
+    }
+    const cx = this.pilots.reduce((a, p) => a + p.cx, 0) / this.pilots.length;
 
     // Spawns, weighted by the level's mix
     if (!this.ending) for (const kind of ['land', 'sea', 'air']) {
@@ -184,25 +264,29 @@ export class BattleMode {
 
     // Move targets, cull those that crossed
     for (const t of this.targets) {
-      if (t.dying !== undefined) { t.dying += dt; t.mesh.scale.setScalar(Math.max(0.01, 1 - t.dying * 5)); continue; }
       t.x += t.dir * t.speed * dt;
       t.mesh.position.x = t.x;
     }
     this.targets = this.targets.filter((t) => {
-      const gone = Math.abs(t.x) > SPAN + 3 || (t.dying !== undefined && t.dying > 0.2);
+      const gone = Math.abs(t.x) > SPAN + 3;
       if (gone) this.group.remove(t.mesh);
       return !gone;
     });
+    this.updateTipping(dt);
+    this.debris.update(dt);
 
     // Eggs fly to the row they were aimed at and only hit targets there.
     for (const e of this.eggs) {
       e.z += EGG_SPEED * dt;
-      const reach = ROWS[e.aim], k = Math.min(1, e.z / reach);
-      e.mesh.position.set(e.x, 0.6 + Math.sin(k * Math.PI) * 2.2 + HEIGHT[e.aim] * k, -e.z);
+      const reach = ROWS[e.aim], k = Math.min(1, (e.z - e.z0) / (reach - e.z0));
+      const y = 0.6 + Math.sin(k * Math.PI) * 2.2 + HEIGHT[e.aim] * k;
+      e.mesh.position.set(e.x, y, -e.z);
       e.mesh.rotation.x += dt * 10;
+      if (this.hitProps(e, y)) { e.z = 99; continue; }
       for (const t of this.targets) {
-        if (t.kind !== e.aim || t.dying !== undefined || Math.abs(e.z - t.z) > 0.6 || Math.abs(e.x - t.x) > t.len / 2 + 0.3) continue;
-        t.dying = 0;
+        if (t.kind !== e.aim || Math.abs(e.z - t.z) > 0.6 || Math.abs(e.x - t.x) > t.len / 2 + 0.3) continue;
+        this.debris.explode(t.mesh, 1.2);
+        this.targets = this.targets.filter((q) => q !== t);
         e.z = 99;
         this.points += POINTS[t.kind];
         game.run.coins += 1;
@@ -214,14 +298,14 @@ export class BattleMode {
     this.eggs = this.eggs.filter((e) => { const gone = e.z > ROWS[e.aim] + 1; if (gone) this.group.remove(e.mesh); return !gone; });
 
     const tz = -VIEW[this.aim][1];
-    game.camera.update(dt, this.cx * 0.3, tz);
-    game.sky.update(dt, this.cx * 0.3, tz, game.camera.distance);
-    game.headlights.update(this.targets.filter((t) => t.dying === undefined).map((t) => (
+    game.camera.update(dt, cx * 0.3, tz);
+    game.sky.update(dt, cx * 0.3, tz, game.camera.distance);
+    game.headlights.update(this.targets.map((t) => (
       t.kind === 'air' ? { x: t.x, z: -t.z, dir: t.dir, len: t.len, y: 3.35, front: 0.2, lateral: [-1.15, 1.15] }
       : t.kind === 'sea' ? { x: t.x, z: -t.z, dir: t.dir, len: t.len, y: 0.15, front: 1.1 }
       : { x: t.x, z: -t.z, dir: t.dir, len: t.len }
     )), -ROWS.sea);
-    game.hud(game.run.score + this.points);
+    game.hud(game.run.score + this.points, `<b>${game.run.flock.reduce((a, f) => a + (f?.count ?? 0), 0)}</b>`);
 
     if (this.ending) {
       this.ending += dt;

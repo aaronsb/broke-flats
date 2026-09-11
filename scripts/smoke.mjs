@@ -18,17 +18,16 @@ const key = async (code, k = code.replace('Key', '').replace('Arrow', ''), hold 
   await sleep(hold);
   await send('Input.dispatchKeyEvent', { type: 'keyUp', code, key: k, windowsVirtualKeyCode: 0 });
 };
-const state = () => evaluate(`({score: document.getElementById('score').textContent, coins: document.getElementById('coins').textContent, level: document.getElementById('level').textContent, chicks: document.getElementById('chicks').textContent, card: document.getElementById('card').textContent, over: document.getElementById('over').classList.contains('show'), title: document.getElementById('over-title').textContent})`);
+const state = () => evaluate(`({score: document.getElementById('score').textContent, coins: document.getElementById('coin-count').textContent, level: document.getElementById('level').textContent, chicks: document.getElementById('chicks').textContent, card: document.getElementById('card').textContent, over: document.getElementById('over').classList.contains('show'), title: document.getElementById('over-title').textContent})`);
 
 await send('Runtime.enable');
 await send('Page.enable');
 await send('Page.navigate', { url: 'http://localhost:5173/' });
 await sleep(2500);
-await key('Enter', 'Enter');                  // start
-await sleep(300);
-console.log('start', await state());
+const start = async () => { await key('Enter', 'Enter'); await sleep(2500); console.log('start', await state()); };
 const script = process.argv[2] ?? 'hops';
 if (script === 'hops') {
+  await start();
   for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(220); }
   console.log('after 8 hops', await state());
   await key('Space', ' ');  await sleep(1500);
@@ -37,7 +36,25 @@ if (script === 'hops') {
   for (let i = 0; i < 40; i++) { await key('ArrowUp'); await sleep(200); if ((await state()).over) break; }
   console.log('after run', await state());
 }
+if (script === 'respawn') {
+  await start();
+  await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch()`);
+  for (let i = 0; i < 3; i++) { await key('ArrowUp'); await sleep(220); }
+  await evaluate(`__game.mode.players[0].die('car')`); await sleep(1400);
+  console.log('after death', await state(), await evaluate(`[__game.mode.players[0].row, __game.mode.players[0].alive, __game.run.flock]`));
+  await evaluate(`__game.mode.finished = true`); await sleep(14000);
+  console.log('finish flock', await evaluate(`__game.run.flock`));
+}
+if (script === 'tally') {
+  await start();
+  await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch(); __game.mode.trains[0].waiting = 2`);
+  await evaluate(`__game.mode.finished = true`); await sleep(2200);
+  console.log('tally', await state(), await evaluate(`[__game.mode.tally, __game.run.score, __game.mode.trains[0].waitingMeshes?.length]`));
+  await sleep(12000);
+  console.log('after tally', await state(), await evaluate(`[__game.mode.constructor.name, __game.run.flock]`));
+}
 if (script === 'train') {
+  await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(220); }
   await key('ArrowLeft'); await sleep(220); await key('ArrowUp'); await sleep(220);
@@ -46,16 +63,19 @@ if (script === 'train') {
   console.log('after back-hop', await evaluate(`[__game.mode.player.row, __game.mode.train.count]`));
 }
 if (script === 'occupied') {
+  await start();
   await evaluate(`__game.mode.train.hatch()`);
   await key('ArrowUp'); await sleep(250);
   console.log('occupied', await evaluate(`[__game.mode.player.row, __game.mode.train.chicks[0].rec.row, __game.mode.player.isOccupied(0, 0), __game.mode.player.isOccupied(1, 0)]`));
 }
 if (script === 'night') {
+  await start();
   await evaluate(`__game.run.level = 2; __game.nextLevel()`); await sleep(400);
   for (let i = 0; i < 20; i++) { await key('ArrowUp'); await sleep(120); if ((await state()).over) break; }
   console.log('night', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()]; return [__game.sky.name, __game.sky.dark, rows.filter(l => l.data.flies).length, rows.filter(l => l.scenario.id === 'road').length, rows.filter(l => l.scenario.id === 'road' && l.movers.every(m => m.mesh.children.length > 8)).length] })()`));
 }
 if (script === 'skies') {
+  await start();
   for (const n of [3, 4]) {
     await evaluate(`__game.nextLevel()`); await sleep(400);
     for (let i = 0; i < 30; i++) { await key('ArrowUp'); await sleep(120); if ((await state()).over) break; }
@@ -64,6 +84,7 @@ if (script === 'skies') {
   }
 }
 if (script === 'debug') {
+  await start();
   await key('Backquote', '`'); await sleep(100);
   await key('KeyQ', 'q'); await sleep(400);
   console.log('forced road', await evaluate(`[...__game.mode.world.rows.values()].map(l => l.scenario.id).slice(4, 14).join(',')`));
@@ -72,7 +93,7 @@ if (script === 'debug') {
   await key('KeyK', 'k'); await sleep(400);
   console.log('sky', await state());
   await key('KeyG', 'g'); await key('KeyC', 'c'); await sleep(100);
-  console.log('god+coins', await evaluate(`[__game.mode.player.invincible, Math.floor(__game.mode.player.coins)]`));
+  console.log('god+coins', await evaluate(`[__game.mode.player.invincible, Math.floor(__game.run.coins)]`));
   await key('Digit3', '3'); await sleep(400);
   console.log('level 3', await state());
   await key('Digit5', '5'); await sleep(400);
@@ -81,6 +102,12 @@ if (script === 'debug') {
   console.log('panel hidden', await evaluate(`document.getElementById('debug').hidden`));
 }
 if (script === 'shots') {
+  const fs0 = await import('node:fs');
+  await sleep(800);
+  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select.png`, Buffer.from(r.data, 'base64')); }
+  await key('ArrowRight'); await sleep(400);
+  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select-spin.png`, Buffer.from(r.data, 'base64')); }
+  await start();
   // Screenshots of each view for eyeballing. Written to OUT (default: cwd).
   const fs = await import('node:fs');
   const out = process.env.OUT ?? '.';
@@ -95,9 +122,10 @@ if (script === 'shots') {
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(500); await shot('night-top');
   await key('Space', ' '); await sleep(1500); await shot('night-iso');
-  await evaluate(`__game.mode.finished = true`); await sleep(1500); await shot('battle-land');
-  await key('ArrowDown', 'Down'); await sleep(1500); await shot('battle-sea');
-  await key('ArrowDown', 'Down'); await sleep(1500); await shot('battle-air');
+  await evaluate(`__game.mode.finished = true`); await sleep(3000); await shot('tally');
+  await sleep(12000); await shot('battle-land');
+  await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-sea');
+  await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-air');
   await evaluate(`__game.run.level = 1; __game.nextLevel()`); await sleep(500);
   await key('Space', ' '); await sleep(1500); await shot('sunset-iso');
   await evaluate(`__game.run.level = 3; __game.nextLevel()`); await sleep(500);
@@ -111,15 +139,31 @@ if (script === 'shots') {
   await key('Space', ' '); await sleep(300);
   await evaluate(`__game.mode.player.invincible = false; __game.mode.player.die('car')`); await sleep(1500); await shot('game-over');
 }
+if (script === 'coop') {
+  // Second player joins on the title card; both hop; both appear in the battle.
+  await evaluate(`__game.debug.god = true`);
+  await key('KeyD', 'd'); await sleep(200);
+  console.log('roster', await evaluate(`__game.roster.map(c => c.id)`));
+  await start();
+  for (let i = 0; i < 5; i++) { await key('ArrowUp'); await key('KeyW', 'w'); await sleep(220); }
+  console.log('rows', await evaluate(`__game.mode.players.map(p => [p.row, Math.round(p.x), p.alive])`));
+  for (let i = 0; i < 12; i++) { await key('ArrowUp'); await sleep(200); }   // leash should stop P1
+  console.log('leash', await evaluate(`__game.mode.players.map(p => p.row)`));
+  await evaluate(`__game.mode.finished = true`); await sleep(14000);
+  await key('KeyQ', 'q'); await key('Space', ' '); await sleep(300);
+  console.log('battle', await evaluate(`[__game.mode.pilots.length, __game.mode.eggs.length]`));
+}
 if (script === 'battle') {
+  await start();
   await evaluate(`__game.mode.finished = true`);
-  await sleep(500);
+  await sleep(14000);
   console.log('battle enter', await state());
   for (let i = 0; i < 12; i++) {
     await send('Input.dispatchKeyEvent', { type: 'keyDown', code: i % 2 ? 'ArrowLeft' : 'ArrowRight', key: i % 2 ? 'Left' : 'Right' });
     await sleep(250);
     await send('Input.dispatchKeyEvent', { type: 'keyUp', code: i % 2 ? 'ArrowLeft' : 'ArrowRight', key: i % 2 ? 'Left' : 'Right' });
     await key('Space', ' '); await sleep(150);
+    if (i === 4) await key('ShiftLeft', 'Shift');
   }
   console.log('battle mid', await state(), await evaluate(`[__game.mode.targets.length, __game.mode.eggs.length, __game.mode.points]`));
   await evaluate(`__game.mode.timeLeft = 0.1`);

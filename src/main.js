@@ -6,6 +6,7 @@ import { Game } from './game.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
 import { installDebug } from './debug.js';
+import { Select } from './select.js';
 
 // ---------- renderer ----------
 const canvas = document.getElementById('c');
@@ -31,28 +32,42 @@ resize();
 // ---------- game ----------
 const $ = (id) => document.getElementById(id);
 const ui = {
-  score: $('score'), best: $('best'), coins: $('coins'), level: $('level'), card: $('card'),
+  score: $('score'), best: $('best'), coins: $('coins'), coinCount: $('coin-count'), level: $('level'), card: $('card'), tries: $('tries'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'),
+  p1: $('p1'), p2: $('p2'),
 };
 const game = new Game({ scene, camera, sky, ui, headlights });
 if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
 const debugKey = installDebug(game, ui);
 let started = false;
+game.preview();
+let select = new Select(scene, camera);
+select.setPicks(game.picks);
 
 function begin() {
   if (started) return;
-  started = true;
   sfx.unlock();
-  music.start();
-  ui.title.classList.add('hide');
-  game.start();
+  select.confirm(game.picks, () => {
+    started = true;
+    select.dispose();
+    select = null;
+    music.start();
+    ui.title.classList.add('hide');
+    game.start();
+  });
 }
 
 // ---------- input ----------
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
-  if (!started) { begin(); return; }
+  if (!started) {
+    if (select.confirming) return;
+    const changed = game.select(e);
+    if (changed !== false) { select.setPicks(game.picks, changed); e.preventDefault(); return; }
+    if (e.code === 'Enter' || e.code === 'Space') begin();
+    return;
+  }
   if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
   if (debugKey(e)) { e.preventDefault(); return; }
@@ -79,6 +94,7 @@ function frame(now) {
   last = now;
   time += dt;
   if (started) game.update(dt, time);
+  else { select.update(dt); sky.update(dt, 0, -2, camera.distance); }
   renderer.render(scene, camera.camera);
   requestAnimationFrame(frame);
 }

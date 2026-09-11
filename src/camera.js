@@ -14,6 +14,7 @@ const HALF = 10.5;
 const PRESETS = {
   top:        { tilt: 0,    yaw: 0,   fov: 12 },
   iso:        { tilt: 0.85, yaw: 0.55, fov: 20 },   // near-orthographic isometric
+  select:     { tilt: 1.2,  yaw: 0,    fov: 38, dist: 9 },
   // Battle: camera about 9-10 units up and 8-9 behind the chicken; the tilt
   // picks which row sits mid-screen. Targets are set by the battle mode.
   battleLand: { tilt: 0.95, yaw: 0,   fov: 50, dist: 15.8 },

@@ -41,9 +41,9 @@ export function installDebug(game, ui) {
       game.debug.scenery = names[(names.indexOf(game.debug.scenery ?? game.level.scenery) + 1) % names.length];
       game.restartStage();
     }
-    else if (c === 'KeyG') { game.debug.god = !game.debug.god; if (game.mode.player) game.mode.player.invincible = game.debug.god; }
-    else if (c === 'KeyC') { game.run.coins += 10; if (game.mode.player) game.mode.player.coins += 10; }
-    else if (c === 'KeyH') game.mode.train?.hatch();
+    else if (c === 'KeyG') { game.debug.god = !game.debug.god; game.mode.players?.forEach((p) => { p.invincible = game.debug.god; }); }
+    else if (c === 'KeyC') { game.run.coins += 10; }
+    else if (c === 'KeyH') game.mode.trains?.forEach((t) => t.hatch());
     else return false;
     render();
     return true;

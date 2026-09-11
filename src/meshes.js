@@ -270,7 +270,7 @@ export function makeBuildingCell({ h, color, roof, windows, lit }, side) {
   if (windows) {
     const mat = lit ? WINDOW_LIT : WINDOW_DARK;
     for (let y = 0.5; y < h - 0.5; y += 1) {
-      for (const z of [-0.25, 0.25]) g.add(box(0.06, 0.4, 0.3, mat, side * 0.5, y, z, false));
+      for (const z of [-0.25, 0.25]) { const w = box(0.06, 0.4, 0.3, mat, side * 0.5, y, z, false); w.userData.window = true; g.add(w); }
     }
   }
   return g;

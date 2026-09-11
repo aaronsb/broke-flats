@@ -5,48 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>Road Crosser</title>
   <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+    @font-face { font-family: 'Arcade'; src: url('fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: swap; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; font-family: 'Arcade', ui-monospace, Menlo, Consolas, monospace; }
     canvas#c { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
     #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 2px 2px 0 #1b3a5a; user-select: none; }
-    #score { position: absolute; top: 14px; left: 18px; font-size: 40px; font-weight: 700; letter-spacing: 2px; }
-    #coins { position: absolute; top: 18px; right: 18px; font-size: 26px; font-weight: 700; }
-    #best  { position: absolute; top: 62px; left: 18px; font-size: 16px; opacity: .85; }
-    #level { position: absolute; top: 52px; right: 18px; font-size: 16px; opacity: .85; }
-    #chicks { position: absolute; top: 76px; right: 18px; font-size: 20px; font-weight: 700; }
-    #debug { position: absolute; bottom: 44px; left: 18px; font-size: 13px; line-height: 1.5; background: rgba(20, 40, 70, .75); border: 2px solid #fff; border-radius: 6px; padding: 8px 12px; }
-    #card  { position: absolute; top: 18px; left: 0; right: 0; text-align: center; font-size: 26px; font-weight: 700; }
-    #hint  { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 14px; opacity: .85; }
-    #view  { position: absolute; bottom: 44px; right: 18px; pointer-events: auto; font: inherit; font-size: 16px; font-weight: 700; color: #fff; background: #1b3a5a; border: 3px solid #fff; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
+    /* Status bar across the top */
+    #bar { position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #0c182c; border-bottom: 3px solid #1b3a5a; font-size: 12px; letter-spacing: 1px; }
+    #bar span { white-space: nowrap; }
+    #bar b { color: #ffd23f; font-weight: normal; }
+    #coins.draining b { animation: pulse .5s infinite alternate; display: inline-block; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
+    #card  { position: absolute; top: 58px; left: 0; right: 0; text-align: center; font-size: 16px; line-height: 1.8; }
+    #hint  { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 9px; opacity: .85; }
+    #view  { position: absolute; bottom: 40px; right: 16px; pointer-events: auto; font: inherit; font-size: 11px; color: #fff; background: #1b3a5a; border: 3px solid #fff; border-radius: 4px; padding: 10px 12px; cursor: pointer; }
     #view.on { background: #d9702a; }
-    #coins.draining { color: #ffd23f; animation: pulse .5s infinite alternate; }
     #view.broke { opacity: .45; }
-    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+    #debug { position: absolute; bottom: 40px; left: 16px; font-size: 9px; line-height: 2; background: rgba(20, 40, 70, .8); border: 2px solid #fff; border-radius: 4px; padding: 8px 12px; }
     #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
     #over.show { display: flex; }
-    #over h1 { font-size: 56px; margin: 0 0 8px; }
-    #over p { font-size: 22px; margin: 4px 0; }
-    #over button { margin-top: 22px; font: inherit; font-size: 20px; font-weight: 700; color: #fff; background: #d9702a; border: 3px solid #fff; border-radius: 6px; padding: 12px 22px; cursor: pointer; }
-    #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: auto; }
+    #over h1 { font-size: 32px; margin: 0 0 12px; }
+    #over p { font-size: 12px; margin: 8px 0; }
+    #over button { margin-top: 22px; font: inherit; font-size: 12px; color: #fff; background: #d9702a; border: 3px solid #fff; border-radius: 4px; padding: 12px 18px; cursor: pointer; }
+    #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; flex-direction: column; padding: 56px 0 60px; box-sizing: border-box; pointer-events: auto; }
     #title.hide { display: none; }
-    #title h1 { font-size: 64px; margin: 0; letter-spacing: 4px; }
-    #title p { font-size: 20px; margin: 10px 0 0; }
+    #title h1 { font-size: 36px; margin: 0; letter-spacing: 2px; text-shadow: 4px 4px 0 #1b3a5a; }
+    #title .picks { text-align: center; }
+    #title p { font-size: 12px; margin: 14px 0 0; }
+    #title p.go { margin-top: 26px; opacity: .85; font-size: 10px; }
   </style>
 </head>
 <body>
   <canvas id="c"></canvas>
   <div id="hud">
-    <div id="score">0</div>
-    <div id="best">BEST 0</div>
-    <div id="level">LV 1 · DAY</div>
-    <div id="chicks"></div>
+    <div id="bar">
+      <span>SCORE <b id="score">0</b></span>
+      <span id="coins">● <b id="coin-count">0</b></span>
+      <span id="level">LV <b>1</b> DAY</span>
+      <span>TRIES <b id="tries">0</b></span>
+      <span id="chicks">FLOCK <b>0</b></span>
+      <span>BEST <b id="best">0</b></span>
+    </div>
     <div id="debug" hidden></div>
     <div id="card" hidden></div>
-    <div id="coins">● 0</div>
     <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE peek in 3D (burns coins) &nbsp;·&nbsp; P pixel size &nbsp;·&nbsp; M mute &nbsp;·&nbsp; ` debug</div>
     <button id="view">TILT</button>
     <div id="title">
       <h1>ROAD CROSSER</h1>
-      <p>press any key or tap to start</p>
+      <div class="picks">
+        <p id="p1">P1  ◀ CHICKEN ▶   arrows</p>
+        <p id="p2">P2  press A or D to join</p>
+        <p class="go">ENTER or tap to start</p>
+      </div>
     </div>
     <div id="over">
       <h1 id="over-title">SPLAT</h1>
