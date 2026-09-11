@@ -26,6 +26,7 @@ export class Player {
     this.carrier = null;      // mover currently carrying the player (a log, say)
     this.onLanded = null;     // hook: called after every landing
     this.isOccupied = null;   // hook: (col, row) => true blocks a hop
+    this.invincible = false;
     this.bump = 0;
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
@@ -57,7 +58,7 @@ export class Player {
   }
 
   die(cause) {
-    if (!this.alive) return;
+    if (!this.alive || this.invincible) return;
     this.alive = false;
     this.deadBy = cause;
     this.deadFor = 0;

@@ -21,6 +21,7 @@ export class Game {
     this.best = Number(localStorage.getItem('rc-best') || 0);
     this.ui.best.textContent = `BEST ${this.best}`;
     this.run = { level: 1, score: 0, coins: START_COINS };
+    this.debug = { on: false, force: null, sky: null, god: false };
   }
 
   start() {
@@ -35,9 +36,18 @@ export class Game {
   setLevel(n) {
     this.level = levelFor(n);
     this.run.level = n;
-    this.sky.apply(this.level.sky);
-    this.ui.level.textContent = `LV ${n} · ${SKIES[this.level.sky].label}`;
+    const skyName = this.debug.sky ?? this.level.sky;
+    this.sky.apply(skyName);
+    this.ui.level.textContent = `LV ${n} · ${SKIES[skyName].label}${this.debug.on ? ' · DEBUG' : ''}`;
   }
+
+  // Sequencer weights for the current stage, honouring a forced scenario.
+  stageWeights() {
+    return this.debug.force ? { [this.debug.force]: 1 } : this.level.weights;
+  }
+
+  jumpLevel(n) { this.setLevel(n); this.setMode(new CrossingMode(this)); }
+  restartStage() { this.setLevel(this.run.level); this.setMode(new CrossingMode(this)); }
 
   setMode(mode) {
     this.mode?.exit();

@@ -25,11 +25,13 @@ export class CrossingMode {
   enter() {
     const { scene, level, sky } = this.game;
     this.world = new World(scene, {
-      weights: level.weights, bands: level.bands, difficulty: level.difficulty, sky,
+      weights: this.game.stageWeights(), bands: level.bands, difficulty: level.difficulty, sky,
+      ignoreGaps: !!this.game.debug.force,
       onFinish: () => { this.finished = true; },
     });
     this.player = new Player(scene, this.world);
     this.player.coins = this.game.run.coins;
+    this.player.invincible = this.game.debug.god;
     this.train = new Train(scene, this.world, this.player);
     this.player.onEgg = () => this.train.hatch();
     this.world.ensure(26);

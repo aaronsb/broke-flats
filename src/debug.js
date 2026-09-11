@@ -1,0 +1,46 @@
+// Playtest controls. Backquote toggles the panel; keys only act while it is open.
+import { SCENARIOS } from './scenarios/index.js';
+import { SKIES } from './sky.js';
+
+const FORCE = { KeyQ: 'road', KeyE: 'river', KeyT: 'grass', KeyY: 'hedge', KeyU: 'meadow' };
+
+export function installDebug(game, ui) {
+  const panel = ui.debug;
+  const render = () => {
+    panel.innerHTML = [
+      '<b>DEBUG</b> (` closes)',
+      '1-4 level &nbsp; 5 battle &nbsp; N next level',
+      'Q road &nbsp; E river &nbsp; T grass &nbsp; Y hedge &nbsp; U meadow &nbsp; 0 clear',
+      'K sky &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
+      `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,
+    ].join('<br>');
+  };
+
+  return (e) => {
+    if (e.code === 'Backquote') {
+      game.debug.on = !game.debug.on;
+      panel.hidden = !game.debug.on;
+      render();
+      return true;
+    }
+    if (!game.debug.on || game.over) return false;
+    const c = e.code;
+    if (c >= 'Digit1' && c <= 'Digit4') game.jumpLevel(Number(c.slice(5)));
+    else if (c === 'Digit5') game.stageClear();
+    else if (c === 'KeyN') game.nextLevel();
+    else if (c in FORCE) { game.debug.force = FORCE[c]; game.restartStage(); }
+    else if (c === 'Digit0') { game.debug.force = null; game.restartStage(); }
+    else if (c === 'KeyK') {
+      const names = Object.keys(SKIES);
+      game.debug.sky = names[(names.indexOf(game.debug.sky ?? game.level.sky) + 1) % names.length];
+      game.restartStage();
+    }
+    else if (c === 'KeyG') { game.debug.god = !game.debug.god; if (game.mode.player) game.mode.player.invincible = game.debug.god; }
+    else if (c === 'KeyC') { game.run.coins += 10; if (game.mode.player) game.mode.player.coins += 10; }
+    else if (c === 'KeyH') game.mode.train?.hatch();
+    else return false;
+    render();
+    return true;
+  };
+}
+

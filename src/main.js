@@ -4,6 +4,7 @@ import { Sky } from './sky.js';
 import { Game } from './game.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
+import { installDebug } from './debug.js';
 
 // ---------- renderer ----------
 const canvas = document.getElementById('c');
@@ -30,10 +31,11 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), level: $('level'), card: $('card'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
-  title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'),
+  title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'),
 };
 const game = new Game({ scene, camera, sky, ui });
 if (import.meta.env.DEV) window.__game = game;   // for the headless smoke test
+const debugKey = installDebug(game, ui);
 let started = false;
 
 function begin() {
@@ -51,6 +53,7 @@ addEventListener('keydown', (e) => {
   if (!started) { begin(); return; }
   if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
+  if (debugKey(e)) { e.preventDefault(); return; }
   if (game.over) { if (e.code === 'KeyR') game.start(); return; }
   if (game.mode.onKey(e)) e.preventDefault();
 });

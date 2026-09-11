@@ -39,7 +39,9 @@ export class World {
   weightOf(s) { return this.config.weights[s.id] ?? 0; }
 
   pickScenario(r) {
-    const pool = Object.values(SCENARIOS).filter((s) => this.weightOf(s) > 0 && r - (this.lastUsed[s.id] ?? -100) >= (s.minGap ?? 0));
+    const gap = (s) => (this.config.ignoreGaps ? 0 : s.minGap ?? 0);
+    const pool = Object.values(SCENARIOS).filter((s) => this.weightOf(s) > 0 && r - (this.lastUsed[s.id] ?? -100) >= gap(s));
+    if (pool.length === 0) return SCENARIOS[INTRO];
     let roll = Math.random() * pool.reduce((a, s) => a + this.weightOf(s), 0);
     for (const s of pool) { roll -= this.weightOf(s); if (roll <= 0) return s; }
     return pool[pool.length - 1];

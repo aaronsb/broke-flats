@@ -63,6 +63,23 @@ if (script === 'skies') {
     if ((await state()).over) { await key('KeyR', 'r'); await sleep(400); await evaluate(`__game.setLevel(${n}); `); }
   }
 }
+if (script === 'debug') {
+  await key('Backquote', '`'); await sleep(100);
+  await key('KeyQ', 'q'); await sleep(400);
+  console.log('forced road', await evaluate(`[...__game.mode.world.rows.values()].map(l => l.scenario.id).slice(4, 14).join(',')`));
+  await key('KeyY', 'y'); await sleep(400);
+  console.log('forced hedge', await evaluate(`[...__game.mode.world.rows.values()].map(l => l.scenario.id).slice(4, 12).join(',')`));
+  await key('KeyK', 'k'); await sleep(400);
+  console.log('sky', await state());
+  await key('KeyG', 'g'); await key('KeyC', 'c'); await sleep(100);
+  console.log('god+coins', await evaluate(`[__game.mode.player.invincible, Math.floor(__game.mode.player.coins)]`));
+  await key('Digit3', '3'); await sleep(400);
+  console.log('level 3', await state());
+  await key('Digit5', '5'); await sleep(400);
+  console.log('battle', await state());
+  await key('Backquote', '`'); await sleep(100);
+  console.log('panel hidden', await evaluate(`document.getElementById('debug').hidden`));
+}
 if (script === 'battle') {
   await evaluate(`__game.mode.finished = true`);
   await sleep(500);
