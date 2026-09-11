@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { World } from './world.js';
-import { Player } from './player.js';
+import { Player, BACK_LIMIT } from './player.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
 import { damp, lerp, clamp } from './util.js';
@@ -160,7 +160,7 @@ function frame(now) {
     player.update(dt);
     world.update(dt, time);
     world.ensure(player.row + 26);
-    world.cull(player.row - 10);
+    world.cull(player.maxRow - BACK_LIMIT - 2);
     if (!player.alive && player.deadFor > 0.9) {
       over = true;
       if (player.maxRow > best) { best = player.maxRow; localStorage.setItem('rc-best', best); }

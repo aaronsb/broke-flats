@@ -4,7 +4,7 @@ import { sfx } from './sfx.js';
 import { lerp } from './util.js';
 
 const HOP = 0.16;      // seconds per hop
-const BACK_LIMIT = 5;  // rows allowed behind the furthest row reached
+export const BACK_LIMIT = 12; // rows allowed behind the furthest row reached
 
 export class Player {
   constructor(scene, world) {
@@ -35,7 +35,7 @@ export class Player {
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     const tc = Math.round(this.x) + dc;
     const tr = this.row + dr;
-    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || this.world.isBlocked(tc, tr)) {
+    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr)) {
       this.bump = 0.12;
       sfx.bump();
       return;
