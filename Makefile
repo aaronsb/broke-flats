@@ -13,7 +13,7 @@ help: ## Show this help
 	@echo
 	@echo "  smoke takes S=<scenario>: hops (default), train, occupied, night, skies, debug, battle, shots"
 
-dev: ## Start the Vite dev server on all interfaces (port $(PORT))
+dev: ## Start the Vite dev server on all interfaces, port 5173
 	npx vite --port $(PORT) --strictPort --host 0.0.0.0
 
 build: ## Production build into dist/
@@ -25,7 +25,7 @@ preview: ## Serve the production build
 smoke: ## Headless runtime check in Chrome (S=<scenario>)
 	@$(MAKE) --no-print-directory with-server CMD="scripts/smoke.sh $(or $(S),hops)"
 
-shots: ## Capture a screenshot per view into $(SHOTS) and rebuild docs/screenshots.md
+shots: ## Capture a screenshot per view into docs/screenshots and rebuild docs/screenshots.md
 	@mkdir -p $(SHOTS)
 	@$(MAKE) --no-print-directory with-server CMD="env OUT=$(SHOTS) scripts/smoke.sh shots"
 	@node scripts/shots-index.mjs $(SHOTS) > docs/screenshots.md
