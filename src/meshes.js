@@ -290,13 +290,15 @@ export function buildingStyle(kind, lit) {
   return { h: rand(3, 8), color: pick(...BUILDING_COLORS), roof: null, windows: true, lit };
 }
 
-// Picket fence one cell long, running along x.
-export function makeFence() {
+// Picket fence one cell long. Runs along x by default; `along = 'z'` turns it
+// to run down the column so consecutive rows form a continuous line.
+export function makeFence(along = 'x') {
   const g = new THREE.Group();
   const c = 0xe9e4d6;
   g.add(box(1, 0.08, 0.08, c, 0, 0.55));
   g.add(box(1, 0.08, 0.08, c, 0, 0.25));
   for (const x of [-0.35, 0, 0.35]) g.add(box(0.1, 0.8, 0.1, c, x, 0));
+  if (along === 'z') g.rotation.y = Math.PI / 2;
   return g;
 }
 

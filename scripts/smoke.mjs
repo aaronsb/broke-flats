@@ -301,7 +301,7 @@ if (script === 'shots') {
   await sleep(300); await shot('river-top');
   await key('Space', ' '); await sleep(1500); await shot('river-iso');
   await key('Space', ' '); await sleep(300);
-  await evaluate(`__game.run.gauntlet = 'mines'; __game.debug.sky = 'day'; __game.debug.scenery = 'residential'; __game.run.level = 1; __game.restartStage()`); await sleep(800);
+  await evaluate(`__game.debug.force = null; __game.run.gauntlet = 'mines'; __game.debug.sky = 'day'; __game.debug.scenery = 'residential'; __game.run.level = 1; __game.restartStage()`); await sleep(800);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(500); await shot('mines-top');
   await key('Space', ' '); await sleep(1500); await shot('mines-iso');
