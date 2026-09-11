@@ -33,9 +33,8 @@ rig.add(pivot);
 scene.add(rig);
 let tilted = false;
 let view = { tilt: 0, yaw: 0 };
-// Tilting costs time. Coins buy more.
-const START_TILT = 6, COIN_TILT = 3, MAX_TILT = 30;
-let tiltTime = START_TILT;
+// Peeking in 3D burns coins. The less you tilt, the more you keep.
+const START_COINS = 4, TILT_COST = 1; // coins per second while tilted
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -75,9 +74,8 @@ const ui = {
   overCoins: document.getElementById('over-coins'),
   title: document.getElementById('title'),
   view: document.getElementById('view'),
-  meter: document.getElementById('meter'),
 };
-player.onCoin = () => { tiltTime = Math.min(MAX_TILT, tiltTime + COIN_TILT); };
+player.coins = START_COINS;
 ui.best.textContent = `BEST ${best}`;
 
 function restart() {
@@ -89,7 +87,7 @@ function restart() {
   over = false;
   ui.over.classList.remove('show');
   rig.position.set(0, 0, -3);
-  tiltTime = START_TILT;
+  player.coins = START_COINS;
   setTilt(false);
 }
 world.ensure(26);
@@ -105,7 +103,7 @@ function begin() {
 
 function setTilt(on) {
   if (on === tilted) return;
-  if (on && tiltTime <= 0) { sfx.bump(); return; }
+  if (on && player.coins < 1) { sfx.bump(); return; }
   tilted = on;
   ui.view.classList.toggle('on', tilted);
   sfx.tilt();
@@ -165,7 +163,7 @@ function frame(now) {
       ui.best.textContent = `BEST ${best}`;
       ui.overTitle.textContent = player.deadBy === 'car' ? 'SPLAT' : 'GLUB';
       ui.overScore.textContent = `score ${player.maxRow}`;
-      ui.overCoins.textContent = `coins ${player.coins}`;
+      ui.overCoins.textContent = `coins ${Math.floor(player.coins)}`;
       ui.over.classList.add('show');
       sfx.over();
     }
@@ -174,11 +172,11 @@ function frame(now) {
   }
 
   if (tilted && started && !over) {
-    tiltTime -= dt;
-    if (tiltTime <= 0) { tiltTime = 0; setTilt(false); }
+    player.coins -= TILT_COST * dt;
+    if (player.coins <= 0) { player.coins = 0; setTilt(false); }
   }
-  ui.meter.style.width = `${(tiltTime / MAX_TILT) * 100}%`;
-  ui.meter.parentElement.classList.toggle('empty', tiltTime <= 0);
+  ui.coins.classList.toggle('draining', tilted);
+  ui.view.classList.toggle('broke', player.coins < 1);
 
   // camera follow + view blend
   const goal = tilted ? ISO : TOP;
@@ -198,7 +196,7 @@ function frame(now) {
   sun.target.position.set(player.x, 0, player.z);
 
   ui.score.textContent = player.maxRow;
-  ui.coins.textContent = `● ${player.coins}`;
+  ui.coins.textContent = `● ${Math.floor(player.coins)}`;
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

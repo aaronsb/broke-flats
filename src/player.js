@@ -21,7 +21,7 @@ export class Player {
     this.buffered = null;
     this.facing = 0;
     this.alive = true; this.deadBy = null; this.deadFor = 0;
-    this.maxRow = 0; this.coins = 0;
+    this.maxRow = 0;
     this.onLog = null;
     this.bump = 0;
     this.mesh.scale.set(1, 1, 1);
@@ -51,7 +51,6 @@ export class Player {
   gotCoin() {
     this.coins++;
     sfx.coin();
-    if (this.onCoin) this.onCoin();
   }
 
   die(how) {

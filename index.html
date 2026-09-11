@@ -14,9 +14,9 @@
     #hint  { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 14px; opacity: .85; }
     #view  { position: absolute; bottom: 44px; right: 18px; pointer-events: auto; font: inherit; font-size: 16px; font-weight: 700; color: #fff; background: #1b3a5a; border: 3px solid #fff; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
     #view.on { background: #d9702a; }
-    #meter-box { position: absolute; bottom: 96px; right: 18px; width: 120px; height: 14px; background: #1b3a5a; border: 3px solid #fff; border-radius: 4px; overflow: hidden; }
-    #meter { height: 100%; width: 20%; background: #ffd23f; }
-    #meter-box.empty { border-color: #888; }
+    #coins.draining { color: #ffd23f; animation: pulse .5s infinite alternate; }
+    #view.broke { opacity: .45; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.12); } }
     #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
     #over.show { display: flex; }
     #over h1 { font-size: 56px; margin: 0 0 8px; }
@@ -34,8 +34,7 @@
     <div id="score">0</div>
     <div id="best">BEST 0</div>
     <div id="coins">● 0</div>
-    <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE tilt view (coins buy tilt time) &nbsp;·&nbsp; P pixel size</div>
-    <div id="meter-box"><div id="meter"></div></div>
+    <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE peek in 3D (burns coins) &nbsp;·&nbsp; P pixel size</div>
     <button id="view">TILT</button>
     <div id="title">
       <h1>ROAD CROSSER</h1>
