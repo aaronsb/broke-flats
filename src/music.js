@@ -20,13 +20,16 @@ const MOODS = {
   danger: { bpm: 150, cutoff: 1800 },
   battle: { bpm: 164, cutoff: 2600 },
   gauntlet: { bpm: 184, cutoff: 3200 },
+  attract: { bpm: 112, cutoff: 1600 },
 };
 const BATTLE_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [57, 60, 64]]; // C F G Am
 
 let ctx, master, bus, delayBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
-let mood = { danger: false, tilted: false, dead: false, battle: false, countdown: 0 };
+let mood = { danger: false, tilted: false, dead: false, battle: false, countdown: 0, attract: false };
+// Attract-mode hook: a fixed motif over the calm chords so the title has a tune.
+const MOTIF = [0, 2, 4, 7, 4, 2, 0, -1, 0, 2, 4, 9, 7, 4, 2, 0];
 let muted = false;
 
 function setup() {
@@ -112,7 +115,7 @@ const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, {
 
 // ---------- step sequencer ----------
 function scheduleStep(s, t) {
-  const target = MOODS[mood.dead ? 'calm' : mood.battle ? 'battle' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm'];
+  const target = MOODS[mood.attract ? 'attract' : mood.dead ? 'calm' : mood.battle ? 'battle' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm'];
   // A running continue countdown pushes the tempo up toward the end.
   const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : target.bpm;
   bpm += (goalBpm - bpm) * 0.12;
@@ -127,6 +130,16 @@ function scheduleStep(s, t) {
 
   if (mood.dead) {
     if (s === 0) pad(chord, t, beat * 4);
+    return;
+  }
+
+  if (mood.attract) {
+    // Title tune: pad, walking bass, the motif on square lead, a soft hat.
+    if (s === 0) pad(chord, t, beat * 4);
+    if (s % 4 === 0) bass(root + [0, 7, 12, 7][(s / 4) | 0], t, beat * 0.9, false);
+    const step = MOTIF[(s + bar * 4) % MOTIF.length];
+    if (step >= 0 && s % 2 === 0) lead(scale[(step + bar) % scale.length], t, sixteenth * 2.5, 0.07);
+    if (s % 4 === 2) hat(t, false, 0.06);
     return;
   }
 

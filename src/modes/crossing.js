@@ -50,7 +50,7 @@ export class CrossingMode {
     this.focus = { x: 0, z: 0 };
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
-    music.setMood({ dead: false, danger: false, battle: false, tilted: false, gauntlet: !!this.game.run.gauntlet, countdown: 0 });
+    music.setMood({ dead: false, danger: false, battle: false, tilted: false, attract: false, gauntlet: !!this.game.run.gauntlet, countdown: 0 });
     if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
   }
