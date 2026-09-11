@@ -145,6 +145,21 @@ if (script === 'playtest') {
   await send('Page.navigate', { url: 'http://localhost:5173/?battle&level=2' }); await sleep(3500);
   console.log('battle url', await evaluate(`[__game.mode.constructor.name, __game.run.level]`));
 }
+if (script === 'wing') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'runway'; __game.restartStage()`); await sleep(500);
+  // Stand the player under a taxiing plane's wing on the row before the runway and see it get picked up.
+  const r = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'runway'); const m = lane.movers[0]; m.kind = 'taxi'; m.x = 0; m.mesh.position.x = 0; const p = __game.mode.players[0];
+    p.row = lane.r - 1; p.z = -p.row; p.x = 0.1 * lane.dir; p.col = 0; p.mesh.position.set(p.x, 0, p.z); p.land(); return [lane.r, lane.dir, !!p.carrier, !!p.carrier?.wing]; })()`);
+  await sleep(700);
+  console.log('mounted', r, await evaluate(`[__game.mode.players[0].alive, Math.round(__game.mode.players[0].x * 10) / 10, Math.round(__game.mode.players[0].y * 100) / 100]`));
+  await evaluate(`(() => { const p = __game.mode.players[0]; p.y = 3; p.carrier.y = 2.6; })()`);   // pretend the plane climbed
+  await key('ArrowDown'); await sleep(200);
+  console.log('hover', await evaluate(`[!!__game.mode.players[0].airborne, Math.round(__game.mode.players[0].y * 10) / 10]`));
+  await sleep(2500);
+  console.log('landed', await evaluate(`[!!__game.mode.players[0].airborne, Math.round(__game.mode.players[0].y * 10) / 10, __game.mode.players[0].row]`));
+  console.log('spacing', await evaluate(`(() => { const rs = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'runway').map(l => l.r).sort((a, b) => a - b); let min = 99; for (let i = 1; i < rs.length; i++) min = Math.min(min, rs[i] - rs[i - 1]); return [rs.length, min]; })()`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

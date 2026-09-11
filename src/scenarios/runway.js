@@ -11,6 +11,7 @@ import { sfx } from '../sfx.js';
 import { traffic } from '../tuning.js';
 
 registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat' });
+registerDeath('flown', { anim: 'launch', title: 'FLOWN OFF', sfx: 'splat' });
 
 const CLIMB = 4;          // height reached at the end of the row
 const LETHAL_BELOW = 1.0; // plane height under which it can hit you
@@ -40,7 +41,9 @@ export default {
   id: 'runway',
   danger: true,
   weight: 2,
-  band: [1, 3],
+  band: [1, 1],     // one row per band, and never within two rows of another: wings must not touch
+  minGap: 3,
+  keepGap: true,    // even when forced or in a gauntlet
   build(lane, { prev, sky, difficulty, gauntlet }) {
     lane.ground(0x3e3e46);
     for (let x = -GW / 2; x < GW / 2; x += 2) lane.add(box(1.1, 0.02, 0.12, 0xe8e8e8, x, 0, 0, false));   // centreline
@@ -55,6 +58,8 @@ export default {
       const m = makePlane();
       m.kind = pick(...kinds);
       m.y = 0;
+      m.wing = true;                 // ridable from the rows either side
+      m.offCause = 'flown';
       if (sky.headlights) for (const dz of [-1.15, 1.15]) m.mesh.add(makeHeadlightCone(m.len * CONE, m.len * CONE / 2 + 0.2, 0.15, dz, 0.5));
       return m;
     }, 0.6);

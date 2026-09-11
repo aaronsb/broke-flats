@@ -8,6 +8,8 @@ import { lerp } from './util.js';
 const HOP = 0.16;             // seconds per hop
 export const BACK_LIMIT = 12; // rows allowed behind the furthest row reached
 
+const HOVER = 0.5;        // seconds hanging in the air after leaving a high wing
+const GRAVITY = 14;
 const BURST_GAP = 0.32;   // hops closer than this count toward a burst
 const BURST_HOPS = 4;     // burst length that earns a call
 export const DEATH_FLAP = 0.8; // seconds of frame-flapping before the death pose
@@ -31,7 +33,9 @@ export class Player {
     this.facing = 0;
     this.alive = true; this.deadBy = null; this.deadFor = 0;
     this.maxRow = 0;
-    this.carrier = null;      // mover currently carrying the player (a log, say)
+    this.carrier = null;      // mover currently carrying the player (a log, a wing)
+    this.carrierOffset = 0;   // where on the carrier the player stands
+    this.airborne = null;     // { hover } after hopping off something tall
     this.onLanded = null;     // hook: called after every landing
     this.isOccupied = null;   // hook: (col, row) => true blocks a hop
     this.invincible = false;
@@ -64,12 +68,20 @@ export class Player {
       return;
     }
     this.from = { x: this.x, z: this.z, y: this.y };
-    this.to = { x: tc, z: -tr };
+    // Leaving something tall: the hop keeps its altitude, then comes the drop.
+    const high = this.y > 0.6;
+    this.to = { x: tc, z: -tr, y: high ? this.y : 0 };
+    this.airborne = high ? { hover: HOVER, vy: 0 } : null;
     this.tcol = tc; this.trow = tr;
     this.moving = true; this.t = 0;
     this.carrier = null;
     sfx.hop();
     this.call();
+  }
+
+  mount(m) {
+    this.carrier = m;
+    this.carrierOffset = this.x - m.x;
   }
 
   // A run of quick hops earns a call from the character.
@@ -119,8 +131,12 @@ export class Player {
   land() {
     const lane = this.world.laneAt(this.row);
     if (!lane) return;
+    // A wing over this cell catches you before whatever is below can.
+    const wing = this.world.wingAt(this.x, this.row);
+    if (wing) { this.mount(wing); this.onLanded?.(); return; }
     const cause = lane.scenario.onLand?.(lane, this);
     if (cause) { this.die(cause); return; }
+    if (this.carrier) this.carrierOffset = this.x - this.carrier.x;
     if (lane.takeCoin(this.col)) this.gotCoin();
     if (this.carrier && Math.abs(this.x - this.carrier.x) < 0.6 && lane.takeMoverCoin(this.carrier)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
@@ -180,33 +196,44 @@ export class Player {
       this.x = lerp(this.from.x, this.to.x, t);
       this.z = lerp(this.from.z, this.to.z, t);
       const s = Math.sin(Math.PI * t);
-      this.y = lerp(this.from.y, 0, t) + s * 0.55;
+      this.y = lerp(this.from.y, this.to.y ?? 0, t) + s * 0.55;
       sy = 1 + 0.25 * s; sx = 1 - 0.12 * s;
       setFrame(m, t > 0.2 && t < 0.85 ? 1 : 0);
       if (this.t >= 1) {
         this.moving = false;
-        this.x = this.to.x; this.z = this.to.z; this.y = 0;
+        this.x = this.to.x; this.z = this.to.z; this.y = this.to.y ?? 0;
         this.col = this.tcol; this.row = this.trow;
-        this.land();
+        if (!this.airborne) this.land();
       }
+    } else if (this.airborne) {
+      // Hang for a beat, notice, then drop; landing checks run on touchdown.
+      const a = this.airborne;
+      if (a.hover > 0) {
+        a.hover -= dt;
+        setFrame(m, Math.floor(a.hover / 0.08) % 2);     // frantic flapping, to no effect
+        if (a.hover <= 0) { sfx.fall(); setFrame(m, 1); }
+      } else { a.vy += GRAVITY * dt; this.y -= a.vy * dt; }
+      if (this.y <= 0) { this.y = 0; this.airborne = null; setFrame(m, 0); sfx.boom(0.45); this.land(); }
     } else {
-      const lane = this.world.laneAt(this.row);
-      if (this.carrier && lane) {
-        this.x += lane.dir * lane.speed * dt;
+      if (this.carrier) {
+        this.x = this.carrier.x + this.carrierOffset;
         this.col = Math.round(this.x);
-        this.y = (this.carrier.rideY ?? 0) + Math.min(0, this.carrier.mesh.position.y);
+        this.y = this.carrier.wing ? this.carrier.y + 0.4 : (this.carrier.rideY ?? 0) + Math.min(0, this.carrier.mesh.position.y);
         if (this.carrier.submerged) { this.die('water'); return; }
         if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
     }
 
-    // Hazard check against whichever row the chicken is mostly in.
-    const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
-    const lane = this.world.laneAt(checkRow);
-    const cause = lane?.scenario.lethalAt?.(lane, this.x);
-    if (cause === 'bounce') this.bounce(lane);
-    else if (cause) this.die(cause);
+    // Hazard check against whichever row the chicken is mostly in. Nothing
+    // can reach you on a wing or in the air.
+    if (!this.carrier?.wing && !this.airborne) {
+      const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
+      const lane = this.world.laneAt(checkRow);
+      const cause = lane?.scenario.lethalAt?.(lane, this.x);
+      if (cause === 'bounce') this.bounce(lane);
+      else if (cause) this.die(cause);
+    }
 
     m.position.set(this.x, this.y, this.z);
     m.rotation.y = this.facing;

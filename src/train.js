@@ -139,7 +139,7 @@ export class Train {
       // Followers chatter now and then, always pitched above the player.
       k.chatter -= dt;
       if (k.chatter < 0) { k.chatter = randInt(10, 25); this.voice?.(1.5 + Math.random() * 0.4); }
-      const tx = this.resolveX(k.rec), tz = -k.rec.row, ty = k.rec.rideY;
+      const tx = this.resolveX(k.rec), tz = -k.rec.row, ty = k.rec.carrier?.wing ? k.rec.carrier.y + 0.4 : k.rec.rideY;
       let sy = 1;
       if (k.moving) {
         k.t += dt / HOP;

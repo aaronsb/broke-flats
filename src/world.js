@@ -34,13 +34,24 @@ export class World {
   }
 
   laneAt(r) { return this.rows.get(r); }
+
+  // A grounded plane whose wing reaches over cell (x, row) from a runway on
+  // either side. Wings span the neighbouring rows.
+  wingAt(x, row) {
+    for (const r of [row - 1, row + 1]) {
+      const lane = this.rows.get(r);
+      if (!lane || lane.scenario.id !== 'runway') continue;
+      for (const m of lane.movers) if (m.y < 1.0 && Math.abs(x - (m.x + lane.dir * 0.1)) < 0.45) return m;
+    }
+    return null;
+  }
   isBlocked(c, r) { const lane = this.rows.get(r); return !!lane && lane.blocked.has(c); }
 
   // ---- sequencer ----
   weightOf(s) { return this.config.weights[s.id] ?? 0; }
 
   pickScenario(r) {
-    const gap = (s) => (this.config.ignoreGaps ? 0 : s.minGap ?? 0);
+    const gap = (s) => (this.config.ignoreGaps && !s.keepGap ? 0 : s.minGap ?? 0);
     const pool = Object.values(SCENARIOS).filter((s) => this.weightOf(s) > 0 && r - (this.lastUsed[s.id] ?? -100) >= gap(s));
     if (pool.length === 0) return SCENARIOS[INTRO];
     let roll = Math.random() * pool.reduce((a, s) => a + this.weightOf(s), 0);
