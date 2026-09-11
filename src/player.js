@@ -93,6 +93,7 @@ export class Player {
     this.moving = true; this.t = 0;
     this.carrier = null;
     this.facing = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+    this.bounces = (this.bounces ?? 0) + 1;
     sfx.bump();
   }
 

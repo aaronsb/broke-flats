@@ -127,10 +127,10 @@ if (script === 'bounce') {
   await evaluate(`__game.debug.on = true; __game.debug.force = 'road'; __game.restartStage()`); await sleep(500);
   // Park the player right behind a car's rear bumper on the first road row and watch.
   const r = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'road'); const m = lane.movers[0]; const p = __game.mode.players[0];
-    m.x = 2; m.mesh.position.x = 2;
+    lane.movers.forEach((o, i) => { o.x = i === 0 ? 2 : -12 - i * 4; o.mesh.position.x = o.x; });
     p.row = lane.r; p.z = -lane.r; p.x = m.x - lane.dir * (m.len / 2 + 0.3); p.col = Math.round(p.x); p.mesh.position.set(p.x, 0, p.z); return [lane.r, lane.dir, Math.round(p.x * 10) / 10]; })()`);
-  await sleep(400);
-  console.log('bounce', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].row, __game.run.lives]`));
+  await sleep(250);
+  console.log('bounce', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].bounces ?? 0, Math.round(__game.mode.players[0].x)]`));
 }
 if (script === 'train') {
   await start();
