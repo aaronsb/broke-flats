@@ -57,7 +57,6 @@ function begin() {
     inserting = false;
     select.dispose();
     select = null;
-    music.setMood({ attract: false });
     ui.title.classList.add('hide');
     game.start();
   })) || (inserting = false);
@@ -69,7 +68,7 @@ function toTitle() {
   game.mode?.exit();
   game.mode = null;
   game.newSession();
-  music.setMood({ attract: true, dead: false, countdown: 0, danger: false, battle: false, gauntlet: false });
+  music.reset({ attract: true });
   ui.title.classList.remove('hide');
   select = new Select(scene, camera);
   select.setPicks(game.picks);
@@ -80,7 +79,7 @@ game.onTimeout = toTitle;
 // Attract music from the start: scheduled now, audible as soon as the
 // browser lets audio play (immediately, or on the first key or tap).
 music.start();
-music.setMood({ attract: true });
+music.reset({ attract: true });
 const unlock = () => { sfx.unlock(); removeEventListener('keydown', unlock); removeEventListener('pointerdown', unlock); };
 addEventListener('keydown', unlock);
 addEventListener('pointerdown', unlock);

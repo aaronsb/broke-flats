@@ -29,6 +29,7 @@ export class CrossingMode {
     this.hint = 'arrows / WASD hop · SPACE peek in 3D (burns coins) · M mute · P pixels';
   }
 
+  get mood() { return { gauntlet: !!this.game.run.gauntlet }; }
   get player() { return this.players[0]; }
   get train() { return this.trains[0]; }
 
@@ -50,7 +51,6 @@ export class CrossingMode {
     this.focus = { x: 0, z: 0 };
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
-    music.setMood({ dead: false, danger: false, battle: false, tilted: false, attract: false, gauntlet: !!this.game.run.gauntlet, countdown: 0 });
     if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
   }

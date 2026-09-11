@@ -49,6 +49,8 @@ export class BattleMode {
     this.hint = 'arrows move · SPACE fire · SHIFT tilt to aim land, sea or air';
   }
 
+  get mood() { return { battle: true }; }
+
   enter() {
     const { scene, level, sky } = this.game;
     this.group = new THREE.Group();
@@ -75,7 +77,6 @@ export class BattleMode {
 
     this.aim = 'land';
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
-    music.setMood({ battle: true, dead: false, tilted: false, danger: false });
     this.game.card(`LEVEL ${level.number} CLEAR · BATTLE`);
   }
 

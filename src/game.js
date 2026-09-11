@@ -171,6 +171,7 @@ export class Game {
   setMode(mode) {
     this.mode?.exit();
     this.mode = mode;
+    music.reset(mode.mood ?? {});
     mode.enter();
     this.ui.hint.textContent = mode.hint;
   }
@@ -203,7 +204,7 @@ export class Game {
     this.renderOver();
     this.ui.over.classList.add('show');
     sfx.over();
-    music.setMood({ dead: true, countdown: 0 });
+    music.reset({ dead: true });
   }
 
   hud(score, flock = '') {

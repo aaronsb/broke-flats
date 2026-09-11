@@ -27,7 +27,8 @@ const BATTLE_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [57, 60, 64]]; //
 let ctx, master, bus, delayBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
-let mood = { danger: false, tilted: false, dead: false, battle: false, countdown: 0, attract: false };
+const QUIET = { danger: false, tilted: false, dead: false, battle: false, countdown: 0, attract: false, gauntlet: false };
+let mood = { ...QUIET };
 // Attract-mode hook: a fixed motif over the calm chords so the title has a tune.
 const MOTIF = [0, 2, 4, 7, 4, 2, 0, -1, 0, 2, 4, 9, 7, 4, 2, 0];
 let muted = false;
@@ -197,6 +198,14 @@ export const music = {
     timer = setInterval(tick, 25);
   },
   setMood(m) { mood = { ...mood, ...m }; },
+  // Scene change: drop every flag, snap the tempo to the new mood, restart on the downbeat.
+  reset(m = {}) {
+    mood = { ...QUIET, ...m };
+    const name = mood.attract ? 'attract' : mood.dead ? 'calm' : mood.battle ? 'battle' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm';
+    bpm = MOODS[name].bpm;
+    step = 0; bar = 0;
+    if (ctx) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
+  },
   toggleMute() {
     muted = !muted;
     if (master) master.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.05);
