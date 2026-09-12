@@ -100,6 +100,12 @@ export class Game {
 
   get roster() { return this.picks.map((i) => CHARACTERS[i]); }
 
+  // Cash-in multiplier for the roster: the mean of each character's own.
+  scoreMul() {
+    const r = this.roster;
+    return r.reduce((a, c) => a + (c.scoreMul ?? 1), 0) / r.length;
+  }
+
   // Title card: sky for level 1 behind the character cards.
   preview() {
     this.setLevel(1);

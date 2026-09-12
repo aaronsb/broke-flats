@@ -167,10 +167,12 @@ const small = (make) => (variant) => { const m = make(variant); m.scale.setScala
 
 // A character may list visual `variants`; make(variant) and young(variant)
 // take the one the run rolled so a player's followers match their parent.
+// `scoreMul` scales every cash-in: perks that make crossing easier cost a
+// little, handicaps pay a little. `swims` is the first perk (see issue #1).
 export const CHARACTERS = [
   { id: 'chicken', name: 'CHICKEN', voice: 'chicken', make: makeChicken, young: makeChick },
-  { id: 'goose',   name: 'GOOSE',   voice: 'goose',   make: makeGoose,   young: small(makeGoose), swims: true },
-  { id: 'duck',    name: 'DUCK',    voice: 'duck',    make: makeDuck,    young: small(makeDuck),  swims: true },
+  { id: 'goose',   name: 'GOOSE',   voice: 'goose',   make: makeGoose,   young: small(makeGoose), swims: true, scoreMul: 0.9 },
+  { id: 'duck',    name: 'DUCK',    voice: 'duck',    make: makeDuck,    young: small(makeDuck),  swims: true, scoreMul: 0.9 },
   { id: 'frog',    name: 'FROG',    voice: 'frog',    make: makeFrog,    young: small(makeFrog) },
   { id: 'cat',     name: 'CAT',     voice: 'cat',     make: makeCat,     young: small(makeCat), variants: Object.keys(CATS) },
   { id: 'pig',     name: 'PIG',     voice: 'pig',     make: makePig,     young: small(makePig) },

@@ -340,7 +340,7 @@ export class BattleMode {
         { label: 'LAND', count: T.land, each: POINTS.land }, { label: 'SEA', count: T.sea, each: POINTS.sea },
         { label: 'AIR', count: T.air, each: POINTS.air }, { label: 'TRAINS', count: T.train, each: 60 },
         { label: 'SCENERY', count: T.props, each: PROP_POINTS },
-      ], { onLine: (v) => { game.run.score += v; }, done: () => { this.summaryDone = true; } });
+      ], { mul: game.scoreMul(), onTotal: (v) => { game.run.score += v; }, done: () => { this.summaryDone = true; } });
     }
   }
 }

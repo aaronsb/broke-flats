@@ -305,7 +305,8 @@ export class CrossingMode {
     music.reset({ tally: true });
     if (T.gauntlet) sfx.phew();
     T.summaryMs = game.summary.show(`LEVEL ${game.level.number} CLEAR`, lines, {
-      onLine: (v) => { game.run.score += v; },
+      mul: game.scoreMul(),
+      onTotal: (v) => { game.run.score += v; },
       done: () => { T.summaryDone = true; },
     });
   }

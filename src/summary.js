@@ -12,8 +12,9 @@ export class Summary {
     this.timers = [];
   }
 
-  // lines: [{ label, count, each }] — value = count × each. onLine(value) fires as each lands.
-  show(title, lines, { onLine = () => {}, done = () => {} } = {}) {
+  // lines: [{ label, count, each }] — value = count × each. The total is scaled by
+  // `mul` (shown as its own line when it is not 1) and handed to onTotal once.
+  show(title, lines, { mul = 1, onTotal = () => {}, done = () => {} } = {}) {
     this.clear();
     this.ui.summary.classList.add('show');
     this.ui.summaryTitle.textContent = title;
@@ -35,18 +36,31 @@ export class Summary {
         const v = Math.round((target * i) / steps);
         later(at + i * STEP_MS, () => { value.textContent = v; if (target) sfx.tick(); });
       }
-      later(at + steps * STEP_MS + 40, () => { if (target) sfx.register(); total += target; onLine(target); });
+      later(at + steps * STEP_MS + 40, () => { if (target) sfx.register(); total += target; });
       at += steps * STEP_MS + LINE_GAP;
     });
+
+    if (mul !== 1) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      later(at, () => {
+        row.innerHTML = `<span class="label">${mul < 1 ? 'PERK HANDICAP' : 'BONUS'}</span><span class="value">×${mul.toFixed(2)}</span>`;
+        body.appendChild(row);
+        sfx.tick();
+      });
+      at += LINE_GAP;
+    }
 
     const totalRow = document.createElement('div');
     totalRow.className = 'row total';
     this.ready = false;
     this.done = done;
     later(at + 200, () => {
-      totalRow.innerHTML = `<span class="label">TOTAL</span><span class="value">${total}</span>`;
+      const scaled = Math.round(total * mul);
+      totalRow.innerHTML = `<span class="label">TOTAL</span><span class="value">${scaled}</span>`;
       body.appendChild(totalRow);
       sfx.register();
+      onTotal(scaled);
     });
     later(at + 900, () => {
       const go = document.createElement('div');
