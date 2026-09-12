@@ -4,6 +4,7 @@
 // hit is not lost: it runs ahead to wait at the finish line and rejoins there.
 import { W, OFF_EDGE } from './lane.js';
 import { setFrame } from './characters.js';
+import { SWIM_Y } from './scenarios/river.js';
 import { sfx } from './sfx.js';
 import { lerp, randInt } from './util.js';
 
@@ -70,8 +71,16 @@ export class Train {
     return this.chicks.find((k) => k.rec && k.rec.row === r && Math.round(this.resolveX(k.rec)) === c) ?? null;
   }
 
+  // Open water for a swimmer's young means swimming depth.
+  restY(rec) {
+    if (rec.carrier) return rec.carrier.wing ? rec.carrier.y + 0.4 : rec.rideY;
+    return this.player.swims && this.world.laneAt(rec.row)?.scenario.id === 'river' ? SWIM_Y : 0;
+  }
+
   sendTo(k, target, delay = 0) {
-    k.from = { x: this.resolveX(k.rec), z: -k.rec.row, y: k.rec.rideY };
+    k.from = { x: this.resolveX(k.rec), z: -k.rec.row, y: this.restY(k.rec) };
+    k.paddling = this.player.swims && !k.rec.carrier && !target.carrier
+      && this.world.laneAt(k.rec.row)?.scenario.id === 'river' && this.world.laneAt(target.row)?.scenario.id === 'river';
     const dx = this.resolveX(target) - k.from.x, dz = -target.row - k.from.z;
     k.facing = Math.abs(dz) > Math.abs(dx) ? (dz < 0 ? 0 : Math.PI) : (dx < 0 ? Math.PI / 2 : -Math.PI / 2);
     k.rec = target;
@@ -139,15 +148,15 @@ export class Train {
       // Followers chatter now and then, always pitched above the player.
       k.chatter -= dt;
       if (k.chatter < 0) { k.chatter = randInt(10, 25); this.voice?.(1.5 + Math.random() * 0.4); }
-      const tx = this.resolveX(k.rec), tz = -k.rec.row, ty = k.rec.carrier?.wing ? k.rec.carrier.y + 0.4 : k.rec.rideY;
+      const tx = this.resolveX(k.rec), tz = -k.rec.row, ty = this.restY(k.rec);
       let sy = 1;
       if (k.moving) {
         k.t += dt / HOP;
         const t = Math.max(0, Math.min(1, k.t));
-        const s = Math.sin(Math.PI * t);
+        const s = k.paddling ? 0 : Math.sin(Math.PI * t);
         k.mesh.position.set(lerp(k.from.x, tx, t), lerp(k.from.y, ty, t) + s * 0.4, lerp(k.from.z, tz, t));
         sy = 1 + 0.2 * s;
-        setFrame(k.mesh, t > 0.2 && t < 0.85 ? 1 : 0);
+        setFrame(k.mesh, !k.paddling && t > 0.2 && t < 0.85 ? 1 : 0);
         if (k.t >= 1) {
           k.moving = false; setFrame(k.mesh, 0);
           const l = this.world.laneAt(k.rec.row);
@@ -161,6 +170,17 @@ export class Train {
 
       if (k.moving && k.t < 0.5) continue;
       const lane = this.world.laneAt(k.rec.row);
+      // A swimmer's young afloat: logs and gator backs pick it up, boats run it down.
+      if (this.player.swims && !k.moving && !k.rec.carrier && lane?.scenario.id === 'river') {
+        const m = lane.moverAt(k.mesh.position.x, 0.3);
+        if (m && !m.submerged) {
+          const x = k.mesh.position.x;
+          const on = (span) => { const a = m.x + lane.dir * span[0], b = m.x + lane.dir * span[1]; return x > Math.min(a, b) + 0.1 && x < Math.max(a, b) - 0.1; };
+          if ((m.head && on(m.head)) || m.kind === 'boat' || m.kind === 'sub') { this.lose(k, true); continue; }
+          if (on(m.bed)) { k.rec = { ...k.rec, carrier: m, offset: x - m.x, rideY: m.rideY ?? 0 }; }
+        }
+        continue;
+      }
       const hit = lane?.scenario.lethalAt?.(lane, k.mesh.position.x);
       if (hit && hit !== 'bounce') this.lose(k);
       else if (Math.abs(k.mesh.position.x) > OFF_EDGE) this.lose(k, lane?.scenario.id === 'river');
