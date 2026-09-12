@@ -4,7 +4,13 @@ import { rand } from './util.js';
 import { sfx } from './sfx.js';
 
 export const W = 8;          // playable columns run -W..W
-export const SPAN = W + 5;   // movers wrap at ±SPAN
+export const VIEW = W + 5;   // about what a top-down window shows either side: "just off screen"
+// Movers wrap at ±SPAN. It has to sit outside the widest view or the wrap is a
+// vehicle popping into existence in front of you: top-down reaches 10.5 units,
+// but the tilted peek reaches 31.4, so the old ±VIEW wrap was 18 units inside
+// the edge of the tilted screen.
+export const SPAN = 35;
+const RING = SPAN / VIEW;    // the ring grew by this much, so counts scale with it to hold the density
 export const OFF_EDGE = 11.6; // carried this far is off screen and lost
 export const GW = 120;       // ground width: far past any camera edge, even tilted
 export const DETAIL_W = 60;  // repeated details (dashes, stripes, sleepers) only span this
@@ -85,6 +91,7 @@ export class Lane {
   // Spread n movers along the wrap span so they never overlap.
   // make() returns { mesh, len }; extra fields are kept on the mover.
   spawnMovers(n, make, gap = 0.5) {
+    n = Math.max(1, Math.round(n * RING));   // n is per visible span; the ring holds more
     const slot = (2 * SPAN) / n;
     for (let i = 0; i < n; i++) {
       const m = make(i);
@@ -101,6 +108,7 @@ export class Lane {
   // dropping any that would not fit around the wrap. Stallers (per `stall`
   // chance) ease to a halt now and then and pull away again.
   spawnSpaced(n, make, { gapMin, gapVar, stall = 0, reckless = 0 }) {
+    n = Math.max(1, Math.round(n * RING));   // n is per visible span; the ring holds more
     let x = -SPAN + rand(0, gapVar);
     for (let i = 0; i < n; i++) {
       const m = make(i);

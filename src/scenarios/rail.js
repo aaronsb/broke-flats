@@ -15,7 +15,7 @@ import { LEFT_HAND } from '../locale.js';
 registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat', squash: 3.6 });
 
 const WARN = 2.0;         // seconds of gates and blinking before the train arrives
-const PARK = 30;          // how far off the strip a waiting train sits: beyond the tilted view
+const PARK = SPAN;        // a waiting train parks on the wrap ring, which clears the tilted view
 const GATE_ARM = W + 1.6; // each arm reaches a cell past the centre: closed arms overlap two cells
 const TYPES = {
   steam:  { speed: [5, 7],   cars: ['flat', 'box', 'closed', 'flat'], w: 3 },

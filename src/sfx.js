@@ -173,6 +173,11 @@ export const sfx = {
   // Giving up quietly: a slow sag with the colour draining out of it.
   sigh: () => { voice({ wave: 'triangle', freq: N(69), slideTo: N(55), attack: 0.03, decay: 0.1, sustain: 0.6, hold: 0.3, release: 0.3, vol: 0.05 });
                 voice({ wave: 'sine', freq: N(57), slideTo: N(45), attack: 0.05, decay: 0.1, sustain: 0.5, hold: 0.35, release: 0.3, vol: 0.035 }); },
+  // Catching light: a broad noise swell that rushes up, then falls away as it
+  // takes hold, over a low roar.
+  fwoosh: () => { voice({ wave: 'noise', freq: 300, slideTo: 3200, filter: 'bandpass', attack: 0.04, decay: 0.08, sustain: 0.85, hold: 0.16, release: 0.3, vol: 0.16 });
+                  voice({ wave: 'sawtooth', freq: vary(70, 0.2), slideTo: 38, attack: 0.02, decay: 0.1, sustain: 0.6, hold: 0.2, release: 0.3, vol: 0.05 });
+                  setTimeout(() => voice({ wave: 'noise', freq: 2600, slideTo: 260, filter: 'bandpass', attack: 0.02, decay: 0.1, sustain: 0.7, hold: 0.2, release: 0.4, vol: 0.11 }), 170); },
   // Fire crackle: a handful of tiny bright noise ticks at random times.
   crackle: () => { for (let i = 0; i < 5; i++) setTimeout(() => voice({ wave: 'noise', freq: vary(3500, 0.3), filter: 'highpass', attack: 0.001, decay: 0.01, sustain: 0.3, hold: 0.005, release: 0.02, vol: 0.05 }), rand(40, 520)); },
   // "Dee-doo" confirmation chime.

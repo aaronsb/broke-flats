@@ -63,9 +63,12 @@ export function makeTruck() {
 
 export function makeTree(tall = false) {
   const g = new THREE.Group();
+  g.userData.burns = true;          // catches light instead of shattering
   const h = tall ? rand(0.9, 1.6) : rand(0.5, 1.0);
   const c1 = pick(...GREENS), c2 = pick(...GREENS);
-  g.add(box(0.3, h, 0.3, 0x7a4a1f));
+  const trunk = box(0.3, h, 0.3, 0x7a4a1f);
+  trunk.userData.trunk = true;      // what is left standing once the rest burns off
+  g.add(trunk);
   g.add(box(0.9, 0.9, 0.9, c1, 0, h));
   g.add(box(0.6, 0.5, 0.6, c2, 0, h + 0.9));
   if (tall) g.add(box(0.35, 0.35, 0.35, c1, 0, h + 1.4));
@@ -132,8 +135,6 @@ export function makeTunnel() {
   return g;
 }
 
-const haloMat = new THREE.MeshBasicMaterial({ color: 0xffe36b });
-// A ring of eight little cubes.
 // A hole in the ground: a flat black disc, laid just above the ground so it
 // does not fight with it. Scaled from nothing and back by whoever drops in.
 export function makeHole() {
@@ -144,6 +145,8 @@ export function makeHole() {
   return m;
 }
 
+const haloMat = new THREE.MeshBasicMaterial({ color: 0xffe36b });
+// A ring of eight little cubes.
 export function makeHalo() {
   const g = new THREE.Group();
   for (let i = 0; i < 8; i++) {

@@ -9,7 +9,7 @@ import {
 import { Footprints } from '../scenery/footprints.js';
 import { Debris } from '../debris.js';
 import { setFrame } from '../characters.js';
-import { W, SPAN } from '../lane.js';
+import { W, VIEW as OFFSCREEN } from '../lane.js';   // VIEW is taken here by the camera presets
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { CONE } from '../headlights.js';
@@ -25,6 +25,8 @@ const GRID_X = 40;     // props are placed on cells out to ±GRID_X
 // Field themes: prop mix (weighted by repetition), building style and how
 // often a footprint is attempted per side per row. One is picked per battle.
 const tall = () => makeTree(true);
+const CHAR = new THREE.MeshLambertMaterial({ color: 0x1a1410 });   // what is left of a tree
+const CHAR_HOLD = 0.7;    // seconds the black stick stands before it crumbles
 const THEMES = {
   forest:      { props: [tall, tall, tall, makeTree, makeTree, makeHedge, makeHedge, makeShrub, makeShrub], building: 'house', buildProb: 0.08 },
   residential: { props: [makeFence, makeFence, makeShrub, makeShrub, makeTree, tall, tall, makeHedge], building: 'house', buildProb: 0.5 },
@@ -66,6 +68,7 @@ export class BattleMode {
     this.keys = {};
     this.ending = 0;
     this.props = [];                 // breakable scenery inside the strip
+    this.burning = [];               // trees part way through going up
     this.debris = new Debris(scene);
 
     this.buildField(sky);
@@ -147,6 +150,8 @@ export class BattleMode {
     const v = this.game.ui.view;
     v.hidden = true;
     v.textContent = 'TILT';
+    for (const b of this.burning) b.mesh.parent?.remove(b.mesh);
+    this.burning = [];
   }
 
   // An egg that clips scenery breaks it apart. Tall buildings take several
@@ -173,11 +178,29 @@ export class BattleMode {
   }
 
   smash(p) {
-    this.debris.explode(p.mesh, 0.8 + p.h * 0.1);
     this.props = this.props.filter((q) => q !== p);
     this.points += PROP_POINTS * Math.ceil(p.h / 2);
     this.tally.props++;
+    if (p.mesh.userData.burns) { this.torch(p); return; }
+    this.debris.explode(p.mesh, 0.8 + p.h * 0.1);
     sfx.boom(0.6 + p.h * 0.1);
+  }
+
+  // A tree does not shatter, it goes up. Fire takes the canopy in one fwoosh
+  // and leaves a black stick standing in the smoke, which crumbles a moment
+  // later — tree, fire, stick, gone.
+  torch(p) {
+    const at = new THREE.Vector3();
+    p.mesh.getWorldPosition(at);
+    at.y += 0.6;
+    this.debris.ignite(at, 0.9 + p.h * 0.1);
+    sfx.fwoosh();
+    p.mesh.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.userData.trunk) o.material = CHAR;   // charred, still standing
+      else o.visible = false;                    // the canopy is what burns off
+    });
+    this.burning.push({ mesh: p.mesh, t: 0, at });
   }
 
   // Tip a doomed tower over from its base, then shatter it.
@@ -289,7 +312,7 @@ export class BattleMode {
     const t = train ? makeTrain(pick('steam', 'diesel', 'bullet'), Array.from({ length: randInt(2, 4) }, () => 'closed'))
       : kind === 'land' ? (Math.random() < 0.3 ? makeTruck() : makeCar())
       : kind === 'sea' ? makeBoat() : makePlane();
-    const entry = -dir * (SPAN + 2 + t.len / 2);
+    const entry = -dir * (OFFSCREEN + 2 + t.len / 2);
     if (this.targets.some((o) => o.kind === kind && Math.abs(o.x - entry) < (o.len + t.len) / 2 + 1.5)) return false;
     t.kind = kind;
     t.points = train ? 60 : POINTS[kind];
@@ -297,7 +320,7 @@ export class BattleMode {
     const base = train ? rand(5, 7) : kind === 'sea' ? rand(1.5, 2.5) : kind === 'air' ? rand(5, 7.5) : rand(3, 4.5);
     t.speed = base + this.game.level.difficulty * 0.5;
     t.z = ROWS[kind];
-    t.x = -t.dir * (SPAN + 2 + t.len / 2);
+    t.x = -t.dir * (OFFSCREEN + 2 + t.len / 2);
     t.mesh.position.set(t.x, kind === 'air' ? 3.2 : 0, -t.z);
     if (t.dir < 0) t.mesh.rotation.y = Math.PI;
     if (this.game.sky.headlights) {
@@ -347,13 +370,24 @@ export class BattleMode {
       t.mesh.position.x = t.x;
     }
     this.targets = this.targets.filter((t) => {
-      const gone = Math.abs(t.x) > SPAN + 3 + t.len / 2;
+      const gone = Math.abs(t.x) > OFFSCREEN + 3 + t.len / 2;
       if (gone) this.group.remove(t.mesh);
       return !gone;
     });
     this.plow();
     this.updateTipping(dt);
     this.debris.update(dt);
+    for (const b of this.burning) {
+      b.t += dt;
+      const k = Math.max(0, (b.t - CHAR_HOLD) / 0.35);
+      if (k > 0) b.mesh.scale.setScalar(Math.max(0.001, 1 - k));
+    }
+    this.burning = this.burning.filter((b) => {
+      if (b.t <= CHAR_HOLD + 0.35) return true;
+      for (let i = 0; i < 3; i++) this.debris.puff(b.at, 0x8a8a8a, 0.22, 1.1, new THREE.Vector3(rand(-0.3, 0.3), rand(1, 1.8), rand(-0.3, 0.3)), 2);
+      b.mesh.parent?.remove(b.mesh);
+      return false;
+    });
 
     // Eggs fly to the row they were aimed at and only hit targets there.
     for (const e of this.eggs) {

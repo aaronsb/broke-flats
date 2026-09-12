@@ -3,7 +3,7 @@
 // in from height and roll out. A plane only kills while it is on or near the
 // ground, so a lifting or descending one passes overhead (watch its shadow).
 import { box, makePlane, makeHeadlightCone } from '../meshes.js';
-import { W, SPAN, DETAIL_W } from '../lane.js';
+import { W, VIEW, SPAN, DETAIL_W } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
@@ -25,8 +25,10 @@ function pickComposition(level) {
   return [kinds[0]];
 }
 
-// Progress 0..1 along the row in the direction of travel.
-const progress = (lane, m) => (m.x * lane.dir + SPAN) / (2 * SPAN);
+// Progress 0..1 across the visible board in the direction of travel. Keyed to
+// VIEW, not the wrap ring: a plane has to be climbing by the time it leaves the
+// screen, however far out the ring puts the wrap.
+const progress = (lane, m) => Math.max(0, Math.min(1, (m.x * lane.dir + VIEW) / (2 * VIEW)));
 
 function profile(kind, p) {
   if (kind === 'takeoff') return { y: p < 0.5 ? 0 : ((p - 0.5) * 2) ** 2 * CLIMB, speed: 1 + p * 1.6 };

@@ -63,7 +63,7 @@ export default {
     if (gauntlet) lane.bonusDrop();
 
     lane.data.flecks = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 18; i++) {         // spread over the wrap ring, not just the screen
       const f = lane.add(makeFleck(), rand(-SPAN, SPAN));
       lane.data.flecks.push({ mesh: f, speed: lane.dir * lane.speed * rand(0.25, 0.6) });
     }

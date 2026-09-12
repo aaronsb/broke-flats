@@ -26,6 +26,14 @@ export class Debris {
     sfx.crackle();
   }
 
+  // Something catching light: fire cubes that leap and die back, with smoke
+  // that keeps climbing after them. No boom — this is burning, not exploding.
+  ignite(at, kick = 1) {
+    for (let i = 0; i < 11; i++) this.puff(at, pick(...FIRE), rand(0.16, 0.34) * kick, rand(0.3, 0.6), new THREE.Vector3(rand(-1.2, 1.2), rand(3.5, 7), rand(-1.2, 1.2)), -1);
+    for (let i = 0; i < 7; i++) this.puff(at, pick(...SMOKE), rand(0.22, 0.4) * kick, rand(1.0, 1.7), new THREE.Vector3(rand(-0.5, 0.5), rand(1.4, 2.4), rand(-0.5, 0.5)), 2.4);
+    sfx.crackle();
+  }
+
   // Pixel splash: light cubes thrown up from the water line, falling back.
   splash(at, kick = 1) {
     for (let i = 0; i < 10; i++) {

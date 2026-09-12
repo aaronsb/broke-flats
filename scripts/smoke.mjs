@@ -365,6 +365,56 @@ if (script === 'phone' || script === 'tablet') {
   await send('Emulation.clearDeviceMetricsOverride');
   console.log(`${script} shots written to`, out);
 }
+if (script === 'reach') {
+  await start();
+  // Where does each view actually put the ground at the screen edges? Unproject
+  // the four corners onto y = 0 and take the widest |x|. Anything that wraps
+  // inside that is a mover popping into existence in plain sight.
+  const reach = `(() => { const c = __game.camera.camera; const v = c.position.clone();
+    let max = 0;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      v.set(sx, sy, 0.5).unproject(c);
+      const d = v.sub(c.position).normalize();
+      if (d.y >= -1e-4) { max = Infinity; break; }         // that corner is above the horizon
+      const t = -c.position.y / d.y;
+      max = Math.max(max, Math.abs(c.position.x + d.x * t));
+    }
+    return Math.round(max * 10) / 10; })()`;
+  await evaluate(`__game.run.coins = 90`);
+  console.log('top-down reach  :', await evaluate(reach));
+  await key('Space', ' '); await sleep(2500);
+  console.log('tilted reach    :', await evaluate(reach));
+  // Movers must exist out past the screen edge, or the wrap happens in view.
+  console.log('movers reach out:', await evaluate(`(() => { let max = 0;
+    for (const l of __game.mode.world.rows.values()) for (const m of l.movers) max = Math.max(max, Math.abs(m.x));
+    return Math.round(max * 10) / 10; })()`));
+  await key('Space', ' ');
+}
+if (script === 'burn') {
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  await start();
+  await evaluate(`__game.mode.finished = true`); await sleep(9000);
+  await key('Enter', 'Enter'); await sleep(4000);
+  // Light the tree nearest the pilot, so the camera is already looking at it.
+  console.log('lit', await evaluate(`(() => { const m = __game.mode, pilot = m.pilots?.[0] ?? m.players?.[0];
+    const trees = m.props.filter((q) => q.mesh.userData.burns);
+    if (!trees.length) return 'no trees in this theme';
+    const px = pilot?.cx ?? 0, pz = pilot?.cz ?? 0;
+    const d2 = (q) => (q.x - px) ** 2 + (q.z - pz) ** 2;   // nearest in both axes, or it lights up on the horizon
+    trees.sort((a, b) => d2(a) - d2(b));
+    m.smash(trees[0]);
+    return { burning: m.burning.length, canopyHidden: trees[0].mesh.children.filter((c) => !c.visible).length,
+             dx: Math.round((trees[0].x - px) * 10) / 10, dz: Math.round((trees[0].z - pz) * 10) / 10 }; })()`));
+  const burnT = `__game.mode.burning[0]?.t ?? 9`;
+  for (let i = 0; i < 200 && (await evaluate(burnT)) < 0.12; i++) await sleep(30);
+  await shot('burn-fire');
+  for (let i = 0; i < 200 && (await evaluate(burnT)) < 0.55; i++) await sleep(30);
+  await shot('burn-stick');
+  for (let i = 0; i < 300 && (await evaluate(`__game.mode.burning.length`)) > 0; i++) await sleep(50);
+  console.log('after it crumbles, burning left:', await evaluate(`__game.mode.burning.length`));
+  await shot('burn-gone');
+}
 if (script === 'poses') {
   const fs = await import('node:fs');
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
@@ -388,11 +438,20 @@ if (script === 'poses') {
     await sleep(900);
   }
   // Arrivals are short, so drive them directly rather than trying to catch one.
-  for (const pose of ['pancake', 'beam', 'hole']) {
+  // Every pose must have one: a character that just vanishes is the thing this
+  // is all meant to avoid. Each has to finish and leave a sane transform.
+  for (const pose of ['flat', 'pancake', 'halo', 'pieces', 'hole', 'beam', 'roulette', 'fade', 'sink', 'launch']) {
     await evaluate(`__game.mode.players[0].arrive('${pose}')`);
-    await sleep(250);
-    await shot(`arrive-${pose}`);
-    await sleep(900);
+    // Wait on the arrival's own clock for the same reason the poses do; 0.2s of
+    // game time is about a second of wall time here, a far easier frame to hit.
+    if (pose === 'pancake') {
+      for (let i = 0; i < 100 && (await evaluate(`__game.mode.players[0].arriving?.t ?? 1`)) < 0.18; i++) await sleep(20);
+      await shot('arrive-pancake');
+    }
+    for (let i = 0; i < 200 && (await evaluate(`!!__game.mode.players[0].arriving`)); i++) await sleep(40);
+    console.log('arrive', pose, await evaluate(`(() => { const m = __game.mode.players[0].mesh, s = m.scale;
+      const fin = [s.x, s.y, s.z].every(Number.isFinite);
+      return { vis: m.visible, scale: [s.x, s.y, s.z].map((v) => Math.round(v * 100) / 100).join(','), finite: fin }; })()`));
   }
   console.log('pose shots written to', OUT);
 }
