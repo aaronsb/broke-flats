@@ -306,9 +306,31 @@ if (script === 'debug') {
   await key('Backquote', '`'); await sleep(100);
   console.log('panel hidden', await evaluate(`document.getElementById('debug').hidden`));
 }
+if (script === 'logo') {
+  const fs = await import('node:fs');
+  const out = process.env.OUT ?? '.';
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  // Reload so the attract intro runs from the top. Module load time varies, so
+  // anchor to the frame actually appearing, then shoot at offsets from there.
+  await send('Page.navigate', { url: 'http://localhost:5173/' });
+  const shown = `document.getElementById('intro')?.classList.contains('show')`;
+  while (!(await evaluate(shown))) await sleep(50);
+  const t0 = Date.now();
+  const at = async (ms, n) => { await sleep(Math.max(0, ms - (Date.now() - t0))); await shot(n); };
+  await at(500, 'logo-fall');    // crossing sign planted, town sign still falling
+  await at(1150, 'logo-slam');   // landed, still straight
+  await at(2300, 'logo-creak');  // leaning on the post that gave
+  await at(4600, 'logo-title');  // frame gone, insert-coin screen with the static sign
+  await key('KeyI', 'i'); await sleep(6000); await shot('logo-about');
+  await key('Escape', 'Escape');
+  console.log('logo shots written to', out);
+}
 if (script === 'shots') {
   const fs0 = await import('node:fs');
-  await sleep(800);
+  // The attract intro takes the screen for a stretch of every loop; wait it out
+  // so select.png shows the character select rather than the framed sign.
+  for (let i = 0; i < 200 && !(await evaluate(`document.getElementById('intro')?.hidden !== false`)); i++) await sleep(100);
+  await sleep(600);
   { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select.png`, Buffer.from(r.data, 'base64')); }
   await key('KeyI', 'i'); await sleep(6000);
   { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/about.png`, Buffer.from(r.data, 'base64')); }

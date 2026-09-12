@@ -8,6 +8,7 @@ import { music } from './music.js';
 import { installDebug } from './debug.js';
 import { Select } from './select.js';
 import { Attract } from './attract.js';
+import { mountSign, startTitleCycle, stopTitleCycle } from './logo.js';
 import { installTouch } from './touch.js';
 import { readPlaytest, applyBeforeStart, applyAfterStart } from './playtest.js';
 
@@ -38,9 +39,12 @@ const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), coinCount: $('coin-count'), level: $('level'), card: $('card'), tries: $('tries'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'), about: $('about'),
+  intro: $('intro'),
   summary: $('summary'), summaryTitle: $('summary-title'), summaryBody: $('summary-body'),
   p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
 };
+mountSign($('logo'));
+mountSign($('about-sign'));
 const game = new Game({ scene, camera, sky, ui, headlights });
 if (import.meta.env.DEV) { window.__game = game; import('./meshes.js').then((m) => { window.__meshes = m; }); }   // for the headless smoke test
 const debugKey = installDebug(game, ui);
@@ -57,6 +61,7 @@ let attract = new Attract(scene, sky);
 function begin() {
   if (started || select.confirming || inserting) return;
   sfx.unlock();
+  stopTitleCycle(ui.intro, ui.title);
   inserting = true;
   game.insertCoin(() => select.confirm(game.picks, () => {
     started = true;
@@ -81,6 +86,7 @@ function toTitle() {
   select = new Select(scene, camera);
   select.setPicks(game.picks);
   attract = new Attract(scene, sky);
+  startTitleCycle(ui.intro, ui.title);
 }
 let inserting = false;
 game.onTimeout = toTitle;
@@ -100,6 +106,7 @@ if (playtest?.start) {
 } else if (playtest?.debug) {
   debugKey({ code: 'Backquote' });
 }
+if (!playtest?.start) startTitleCycle(ui.intro, ui.title);
 
 // About: a crawl over the title with its own epilogue theme.
 function openAbout() {

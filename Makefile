@@ -1,4 +1,4 @@
-# Road Crosser tasks. Run `make` for the list.
+# Broke Flats tasks. Run `make` for the list.
 SHELL := /bin/sh
 PORT  := 5173
 SHOTS := docs/screenshots
@@ -7,11 +7,11 @@ SHOTS := docs/screenshots
 .PHONY: help dev build preview smoke shots playtest-doc with-server
 
 help: ## Show this help
-	@echo "Road Crosser"
+	@echo "Broke Flats"
 	@echo
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo
-	@echo "  smoke takes S=<scenario>: hops (default), train, occupied, night, skies, debug, battle, shots"
+	@echo "  smoke takes S=<scenario>: hops (default), train, occupied, night, skies, debug, battle, logo, shots"
 
 dev: ## Start the Vite dev server on all interfaces, port 5173
 	npx vite --port $(PORT) --strictPort --host 0.0.0.0

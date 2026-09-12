@@ -141,6 +141,14 @@ export const sfx = {
   // Structural crack: a sharp noise snap over a low thud.
   crack: () => { voice({ wave: 'noise', freq: vary(2400, 0.2), slideTo: 400, filter: 'bandpass', attack: 0.001, decay: 0.03, sustain: 0.4, hold: 0.02, release: 0.08, vol: 0.12 });
                  voice({ wave: 'square', freq: vary(70, 0.2), slideTo: 40, attack: 0.002, decay: 0.05, sustain: 0.5, hold: 0.06, release: 0.12, vol: 0.08 }); },
+  // Signpost landing: a woody crack, a low thud that sags under it, and a
+  // short metal ring off the post.
+  slam: () => { voice({ wave: 'noise', freq: vary(1700, 0.15), slideTo: 200, filter: 'lowpass', attack: 0.001, decay: 0.04, sustain: 0.4, hold: 0.03, release: 0.12, vol: 0.16 });
+                voice({ wave: 'square', freq: N(38), slideTo: N(26), attack: 0.002, decay: 0.06, sustain: 0.5, hold: 0.08, release: 0.18, vol: 0.1 });
+                setTimeout(() => voice({ wave: 'triangle', freq: N(69), slideTo: N(64), attack: 0.002, decay: 0.05, sustain: 0.3, hold: 0.04, release: 0.16, vol: 0.045 }), 30); },
+  // Old timber giving way: a stepped saw that wobbles as it sags, over a dry rasp.
+  creak: () => { voice({ wave: 'sawtooth', freq: N(62), arp: [N(60), N(63), N(59), N(61), N(57), N(58), N(55)], arpStep: 0.055, attack: 0.01, decay: 0.05, sustain: 0.55, hold: 0.3, release: 0.12, vol: 0.045 });
+                 voice({ wave: 'noise', freq: 1500, slideTo: 500, filter: 'bandpass', attack: 0.03, decay: 0.1, sustain: 0.4, hold: 0.2, release: 0.15, vol: 0.05 }); },
   // Smoke whoosh: a lowpassed noise swell that sinks.
   puff: () => voice({ wave: 'noise', freq: vary(700, 0.2), slideTo: 160, filter: 'lowpass', attack: 0.04, decay: 0.1, sustain: 0.6, hold: 0.12, release: 0.3, vol: 0.09 }),
   // Fire crackle: a handful of tiny bright noise ticks at random times.
