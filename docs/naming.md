@@ -124,7 +124,7 @@ a place.** "Crossing" in "Animal Crossing" is a category. "Crossing" in
 Harpers Ferry, Council Bluffs, Pilot Knob. A place name is specific by
 construction, which is what a category name can never be.
 
-### Flat Broke Crossing — the combination to take
+### Flat Broke Crossing — the first combination
 
 The lose condition survives intact, the genre arrives for free, and the game
 gains a setting it did not have before. The title card becomes a town sign.
@@ -165,6 +165,47 @@ games, clear on npm. It is the best *money plus road* name available.
 Cost: it drops the flat. It names the currency and the crossing but says
 nothing about the view, which is the half of the hook that is actually novel.
 
+### Crossing Flat Broke — the inversion, and the one to ship
+
+Reversing the words is not a reshuffle, it changes what the name does.
+
+**It drops the Animal Crossing echo completely.** `___ Crossing` *is* that
+pattern. `Crossing ___` is a different one with its own pedigree — Crossing
+Delancey, Crossing Jordan, Crossing Over — and it reads as a title, never as a
+category.
+
+**"Crossing" becomes a verb.** As a suffix it classifies the thing; in front it
+describes an act in progress. The game is an act in progress.
+
+**The punchline lands last.** On a title card, `CROSSING` over `FLAT BROKE`
+reveals the joke on the second line, which is where a joke goes. The other
+order opens with the payoff and closes on a filing category.
+
+**Both readings are true.** Crossing *while* flat broke is the endgame state —
+no coins, no tilt, going on memory. Crossing *the town of* Flat Broke is the
+setting. The name means the predicament and the place at once, and you never
+have to pick.
+
+Cost: it opens on the least distinctive word, so alphabetical lists and quick
+scans get "Crossing…" first. And a gerund title reads film festival where the
+`INSERT COIN` HUD reads arcade cabinet — though a dusty, ironic title over a
+coin-op game is a joke the game is already telling.
+
+### Take both, at different jobs
+
+The two orders are not rivals. They are the town and the title.
+
+- **The town is Flat Broke.** Signage in the world says `FLAT BROKE CROSSING`
+  or `WELCOME TO FLAT BROKE, POP. 3`. Put it on a board in the meadow band
+  before the start line, where there is already ground behind the player.
+- **The game is Crossing Flat Broke.** Title card, repo, page title, store
+  page.
+
+Each string then does the job it is shaped for: the noun phrase is a sign
+because signs are noun phrases, and the verb phrase is a title because it
+describes what you are about to do. The place name earns its keep inside the
+game instead of only on the box.
+
 ### Ruled out from this batch
 
 | Name | Why not |
@@ -176,9 +217,13 @@ nothing about the view, which is the half of the hook that is actually novel.
 
 ## Recommendation
 
-**Flat Broke Crossing** as the title, **Flat Broke** as what everyone actually
-calls it. It keeps the one name that states the lose condition, and buys back
-the genre clarity that the short name gives up.
+**Crossing Flat Broke**, with the town itself named Flat Broke and the crossing
+sign as an in-world asset. It keeps the lose condition, sheds the genre-echo
+that `___ Crossing` carries, puts the joke at the end where it lands, and gives
+the art a string to paint on a board.
+
+Short form in conversation stays **Flat Broke**, which was the pick on its own
+merits before any of this.
 
 If you want one tight phrase instead of three words, **Level Crossing** is the
 cleverest thing on either list and the hardest to ever find in a search. That
@@ -192,10 +237,10 @@ README, and the GitHub Pages URL.
 
 | Check | Result |
 |-------|--------|
-| npm registry | `sidelong`, `peektax`, `tilttoll`, `hatchline`, `nodepth`, `flatbroke`, `tollroad`, `blindhop`, `flatbrokecrossing`, `brokecrossing`, `levelcrossing`, `exactchange`, `gradecrossing` unregistered; `clutch`, `squint`, `brood`, `flatland`, `hedgerow`, `overlook`, `oblique`, `askew`, `lastseen` taken (all irrelevant to a browser game, noted for completeness) |
+| npm registry | `sidelong`, `peektax`, `tilttoll`, `hatchline`, `nodepth`, `flatbroke`, `tollroad`, `blindhop`, `flatbrokecrossing`, `crossingflatbroke`, `brokecrossing`, `levelcrossing`, `exactchange`, `gradecrossing` unregistered; `clutch`, `squint`, `brood`, `flatland`, `hedgerow`, `overlook`, `oblique`, `askew`, `lastseen` taken (all irrelevant to a browser game, noted for completeness) |
 | `github.com/aaronsb/*` | No collision with any shortlisted name across the 134 repos on the account |
-| itch.io / Steam | Collisions found for Clutch, Look Both Ways, Squint, Double Cross, FlatOut. Flat Broke, Flat Broke Crossing, Level Crossing, Exact Change, Peek Tax, Sidelong, Overlook and Coinsight came back clear |
-| `"<name>" game` attention test | Clutch is unwinnable and Level Crossing is unwinnable against the real-world term. Flat Broke, Flat Broke Crossing, Exact Change, Peek Tax and Coinsight have effectively empty fields |
+| itch.io / Steam | Collisions found for Clutch, Look Both Ways, Squint, Double Cross, FlatOut. Flat Broke, Crossing Flat Broke, Flat Broke Crossing, Level Crossing, Exact Change, Peek Tax, Sidelong, Overlook and Coinsight came back clear |
+| `"<name>" game` attention test | Clutch is unwinnable and Level Crossing is unwinnable against the real-world term. Both Flat Broke orders, Exact Change, Peek Tax and Coinsight have effectively empty fields |
 
 **Still to do by hand:** the USPTO search in classes 9 and 41. `tmsearch.uspto.gov`
 is blocked by this environment's egress policy, so it could not be run here.
