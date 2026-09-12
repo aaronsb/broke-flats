@@ -8,6 +8,8 @@ import { rand, randInt, pick, damp } from '../util.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
 registerDeath('chomped', { anim: 'flat', title: 'CHOMP', sfx: 'crack' });
+registerDeath('rundown', { anim: 'sink', title: 'RUN DOWN', sfx: 'splash' });
+export const SWIM_Y = -0.5;   // afloat: legs under the surface
 
 // Lane compositions. One kind per lane is the norm; mixes are rarer.
 const KINDS = {
@@ -94,6 +96,17 @@ export default {
       f.mesh.position.y = 0.5 + Math.sin(time * 2 * f.speed + f.phase) * 0.3;
       f.mesh.visible = Math.sin(time * 3 + f.phase) > -0.6;
     }
+  },
+
+  // A swimmer afloat: whatever drifts onto them either carries them (log, gator
+  // back) or runs them down (boat, sub hull). Gator heads bite as ever.
+  swimContact(lane, player) {
+    const m = lane.moverAt(player.x, 0.3);
+    if (!m || m.submerged) return null;
+    if (m.head && within(lane, m, m.head, player.x)) return 'chomped';
+    if (m.kind === 'boat' || m.kind === 'sub') return 'rundown';
+    if (within(lane, m, m.bed, player.x)) player.mount(m);
+    return null;
   },
 
   onLand(lane, player) {

@@ -1,6 +1,7 @@
 import { makeChicken, setFrame } from './characters.js';
 import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
+import { SWIM_Y } from './scenarios/river.js';
 import { DEATHS } from './deaths.js';
 import { sfx, voices } from './sfx.js';
 import { lerp } from './util.js';
@@ -75,6 +76,8 @@ export class Player {
     this.hopCarrier = dr === 0 && this.carrier ? this.carrier : null;
     this.hopCarrierX = this.hopCarrier?.x ?? 0;
     this.hopDir = [dc, dr];
+    // Water to water for a swimmer is a paddle, not a flap.
+    this.paddling = this.swims && !this.carrier && this.world.laneAt(this.row)?.scenario.id === 'river' && this.world.laneAt(tr)?.scenario.id === 'river';
     // Leaving something tall: the hop keeps its altitude, then comes the drop.
     const high = this.y > 0.6;
     this.to = { x: tc, z: -tr, y: high ? this.y : 0 };
@@ -229,7 +232,7 @@ export class Player {
       const s = Math.sin(Math.PI * t);
       this.y = lerp(this.from.y, this.to.y ?? 0, t) + s * 0.55;
       sy = 1 + 0.25 * s; sx = 1 - 0.12 * s;
-      setFrame(m, t > 0.2 && t < 0.85 ? 1 : 0);
+      setFrame(m, !this.paddling && t > 0.2 && t < 0.85 ? 1 : 0);
       if (this.t >= 1) {
         this.moving = false;
         this.x = this.to.x; this.z = this.to.z; this.y = this.to.y ?? 0;
@@ -250,12 +253,18 @@ export class Player {
         this.x = this.carrier.x + this.carrierOffset;
         this.col = Math.round(this.x);
         this.y = this.carrier.wing ? this.carrier.y + 0.4 : (this.carrier.rideY ?? 0) + Math.min(0, this.carrier.mesh.position.y);
-        if (this.carrier.submerged) { if (this.swims) { this.carrier = null; this.y = -0.2; } else { this.die('water'); return; } }
+        if (this.carrier.submerged) { if (this.swims) { this.carrier = null; this.y = SWIM_Y; } else { this.die('water'); return; } }
         if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
-      // A swimmer sits low in the water when not aboard anything.
-      if (!this.carrier && this.swims && this.world.laneAt(this.row)?.scenario.id === 'river') this.y = -0.2;
+      // A swimmer afloat sits low, paddles rather than flaps, and takes whatever drifts onto it.
+      const here = this.world.laneAt(this.row);
+      if (!this.carrier && this.swims && here?.scenario.id === 'river') {
+        this.y = SWIM_Y;
+        setFrame(m, 0);
+        const cause = here.scenario.swimContact?.(here, this);
+        if (cause) { this.die(cause); return; }
+      }
     }
 
     // Hazard check against whichever row the chicken is mostly in. Nothing
