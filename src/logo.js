@@ -141,7 +141,8 @@ function showIntro(intro, title) {
 export function startTitleCycle(intro, title) {
   stopTitleCycle(intro, title);
   if (!intro) return;
-  if (still()) return;              // no cycling for anyone who asked for stillness
+  // Reduced motion still gets the postcard — the CSS holds it at its settled
+  // pose and showIntro keeps the slam quiet. Less motion, not less game.
   const turn = () => { showIntro(intro, title); later(turn, CYCLE); };
   turn();
 }
