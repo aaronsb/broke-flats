@@ -2,7 +2,7 @@
 import { box, makeCar, makeTruck, makeFlatbed, makeHeadlightCone } from '../meshes.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
-import { W, GW } from '../lane.js';
+import { W, DETAIL_W } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
@@ -27,7 +27,7 @@ export default {
   build(lane, { prev, sky, difficulty, gauntlet, level }) {
     lane.ground(0x4a4a52);
     if (prev && prev.scenario.id === 'road') {
-      for (let x = -GW / 2; x < GW / 2; x += 1.5) lane.add(box(0.7, 0.02, 0.1, 0xdedede, x, 0, 0.5, false));
+      for (let x = -DETAIL_W / 2; x < DETAIL_W / 2; x += 1.5) lane.add(box(0.7, 0.02, 0.1, 0xdedede, x, 0, 0.5, false));
     }
     lane.dir = pick(-1, 1);
     const tr = traffic(difficulty + lane.r / 120);

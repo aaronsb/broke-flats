@@ -3,7 +3,7 @@
 // in from height and roll out. A plane only kills while it is on or near the
 // ground, so a lifting or descending one passes overhead (watch its shadow).
 import { box, makePlane, makeHeadlightCone } from '../meshes.js';
-import { W, SPAN, GW } from '../lane.js';
+import { W, SPAN, DETAIL_W } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
@@ -46,9 +46,9 @@ export default {
   flank: ['meadow', 'road', 'road', 'river'],   // wings need flat rows either side
   build(lane, { prev, sky, difficulty, gauntlet, level }) {
     lane.ground(0x3e3e46);
-    for (let x = -GW / 2; x < GW / 2; x += 2) lane.add(box(1.1, 0.02, 0.12, 0xe8e8e8, x, 0, 0, false));   // centreline
+    for (let x = -DETAIL_W / 2; x < DETAIL_W / 2; x += 2) lane.add(box(1.1, 0.02, 0.12, 0xe8e8e8, x, 0, 0, false));   // centreline
     if (!prev || prev.scenario.id !== 'runway') {
-      for (let x = -GW / 2; x < GW / 2; x += 2.5) lane.add(box(0.14, 0.1, 0.14, EDGE_LIGHT.blue, x, 0, 0.47, false));
+      for (let x = -DETAIL_W / 2; x < DETAIL_W / 2; x += 2.5) lane.add(box(0.14, 0.1, 0.14, EDGE_LIGHT.blue, x, 0, 0.47, false));
     }
     lane.dir = pick(-1, 1);
     const tr = traffic(difficulty + lane.r / 120);

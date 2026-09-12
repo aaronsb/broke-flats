@@ -6,7 +6,8 @@ import { sfx } from './sfx.js';
 export const W = 8;          // playable columns run -W..W
 export const SPAN = W + 5;   // movers wrap at ±SPAN
 export const OFF_EDGE = 11.6; // carried this far is off screen and lost
-export const GW = 44;        // ground width
+export const GW = 120;       // ground width: far past any camera edge, even tilted
+export const DETAIL_W = 60;  // repeated details (dashes, stripes, sleepers) only span this
 
 // One board row. Scenarios fill it through these helpers; the board and the
 // player only read the fields (blocked, coins, movers, dir, speed).

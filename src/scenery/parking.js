@@ -1,12 +1,12 @@
 // Asphalt lot: painted bays, a fence line, and parked cars on both sides.
 import { makeFence, makeParkedCar, makeParkingStripe, makeCanopy, makePlanter } from '../meshes.js';
-import { W, GW } from '../lane.js';
+import { W, DETAIL_W } from '../lane.js';
 
 export default {
   id: 'parking',
   ground(lane) {
     lane.ground(0x5a5a62);
-    for (let x = -GW / 2 + 0.5; x < GW / 2; x += 1) lane.add(makeParkingStripe(), x);
+    for (let x = -DETAIL_W / 2 + 0.5; x < DETAIL_W / 2; x += 1) lane.add(makeParkingStripe(), x);
   },
   edge(lane) {
     for (const s of [-1, 1]) {

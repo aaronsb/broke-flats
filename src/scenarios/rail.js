@@ -3,7 +3,7 @@
 // trains are slow and puff, diesels are middling, bullet trains are fast.
 // Flat cars and box-car doorways can be ridden; everything else is fatal.
 import { box, makeTrain, makeRailSignal, makeGate, makeHeadlightCone } from '../meshes.js';
-import { W, SPAN, GW } from '../lane.js';
+import { W, SPAN, GW, DETAIL_W } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { sfx } from '../sfx.js';
@@ -41,7 +41,7 @@ export default {
   keepGap: true,
   build(lane, { sky, difficulty, gauntlet, level }) {
     lane.ground(0x6a645c);
-    for (let x = -GW / 2; x < GW / 2; x += 0.7) lane.add(box(0.3, 0.06, 0.9, 0x5a3d24, x, 0, 0, false));   // sleepers
+    for (let x = -DETAIL_W / 2; x < DETAIL_W / 2; x += 0.7) lane.add(box(0.3, 0.06, 0.9, 0x5a3d24, x, 0, 0, false));   // sleepers
     for (const z of [-0.3, 0.3]) lane.add(box(GW, 0.08, 0.08, 0xb8b8b8, 0, 0.05, z, false));                // rails
     lane.dir = pick(-1, 1);
     const type = pickType(level);
