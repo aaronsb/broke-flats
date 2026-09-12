@@ -9,6 +9,7 @@ import { sfx } from './sfx.js';
 import { damp, lerp } from './util.js';
 
 const GAP = 2.1, ROW_Z = -2.2;
+const HALF_CARD = GAP / 2;   // cards tile the row, so half a gap is half a card
 const CARD = [0x3a7be0, 0xe0473a, 0xf2c53d, 0x3ac9a8, 0x8f3ae0, 0xf07f2b, 0x27703a, 0x9aa4b2, 0xd9683a, 0x2f7fc9, 0x8b3a2f];
 const P1 = new THREE.MeshBasicMaterial({ color: 0xffd23f });
 const P2 = new THREE.MeshBasicMaterial({ color: 0x66e0ff });
@@ -69,11 +70,15 @@ export class Select {
     if (!(scale > 0)) return;
     const first = this.ndcX(0, this.targetX), last = this.ndcX(n - 1, this.targetX);
     if (last - first <= 1.6) { this.targetX = -((n - 1) * GAP) / 2; return; }   // fits: centre it
+    // Hold the whole card on screen, not just the point at its middle. On a
+    // narrow window one card is most of the width, so the limit collapses to
+    // zero and the pick simply centres — which is what the row is for.
+    const limit = Math.max(0, 0.8 - HALF_CARD * scale);
     const x = this.ndcX(this.keep, this.targetX);
-    if (x > 0.8) this.targetX -= (x - 0.8) / scale;
-    else if (x < -0.8) this.targetX += (-0.8 - x) / scale;
-    if (this.ndcX(0, this.targetX) > -0.8) this.targetX -= (this.ndcX(0, this.targetX) + 0.8) / scale;
-    if (this.ndcX(n - 1, this.targetX) < 0.8) this.targetX += (0.8 - this.ndcX(n - 1, this.targetX)) / scale;
+    if (x > limit) this.targetX -= (x - limit) / scale;
+    else if (x < -limit) this.targetX += (-limit - x) / scale;
+    if (this.ndcX(0, this.targetX) > -limit) this.targetX -= (this.ndcX(0, this.targetX) + limit) / scale;
+    if (this.ndcX(n - 1, this.targetX) < limit) this.targetX += (limit - this.ndcX(n - 1, this.targetX)) / scale;
   }
 
   confirm(picks, done) {

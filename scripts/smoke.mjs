@@ -320,6 +320,8 @@ if (script === 'phone') {
   await sleep(2400); await shot('phone-intro');
   for (let i = 0; i < 200 && (await evaluate(`document.getElementById('intro')?.hidden`)) === false; i++) await sleep(100);
   await sleep(700); await shot('phone-title');
+  await key('ArrowRight'); await sleep(300); await key('ArrowRight'); await sleep(1200);
+  await shot('phone-select');   // a pick two along has to sit centred, not half off
   await key('Enter', 'Enter'); await sleep(5000);
   await shot('phone-play');   // in game: the hint and the tilt placard come back
   await send('Emulation.clearDeviceMetricsOverride');
