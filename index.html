@@ -69,7 +69,7 @@
     @keyframes crawl { from { transform: translateY(0); } to { transform: translateY(calc(-100% - min(70vh, 520px))); } }
     #about .close { position: absolute; top: 12px; right: 12px; }
     /* Cash-in summary: a framed panel of lines that count up */
-    #summary { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(640px, 66vw); min-height: 30vh; display: none; flex-direction: column; justify-content: center; background: rgba(12, 24, 44, .62); border: 4px solid rgba(255, 255, 255, .85); border-radius: 8px; padding: 14px 22px 18px; box-sizing: border-box; }
+    #summary { pointer-events: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(640px, 66vw); min-height: 30vh; display: none; flex-direction: column; justify-content: center; background: rgba(12, 24, 44, .62); border: 4px solid rgba(255, 255, 255, .85); border-radius: 8px; padding: 14px 22px 18px; box-sizing: border-box; }
     #summary.show { display: flex; }
     #summary .go { text-align: center; margin-top: 12px; opacity: .9; animation: pulse .6s infinite alternate; }
     #summary h2 { font-size: var(--ui); margin: 0 0 10px; color: var(--accent); text-align: center; }

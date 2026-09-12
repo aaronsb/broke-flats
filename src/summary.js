@@ -51,7 +51,7 @@ export class Summary {
     later(at + 900, () => {
       const go = document.createElement('div');
       go.className = 'go';
-      go.textContent = 'PRESS ANY KEY';
+      go.textContent = 'ENTER TO CONTINUE';
       body.appendChild(go);
       this.ready = true;
     });

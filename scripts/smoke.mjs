@@ -88,7 +88,10 @@ if (script === 'tally') {
   await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch(); __game.mode.trains[0].waiting = 2`);
   await evaluate(`__game.mode.finished = true`); await sleep(4000);
   console.log('tally', await evaluate(`[document.getElementById('summary').classList.contains('show'), [...document.querySelectorAll('#summary .row')].map(r => r.textContent).join(' | ')]`));
-  await sleep(6000); await key('Enter', 'Enter'); await sleep(800);
+  await sleep(6000);
+  await key('ArrowUp'); await sleep(300);
+  console.log('hop kept panel', await evaluate(`[document.getElementById('summary').classList.contains('show'), __game.summary.ready]`));
+  await key('Enter', 'Enter'); await sleep(800);
   console.log('after tally', await state(), await evaluate(`[__game.mode.constructor.name, __game.run.flock]`));
 }
 if (script === 'river') {

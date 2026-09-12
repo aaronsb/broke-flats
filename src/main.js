@@ -140,7 +140,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
   if (debugKey(e)) { e.preventDefault(); return; }
-  if (game.summary.ready) { game.summary.confirm(); e.preventDefault(); return; }
+  if (game.summary.ready && (e.code === 'Enter' || e.code === 'Space')) { game.summary.confirm(); e.preventDefault(); return; }
   if (game.over) {
     if (e.code === 'KeyC') game.buyLife();
     else if (e.code === 'Enter' || e.code === 'Space') game.resume();
@@ -169,7 +169,8 @@ ui.view.addEventListener('click', () => { begin(); if (!game.over) game.mode.onV
 $('retry').addEventListener('click', () => { if (game.run.lives > 0) game.resume(); else if (!game.buyLife()) toTitle(); });
 
 let touchStart = null;
-canvas.addEventListener('pointerdown', (e) => { begin(); if (game.summary.ready) { game.summary.confirm(); return; } touchStart = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerdown', (e) => { begin(); touchStart = { x: e.clientX, y: e.clientY }; });
+ui.summary.addEventListener('pointerdown', () => game.summary.confirm());
 canvas.addEventListener('pointerup', (e) => {
   if (!touchStart) return;
   const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
