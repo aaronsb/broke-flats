@@ -50,6 +50,7 @@ export class CrossingMode {
     });
     this.world.onMine = () => { this.mined = 0.001; };
     this.buildPlayers();
+    this.game.run.lastPose = null;   // spent: the next arrival is earned afresh
     this.world.ensure(26);
     this.finished = false;
     this.tally = null;
@@ -74,14 +75,18 @@ export class CrossingMode {
       const variant = (run.variants[i] ??= rollVariant(c));
       const p = new Player(scene, this.world, c, variant);
       p.index = i;
+      p.fx = this.fx;                 // poses that throw blocks or sparkles need it
       p.invincible = debug.god;
       p.onCoin = () => { run.coins += 1; };
       const landed = () => this.hintNearby(p);
       p.onLandedHint = landed;
-      p.onDie = (cause) => { if (cause === 'water') this.fx.splash(p.mesh.position); };
+      // Remember the way they went out. A solo death rebuilds the whole mode,
+      // so it rides on the run to become the way they come back.
+      p.onDie = (cause) => { run.lastPose = p.deathAnim; if (cause === 'water') this.fx.splash(p.mesh.position); };
       p.isOccupied = (col, row) => this.blocked(p, col, row);
       const col = roster.length > 1 ? (i === 0 ? -1 : 1) : 0;
       p.col = col; p.x = col; p.mesh.position.x = col;
+      if (run.lastPose) p.arrive(run.lastPose);
       return p;
     });
     this.trains = this.players.map((p, i) => {
@@ -108,9 +113,11 @@ export class CrossingMode {
     if (!this.game.spendLife()) { p.gone = true; return; }
     let row = Math.max(0, partner.row - 2);
     while (row > 0 && this.world.laneAt(row)?.scenario.danger) row--;
+    const pose = p.deathAnim;
     p.reset();
     p.row = row; p.col = -partner.col || 1; p.x = p.col; p.z = -row; p.maxRow = partner.maxRow;
     p.mesh.position.set(p.x, 0, p.z);
+    p.arrive(pose);
     t.trail = [];
     this.game.card(''); 
   }

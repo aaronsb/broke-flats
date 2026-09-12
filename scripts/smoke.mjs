@@ -365,6 +365,37 @@ if (script === 'phone' || script === 'tablet') {
   await send('Emulation.clearDeviceMetricsOverride');
   console.log(`${script} shots written to`, out);
 }
+if (script === 'poses') {
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  await start();
+  // Poses are drawn at random, so force each one in turn. A train does the
+  // killing: it has the longest squash, which makes the pancake obvious.
+  await evaluate(`__game.run.lives = 99; __game.mode.players[0].invincible = false`);
+  for (const pose of ['flat', 'pancake', 'halo', 'pieces', 'hole', 'beam', 'roulette', 'fade']) {
+    // `gone` holds the death open: without it the stage restarts 1.7s in and a
+    // slow capture photographs the fresh player instead of the pose.
+    await evaluate(`(() => { const p = __game.mode.players[0]; p.invincible = false; p.die('train'); p.deathAnim = '${pose}'; p.gone = true; })()`);
+    // Wall time is no guide here: the software renderer runs the game clock at a
+    // fraction of it, so wait on deadFor itself.
+    for (let i = 0; i < 300 && (await evaluate(`__game.mode.players[0].deadFor`)) < 1.25; i++) await sleep(50);
+    console.log(pose, await evaluate(`(() => { const p = __game.mode.players[0], m = p.mesh, s = m.scale;
+      return { anim: p.deathAnim, t: Math.round((p.deadFor - 0.8) * 100) / 100, vis: m.visible,
+               scale: [s.x, s.y, s.z].map((v) => Math.round(v * 100) / 100).join(','),
+               y: Math.round(m.position.y * 100) / 100 }; })()`));
+    await shot(`pose-${pose}`);
+    await evaluate(`__game.run.lives = 99; __game.restartStage()`);
+    await sleep(900);
+  }
+  // Arrivals are short, so drive them directly rather than trying to catch one.
+  for (const pose of ['pancake', 'beam', 'hole']) {
+    await evaluate(`__game.mode.players[0].arrive('${pose}')`);
+    await sleep(250);
+    await shot(`arrive-${pose}`);
+    await sleep(900);
+  }
+  console.log('pose shots written to', OUT);
+}
 if (script === 'logo') {
   const fs = await import('node:fs');
   const out = OUT;

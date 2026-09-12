@@ -12,7 +12,7 @@ import { traffic, kindsFor } from '../tuning.js';
 import * as THREE from 'three';
 import { LEFT_HAND } from '../locale.js';
 
-registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat' });
+registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat', squash: 3.6 });
 
 const WARN = 2.0;         // seconds of gates and blinking before the train arrives
 const PARK = 30;          // how far off the strip a waiting train sits: beyond the tilted view

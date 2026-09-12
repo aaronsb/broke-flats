@@ -134,6 +134,16 @@ export function makeTunnel() {
 
 const haloMat = new THREE.MeshBasicMaterial({ color: 0xffe36b });
 // A ring of eight little cubes.
+// A hole in the ground: a flat black disc, laid just above the ground so it
+// does not fight with it. Scaled from nothing and back by whoever drops in.
+export function makeHole() {
+  const m = new THREE.Mesh(new THREE.CircleGeometry(1, 20), new THREE.MeshBasicMaterial({ color: 0x07060a }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.03;
+  m.scale.setScalar(0.001);
+  return m;
+}
+
 export function makeHalo() {
   const g = new THREE.Group();
   for (let i = 0; i < 8; i++) {

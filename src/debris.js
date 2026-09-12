@@ -35,6 +35,13 @@ export class Debris {
     sfx.splash();
   }
 
+  // Transporter sparkle: bright cubes drifting up out of the body.
+  sparkles(at, n = 14) {
+    for (let i = 0; i < n; i++)
+      this.puff(new THREE.Vector3(at.x, at.y + rand(0, 0.9), at.z), pick(0xbfe6ff, 0xffffff, 0xffe36b),
+        rand(0.06, 0.14), rand(0.5, 1.0), new THREE.Vector3(rand(-0.5, 0.5), rand(1.4, 3.2), rand(-0.5, 0.5)), -1);
+  }
+
   puff(at, color, size, life, v, grow) {
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false });
     const m = new THREE.Mesh(unit, mat);
@@ -47,10 +54,26 @@ export class Debris {
 
   // Convert `group` into flying pieces. It is removed from its parent.
   explode(group, kick = 1) {
+    const centre = this.shatter(group, kick);
+    this.burst(centre, kick);
+  }
+
+  // Come apart without the fireball: a character losing an argument with a
+  // truck sheds its blocks, it does not detonate.
+  scatter(group, kick = 0.8) {
+    this.shatter(group, kick);
+    sfx.clatter();
+  }
+
+  // Detach every visible leaf box in place, loft it and set it spinning.
+  // Parts of the group that are hidden (a character's unused pose frame) stay
+  // out of it, or the air fills with blocks nobody can see.
+  shatter(group, kick) {
     const centre = new THREE.Vector3();
     group.getWorldPosition(centre);
+    const shown = (o) => { for (let n = o; n && n !== group.parent; n = n.parent) if (!n.visible) return false; return true; };
     const leaves = [];
-    group.traverse((o) => { if (o.isMesh) leaves.push(o); });
+    group.traverse((o) => { if (o.isMesh && shown(o)) leaves.push(o); });
     for (const m of leaves) {
       this.scene.attach(m);          // keeps the world transform
       const away = new THREE.Vector3().subVectors(m.position, centre).setY(0);
@@ -64,7 +87,7 @@ export class Debris {
       });
     }
     group.parent?.remove(group);
-    this.burst(centre, kick);
+    return centre;
   }
 
   // Launch one mesh on its own (a window shaken loose).

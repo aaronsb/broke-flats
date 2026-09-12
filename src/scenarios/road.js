@@ -6,7 +6,7 @@ import { W, DETAIL_W } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
-registerDeath('hauled', { anim: 'flat', title: 'HAULED OFF', sfx: 'splat' });
+registerDeath('hauled', { anim: 'flat', title: 'HAULED OFF', sfx: 'splat', squash: 2.4 });
 
 // Lane compositions: usually one kind, sometimes a mix once the level allows it.
 const MAKERS = { car: makeCar, truck: makeTruck, flatbed: makeFlatbed };

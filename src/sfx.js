@@ -151,6 +151,28 @@ export const sfx = {
                  voice({ wave: 'noise', freq: 1500, slideTo: 500, filter: 'bandpass', attack: 0.03, decay: 0.1, sustain: 0.4, hold: 0.2, release: 0.15, vol: 0.05 }); },
   // Smoke whoosh: a lowpassed noise swell that sinks.
   puff: () => voice({ wave: 'noise', freq: vary(700, 0.2), slideTo: 160, filter: 'lowpass', attack: 0.04, decay: 0.1, sustain: 0.6, hold: 0.12, release: 0.3, vol: 0.09 }),
+  // Loose blocks hitting the ground: a scatter of woody ticks over two knocks.
+  clatter: () => { for (let i = 0; i < 7; i++) setTimeout(() => voice({ wave: 'noise', freq: vary(1400, 0.4), slideTo: 300, filter: 'lowpass', attack: 0.001, decay: 0.02, sustain: 0.3, hold: 0.01, release: 0.05, vol: 0.08 }), rand(0, 420));
+                   for (const d of [30, 250]) setTimeout(() => voice({ wave: 'square', freq: vary(N(45), 0.2), slideTo: N(33), attack: 0.002, decay: 0.04, sustain: 0.4, hold: 0.03, release: 0.09, vol: 0.06 }), d); },
+  // Pressed flat: a short wet give under a blunt thump.
+  squelch: () => { voice({ wave: 'noise', freq: 1200, slideTo: 200, filter: 'lowpass', attack: 0.002, decay: 0.05, sustain: 0.5, hold: 0.04, release: 0.1, vol: 0.14 });
+                   voice({ wave: 'square', freq: N(41), slideTo: N(31), attack: 0.002, decay: 0.05, sustain: 0.5, hold: 0.05, release: 0.12, vol: 0.08 }); },
+  // Back to full size: air going in, then the shape popping out to meet it.
+  boink: () => { voice({ wave: 'triangle', freq: 260, slideTo: 1500, attack: 0.01, decay: 0.04, sustain: 0.7, hold: 0.2, release: 0.05, vol: 0.06 });
+                 setTimeout(() => voice({ wave: 'square', freq: N(72), arp: [N(79), N(84)], arpStep: 0.05, attack: 0.002, decay: 0.03, sustain: 0.6, hold: 0.08, release: 0.08, vol: 0.07 }), 240); },
+  // Down the hole: a long glide to the cellar with a cork-pop at the bottom.
+  swoop: () => { voice({ wave: 'triangle', freq: 1100, slideTo: 90, attack: 0.01, decay: 0.05, sustain: 0.8, hold: 0.45, release: 0.1, vol: 0.07 });
+                 setTimeout(() => { voice({ wave: 'square', freq: N(64), slideTo: N(76), attack: 0.001, decay: 0.02, sustain: 0.4, hold: 0.01, release: 0.04, vol: 0.07 });
+                                    voice({ wave: 'noise', freq: 2600, filter: 'bandpass', attack: 0.001, decay: 0.02, sustain: 0.3, hold: 0.01, release: 0.04, vol: 0.05 }); }, 560); },
+  // Transporter: a held shimmer with a fast tremolo, sparkling as it climbs.
+  beam: () => { voice({ wave: 'sine', freq: N(88), slideTo: N(100), attack: 0.06, decay: 0.1, sustain: 0.8, hold: 0.5, release: 0.25, vol: 0.05 });
+                voice({ wave: 'noise', freq: 900, slideTo: 5000, filter: 'bandpass', attack: 0.08, decay: 0.12, sustain: 0.7, hold: 0.4, release: 0.2, vol: 0.05 });
+                for (let i = 0; i < 6; i++) setTimeout(() => voice({ wave: 'triangle', freq: vary(N(96 + i), 0.02), attack: 0.002, decay: 0.02, sustain: 0.4, hold: 0.02, release: 0.05, vol: 0.035 }), 60 + i * 95); },
+  // One rung of the roulette: a blunt little blip, a semitone up each time.
+  doot: (step = 0) => voice({ wave: 'square', freq: N(72 + step), attack: 0.002, decay: 0.02, sustain: 0.5, hold: 0.03, release: 0.03, vol: 0.055 }),
+  // Giving up quietly: a slow sag with the colour draining out of it.
+  sigh: () => { voice({ wave: 'triangle', freq: N(69), slideTo: N(55), attack: 0.03, decay: 0.1, sustain: 0.6, hold: 0.3, release: 0.3, vol: 0.05 });
+                voice({ wave: 'sine', freq: N(57), slideTo: N(45), attack: 0.05, decay: 0.1, sustain: 0.5, hold: 0.35, release: 0.3, vol: 0.035 }); },
   // Fire crackle: a handful of tiny bright noise ticks at random times.
   crackle: () => { for (let i = 0; i < 5; i++) setTimeout(() => voice({ wave: 'noise', freq: vary(3500, 0.3), filter: 'highpass', attack: 0.001, decay: 0.01, sustain: 0.3, hold: 0.005, release: 0.02, vol: 0.05 }), rand(40, 520)); },
   // "Dee-doo" confirmation chime.

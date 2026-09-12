@@ -3,6 +3,7 @@ import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { SWIM_Y } from './scenarios/river.js';
 import { DEATHS } from './deaths.js';
+import { POSES, pickPose } from './poses.js';
 import { sfx, voices } from './sfx.js';
 import { lerp } from './util.js';
 
@@ -28,6 +29,17 @@ export class Player {
   }
 
   reset() {
+    POSES[this.deathAnim]?.exit?.(this);
+    this.restore?.();
+    this.posed = false;
+    this.arriving = null;
+    this.deathAnim = null;
+    if (this.mesh) {
+      this.mesh.visible = true;
+      this.mesh.scale.set(1, 1, 1);
+      this.mesh.rotation.set(0, 0, 0);
+    }
+    this.squash = 1.7;        // a pancake needs one even on a player that never died
     this.col = 0; this.row = 0;
     this.x = 0; this.z = 0; this.y = 0;
     this.moving = false; this.t = 0;
@@ -54,6 +66,8 @@ export class Player {
 
   // Remove everything this player put in the scene.
   dispose() {
+    POSES[this.deathAnim]?.exit?.(this);
+    this.restore();
     if (this.halo) { this.mesh.remove(this.halo); this.halo = null; }
     if (this.xMark) { this.scene.remove(this.xMark); this.xMark = null; }
     this.scene.remove(this.mesh);
@@ -151,13 +165,15 @@ export class Player {
     this.deadFor = 0;
     this.moving = false;
     const spec = DEATHS[cause];
-    // Sometimes the 80s way out: a stepped spin and a halo instead of the usual pose.
-    this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'flat');
+    this.deathAnim = pickPose(spec?.anim ?? 'flat');
+    this.squash = spec?.squash ?? 1.6;    // how far a pancake is drawn out along the lane
     this.fall = [['x', -1], ['x', 1], ['z', 1], ['z', -1]][Math.floor(Math.random() * 4)];   // back, face, left, right
-    // Impact first, the character's own cry a beat later, the halo chime after that.
+    // Impact first, the character's own cry a beat later, then the pose's own
+    // punchline — a halo chime, a clatter of blocks, a hole swallowing them.
     if (spec?.sfx) sfx[spec.sfx]?.();
     setTimeout(() => this.voice?.(0.85), 160);
-    if (this.deathAnim === 'halo') setTimeout(() => sfx.halo(), 450);
+    const cue = POSES[this.deathAnim]?.cue;
+    if (cue) setTimeout(() => sfx[cue[0]]?.(), cue[1]);
     this.onDie?.(cause);
   }
 
@@ -192,31 +208,40 @@ export class Player {
     }
     setFrame(m, 0);
     const t = this.deadFor - DEATH_FLAP;
-    const anim = this.deathAnim;
-    if (anim === 'halo') {
-      // Quarter-turn steps, a slow rise, and a halo that climbs above the head.
-      m.rotation.y = this.facing + Math.floor(t / 0.16) * (Math.PI / 2);
-      m.position.y = this.y + t * 0.5;
-      if (!this.halo) { this.halo = makeHalo(); m.add(this.halo); }
-      this.halo.position.y = 1.35 + Math.min(0.6, t * 0.8);
-      this.halo.rotation.y = t * 2;
-    } else if (anim === 'flat') {
-      // Knocked flat on its back, then a red X over it.
-      const k = Math.min(1, t / 0.15);
-      m.position.y = this.y + 0.05;
-      m.rotation[this.fall[0]] = this.fall[1] * k * (Math.PI / 2);
-      if (k >= 1 && !this.xMark) {
-        this.xMark = makeRedX();
-        this.xMark.position.set(this.x, this.y + 0.9, this.z);
-        this.scene.add(this.xMark);
-      }
-    } else if (anim === 'sink') {
-      m.position.y = -Math.min(1.2, t * 2.5);
-      m.rotation.z = t * 3;
-    } else if (anim === 'launch') {
-      m.position.y = t * 12 - t * t * 9;
-      m.rotation.x = t * 8;
-    }
+    const pose = POSES[this.deathAnim];
+    if (!this.posed) { this.posed = true; pose?.enter?.(this); }
+    pose?.update?.(this, t);
+  }
+
+  // Materials are shared by colour across the whole scene, so anything that
+  // fades or greys this one works on its own copies and hands them back.
+  own() {
+    this.mesh.traverse((o) => {
+      if (!o.isMesh || o.userData.mat0) return;
+      o.userData.mat0 = o.material;
+      o.userData.col0 = o.material.color.clone();
+      o.material = o.material.clone();
+      o.material.transparent = true;
+    });
+  }
+
+  restore() {
+    this.mesh.traverse((o) => {
+      if (!o.isMesh || !o.userData.mat0) return;
+      o.material.dispose();
+      o.material = o.userData.mat0;
+      o.userData.mat0 = null;
+    });
+  }
+
+  // Come back the way you went out, played backwards — a pancake rehydrates,
+  // a beam rematerialises. Purely a picture: you can move the moment you land
+  // and the animation just catches up with you.
+  arrive(pose) {
+    const spec = POSES[pose];
+    if (!spec?.spawn) { this.arriving = null; return; }
+    this.arriving = { spec, t: 0 };
+    if (spec.spawnSfx) setTimeout(() => sfx[spec.spawnSfx[0]]?.(), spec.spawnSfx[1]);
   }
 
   update(dt) {
@@ -286,5 +311,12 @@ export class Player {
     m.position.set(this.x, this.y, this.z);
     m.rotation.y = this.facing;
     m.scale.set(sx, sy, sx);
+
+    if (this.arriving) {
+      const a = this.arriving;
+      const done = a.spec.spawn(this, a.t);
+      a.t += dt;
+      if (done) { this.arriving = null; m.scale.set(1, 1, 1); }
+    }
   }
 }

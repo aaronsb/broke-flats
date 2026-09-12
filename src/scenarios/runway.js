@@ -10,7 +10,7 @@ import { rand, randInt, pick } from '../util.js';
 import { sfx } from '../sfx.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
 
-registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat' });
+registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat', squash: 3.0 });
 registerDeath('flown', { anim: 'launch', title: 'FLOWN OFF', sfx: 'splat' });
 
 const CLIMB = 4;          // height reached at the end of the row

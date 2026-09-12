@@ -24,7 +24,7 @@ container, a machine with only Chromium — put a path in `CHROME_BIN`:
 
 ## Scenario names
 
-`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `gauntlet` (scenario mechanics) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
+`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `gauntlet` (scenario mechanics) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
 
 The list lives in `scripts/smoke.mjs`; `make` prints it.
 
@@ -48,6 +48,12 @@ keep proving:
 ## Timing caveat
 
 Software-rendered Chrome runs the game clock slower than wall time. Waits in the harness are generous: 4.5 s for the coin slot at start, about 14 s for the finish tally to reach the battle, 3 s for a death to resolve. If a check reads a state "too early", lengthen the sleep before suspecting the game.
+
+Where a frame has to land inside a game-clock window, do not sleep for it at
+all — poll the clock. A second of wall time was less than half a second of
+`deadFor`, so the death-pose shots were photographing the flap that runs before
+the pose. `for (let i = 0; i < 300 && (await evaluate('...deadFor')) < 1.25; i++) await sleep(50)`
+lands every time, whatever the renderer is doing.
 
 ## Extending the harness
 
