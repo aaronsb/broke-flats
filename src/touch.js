@@ -11,6 +11,11 @@ const BUTTONS = [
   { code: 'ShiftLeft', key: 'Shift', label: 'B', cls: 'act b', title: 'aim' },
   { code: 'KeyC', key: 'c', label: '¢', cls: 'act c', title: 'coin' },
   { code: 'Enter', key: 'Enter', label: '⏎', cls: 'act s', title: 'start / resume' },
+  // Minefield only: hopping already sets your facing, but turning in place is
+  // the whole point there — stepping somewhere to look at it is how you die.
+  { code: 'KeyQ', key: 'q', label: '↺', cls: 'mine q', title: 'turn left' },
+  { code: 'KeyF', key: 'f', label: '⚑', cls: 'mine f', title: 'flag the cell you face' },
+  { code: 'KeyE', key: 'e', label: '↻', cls: 'mine e', title: 'turn right' },
 ];
 
 export function wantsTouch() {

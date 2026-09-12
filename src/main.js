@@ -131,6 +131,23 @@ const unlock = () => { sfx.unlock(); removeEventListener('keydown', unlock); rem
 addEventListener('keydown', unlock);
 addEventListener('pointerdown', unlock);
 
+// ---------- fullscreen ----------
+// Hidden where the API does not exist at all — iPhone Safari has it for video
+// only — since the button would be a dead control there. No key: F already
+// flags a cell in the minefield gauntlet.
+const fullBtn = $('full');
+const fullEl = () => document.fullscreenElement ?? document.webkitFullscreenElement;
+const canFull = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+fullBtn.hidden = !canFull;
+fullBtn.addEventListener('click', () => {
+  const el = document.documentElement;
+  const done = fullEl() ? (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())
+                        : (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.());
+  done?.catch?.(() => {});          // a refusal is not an error worth throwing
+});
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange'])
+  addEventListener(ev, () => { fullBtn.classList.toggle('on', !!fullEl()); resize(); });
+
 // ---------- input ----------
 addEventListener('keydown', (e) => {
   if (e.repeat) return;

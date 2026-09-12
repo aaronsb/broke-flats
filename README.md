@@ -33,6 +33,8 @@ Play it: **https://aaronsb.github.io/broke-flats/**
 | Arrows / WASD | Hop |
 | Space | Toggle 3D peek (burns coins) |
 | Shift | Hold to peek |
+| Q / E | Turn in place (minefield) |
+| F | Flag the cell you face (minefield) |
 | S / Down (battle) | Cycle aim: land, sea, air |
 | Space / W / Up (battle) | Fire an egg |
 | M | Mute music |
@@ -42,7 +44,10 @@ Play it: **https://aaronsb.github.io/broke-flats/**
 On a phone or tablet the controls come up on screen: a d-pad, **A** to peek and
 fire, **B** to hold the peek on the board and cycle the aim in the battle, **¢**
 to feed the slot and **⏎** to start. The battle's corner placard reads the row
-your eggs are going to — LAND, SEA or AIR — and tapping it cycles.
+your eggs are going to — LAND, SEA or AIR — and tapping it cycles. On a
+minefield board three more appear above the d-pad: **↺** and **↻** turn you in
+place, **⚑** flags the cell you face. Hopping already turns you, but stepping
+somewhere to look at it is how you die down there.
 
 ## Running it
 

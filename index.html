@@ -21,6 +21,9 @@
     #card  { position: absolute; top: 58px; left: 0; right: 0; text-align: center; }
     #hint  { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; opacity: .85; }
     #hud #view { position: absolute; bottom: 44px; right: 16px; font-size: var(--ui-big); border-width: 4px; padding: 14px 20px; }
+    /* Fullscreen sits under the status bar, top right, in every mode. */
+    #full { position: absolute; top: 46px; right: 10px; }
+    #full.on { background: var(--hot); }
     #view.on { background: var(--hot); }
     #view.broke { opacity: .45; }
     #view.nudge { animation: nudge .6s infinite alternate; }
@@ -38,6 +41,13 @@
     #touchbar .pad.u { left: 70px; bottom: 100px; }
     #touchbar .pad.d { left: 70px; bottom: 12px; }
     #touchbar .act { position: absolute; bottom: 12px; border-radius: 50%; }
+    /* Minefield turn and flag, in the clear strip above the d-pad. Hidden until
+       the board actually has mines on it. */
+    #touchbar .mine { position: absolute; bottom: 158px; display: none; }
+    body.mines #touchbar .mine { display: block; }
+    #touchbar .mine.q { left: 14px; }
+    #touchbar .mine.f { left: 70px; background: rgba(217, 112, 42, .82); }
+    #touchbar .mine.e { left: 126px; }
     #touchbar .act.a { right: 70px; bottom: 56px; width: 64px; height: 64px; background: rgba(217, 112, 42, .85); }
     #touchbar .act.b { right: 14px; bottom: 100px; }
     #touchbar .act.c { right: 14px; bottom: 12px; }
@@ -47,7 +57,10 @@
        picks already say what to press. Both only crowd the screen. */
     body.touch #hint { display: none; }
     body.touch #hud:has(#title:not(.hide)) #view { display: none; }
-    body.touch #title button.about { top: 64px; right: 10px; bottom: auto; left: auto; }
+    body.touch #title button.about { top: 64px; right: 104px; bottom: auto; left: auto; }
+    /* No keyboard on touch, so the key hint in the label only costs width the
+       badge needs. */
+    body.touch #title button.about .k { display: none; }
     body.touch #title { padding-bottom: 170px; }
     /* Narrow screens: one step down the text scale, and a status bar that wraps
        instead of clipping BEST off the end. */
@@ -56,6 +69,7 @@
       #bar { height: auto; min-height: 40px; flex-wrap: wrap; justify-content: center; gap: 0 12px; padding: 5px 10px; letter-spacing: 0; }
       #card { top: 78px; }
       #logo { top: 64px; }
+      #full { top: 64px; }
     }
     /* Overlays */
     #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
@@ -147,6 +161,7 @@
     <div id="summary"><h2 id="summary-title"></h2><div id="summary-body"></div></div>
     <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE peek in 3D (burns coins) &nbsp;·&nbsp; P pixel size &nbsp;·&nbsp; M mute &nbsp;·&nbsp; ` debug</div>
     <button id="view">TILT</button>
+    <button id="full" title="Fullscreen">FULL</button>
     <div id="title">
       <h1 id="logo"></h1>
       <div class="picks">
@@ -154,7 +169,7 @@
         <p id="p2">P2  press A or D to join</p>
         <p class="go">INSERT COIN · ENTER or tap · 25 coins a life, 4 lives</p>
       </div>
-      <button class="about" id="about-open">ABOUT (I)</button>
+      <button class="about" id="about-open">ABOUT<span class="k"> (I)</span></button>
     </div>
     <div id="intro" hidden></div>
     <div id="about">

@@ -338,6 +338,20 @@ if (script === 'phone' || script === 'tablet') {
   await key('ShiftLeft', 'Shift'); await sleep(1600);
   await shot(`${script}-battle-sea`);   // the placard is the only visible aim control on touch
   console.log('aim placard:', await evaluate(`document.getElementById('view').textContent`));
+  await evaluate(`__game.debug.force = 'mines'; __game.restartStage()`); await sleep(3000);
+  await shot(`${script}-mines`);   // turn and flag: reachable only from these buttons on touch
+  console.log('mines controls:', await evaluate(`document.body.classList.contains('mines')`));
+  // Tap the flag button for real: the handler calls setPointerCapture, which a
+  // synthetic PointerEvent cannot satisfy, so the press has to come from CDP.
+  const flagCount = `[...__game.mode.world.rows.values()].reduce((a, l) => a + (l.flags?.size ?? 0), 0)`;
+  const box = await evaluate(`(() => { const b = document.querySelector('#touchbar .mine.f'); if (!b) return null;
+    const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  const before = await evaluate(flagCount);
+  for (const type of ['mousePressed', 'mouseReleased'])
+    await send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1, pointerType: 'touch' });
+  await sleep(400);
+  console.log('flags planted by the button:', before, '->', await evaluate(flagCount));
+  await evaluate(`__game.debug.force = null`);
   await send('Emulation.clearDeviceMetricsOverride');
   console.log(`${script} shots written to`, out);
 }

@@ -60,7 +60,11 @@ export class CrossingMode {
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
     if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
-    if (this.game.run.gauntlet === 'mines') this.hint = 'arrows hop · Q/E turn · F flag the cell you face · followers sweep: beep and a red blink on a mine';
+    // Forced boards (debug, playtest URLs) lay mines without setting the
+    // gauntlet, so ask both before showing the turn and flag controls.
+    this.mines = this.game.run.gauntlet === 'mines' || this.game.debug.force === 'mines';
+    document.body.classList.toggle('mines', this.mines);
+    if (this.mines) this.hint = 'arrows hop · Q/E turn · F flag the cell you face · followers sweep: beep and a red blink on a mine';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
   }
 
@@ -125,6 +129,7 @@ export class CrossingMode {
     for (const p of this.players) p.dispose();
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
+    document.body.classList.remove('mines');
   }
 
   alive() { return this.players.filter((p) => p.alive); }
