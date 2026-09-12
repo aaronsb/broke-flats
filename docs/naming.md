@@ -215,23 +215,31 @@ game instead of only on the box.
 | **Coin Crossing** | Says both halves and sounds like an Animal Crossing riff, which is the association to avoid, not lean on |
 | **Flat Out** | "Flat out broke" and "flat out" as full speed, but Bugbear's FlatOut racing series has owned it since 2004 |
 
-## Recommendation
+## Decided: Broke Flats
 
-**Crossing Flat Broke**, with the town itself named Flat Broke and the crossing
-sign as an in-world asset. It keeps the lose condition, sheds the genre-echo
-that `___ Crossing` carries, puts the joke at the end where it lands, and gives
-the art a string to paint on a board.
+The town is **Broke Flats** — the idiom bent into a place name, the way western
+flats are named (Bonneville Salt Flats, Sand Flats). It keeps both halves of
+the lose condition, reads as a dot on a map rather than a category, and is
+clear of games, npm and this account's repos.
 
-Short form in conversation stays **Flat Broke**, which was the pick on its own
-merits before any of this.
+The title sequence carries it. An eighth of every attract loop, a framed
+postcard takes the screen: a flat daytime street — buildings, trees, a car —
+with a yellow CROSSING sign planted in the verge, pedestrian symbol and all.
+Then the town sign slams down across the bottom two thirds of it, holds
+straight for a beat, and creaks askew on the post that gave. The crossing is
+literally buried by the town. Two new 8-bit presets, `slam` and `creak`, land
+on those beats.
 
-If you want one tight phrase instead of three words, **Level Crossing** is the
-cleverest thing on either list and the hardest to ever find in a search. That
-trade is the whole decision.
+The sign pair is one asset (`src/logo.js`): static in the title card and the
+about crawl, animated inside the framed scene. `make smoke S=logo` captures it
+on each beat.
 
-If it goes in, the rename touches: repo name, `package.json` `name` and
-`homepage`, the `<title>` in `index.html`, the title card and attract screen,
-README, and the GitHub Pages URL.
+### Still on Road Crosser
+
+The in-game identity is Broke Flats: page title, title card, about crawl,
+README. The repository, `package.json` `name`, and the GitHub Pages URL are
+unchanged, because renaming those moves the published address — that is a call
+to make deliberately, not a side effect of a title screen.
 
 ## Checks run
 
