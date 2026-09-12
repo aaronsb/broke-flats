@@ -154,9 +154,11 @@ export const sfx = {
   coin: () => voice({ wave: 'square', freq: N(88), arp: [N(93), N(93), N(93)], arpStep: 0.06, attack: 0.002, decay: 0.05, sustain: 0.7, hold: 0.12, release: 0.12, vol: 0.07 }),
   hatch: () => voice({ wave: 'square', freq: N(84), arp: [N(88), N(91), N(96)], arpStep: 0.05, attack: 0.002, decay: 0.03, sustain: 0.7, hold: 0.12, release: 0.1, vol: 0.07 }),
   tilt: () => voice({ wave: 'triangle', freq: N(60), arp: [N(64), N(67), N(72)], arpStep: 0.035, attack: 0.005, decay: 0.03, sustain: 0.8, hold: 0.1, release: 0.1, vol: 0.08 }),
+  // Wet slap: a sharp noise crack, a splatter wash, and a low thud underneath.
   splat: () => {
-    voice({ wave: 'noise', freq: 2500, slideTo: 200, attack: 0.002, decay: 0.08, sustain: 0.5, hold: 0.05, release: 0.2, vol: 0.18 });
-    voice({ wave: 'sawtooth', freq: N(50), slideTo: N(31), attack: 0.002, decay: 0.1, sustain: 0.5, hold: 0.1, release: 0.25, vol: 0.09 });
+    voice({ wave: 'noise', freq: 3200, slideTo: 300, filter: 'bandpass', attack: 0.001, decay: 0.03, sustain: 0.6, hold: 0.02, release: 0.08, vol: 0.28 });
+    voice({ wave: 'noise', freq: 1200, slideTo: 150, attack: 0.005, decay: 0.12, sustain: 0.5, hold: 0.08, release: 0.3, vol: 0.2 });
+    voice({ wave: 'sawtooth', freq: N(45), slideTo: N(28), attack: 0.002, decay: 0.1, sustain: 0.5, hold: 0.12, release: 0.3, vol: 0.12 });
   },
   splash: () => {
     voice({ wave: 'noise', freq: 900, slideTo: 3500, filter: 'bandpass', attack: 0.01, decay: 0.15, sustain: 0.5, hold: 0.1, release: 0.35, vol: 0.14 });

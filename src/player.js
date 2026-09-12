@@ -152,8 +152,10 @@ export class Player {
     const spec = DEATHS[cause];
     // Sometimes the 80s way out: a stepped spin and a halo instead of the usual pose.
     this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'flat');
-    if (this.deathAnim === 'halo') sfx.halo(); else if (spec?.sfx) sfx[spec.sfx]?.();
-    this.voice?.(0.85);
+    // Impact first, the character's own cry a beat later, the halo chime after that.
+    if (spec?.sfx) sfx[spec.sfx]?.();
+    setTimeout(() => this.voice?.(0.85), 160);
+    if (this.deathAnim === 'halo') setTimeout(() => sfx.halo(), 450);
     this.onDie?.(cause);
   }
 
