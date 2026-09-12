@@ -139,6 +139,16 @@ if (script === 'bounce') {
     p.row = lane.r; p.z = -lane.r; p.x = m.x - lane.dir * (m.len / 2 + 0.3); p.col = Math.round(p.x); p.mesh.position.set(p.x, 0, p.z); return [lane.r, lane.dir, Math.round(p.x * 10) / 10]; })()`);
   await sleep(250);
   console.log('bounce', r, await evaluate(`[__game.mode.players[0].alive, __game.mode.players[0].bounces ?? 0, Math.round(__game.mode.players[0].x)]`));
+  // A key held through the bounce must not fire straight back into the bumper.
+  console.log('held through bounce', await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row); const m = lane.movers[0]; m.x = p.x + lane.dir * (m.len / 2 + 0.4); m.mesh.position.x = m.x; m.v = 0; m.staller = { phase: 'stop', wait: 99 }; const before = p.bounces ?? 0; p.hop(lane.dir, 0); for (let i = 0; i < 6; i++) p.update(0.03); p.hop(lane.dir, 0); for (let i = 0; i < 12; i++) p.update(0.03); return [ (p.bounces ?? 0) - before, p.buffered ]; })()`));
+  // The truck leaves; hopping the same way again must not bounce.
+  await evaluate(`(() => { const lane = __game.mode.world.laneAt(__game.mode.players[0].row); lane.movers.forEach((o, i) => { o.x = -12 - i * 4; o.mesh.position.x = o.x; o.v = 0; o.staller = { phase: 'stop', wait: 99 }; }); })()`);
+  await sleep(300);
+  const dirKey = r[1] > 0 ? 'ArrowRight' : 'ArrowLeft';
+  await key(dirKey); await sleep(400);
+  console.log('after clear', await evaluate(`[__game.mode.players[0].bounces ?? 0, Math.round(__game.mode.players[0].x), __game.mode.players[0].bouncing, !!__game.mode.players[0].hopCarrier]`));
+  await key(dirKey); await sleep(400);
+  console.log('and again', await evaluate(`[__game.mode.players[0].bounces ?? 0, Math.round(__game.mode.players[0].x)]`));
 }
 if (script === 'unlock') {
   await start();

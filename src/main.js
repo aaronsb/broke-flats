@@ -138,7 +138,7 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyM') { music.toggleMute(); return; }
-  if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
+  if (e.code === 'KeyP') { pixelScale = pixelScale >= 5 ? 1 : pixelScale + 1; resize(); return; }
   if (debugKey(e)) { e.preventDefault(); return; }
   if (game.summary.ready && (e.code === 'Enter' || e.code === 'Space')) { game.summary.confirm(); e.preventDefault(); return; }
   if (game.over) {

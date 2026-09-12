@@ -61,7 +61,7 @@ export class Player {
 
   hop(dc, dr) {
     if (!this.alive || this.frozen) return;
-    if (this.moving) { this.buffered = [dc, dr]; return; }
+    if (this.moving) { if (!this.bouncing) this.buffered = [dc, dr]; return; }   // a bounce swallows queued input
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     const tc = Math.round(this.x) + dc;
     const tr = this.row + dr;
@@ -135,6 +135,7 @@ export class Player {
     this.facing = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     this.bounces = (this.bounces ?? 0) + 1;
     this.bouncing = true;        // no second hit until this hop lands
+    this.buffered = null;        // and no automatic retry into the same bumper
     sfx.bump();
   }
 
