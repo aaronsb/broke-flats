@@ -15,6 +15,7 @@ import { LEFT_HAND } from '../locale.js';
 registerDeath('train', { anim: 'flat', title: 'CHOO CHOO', sfx: 'splat' });
 
 const WARN = 2.0;         // seconds of gates and blinking before the train arrives
+const PARK = 30;          // how far off the strip a waiting train sits: beyond the tilted view
 const GATE_ARM = W + 1.6; // each arm reaches a cell past the centre: closed arms overlap two cells
 const TYPES = {
   steam:  { speed: [5, 7],   cars: ['flat', 'box', 'closed', 'flat'], w: 3 },
@@ -48,9 +49,10 @@ export default {
     lane.speed = rand(...spec.speed) * (0.85 + traffic(difficulty).speed * 0.25);
     const n = randInt(2, 5);
     const t = makeTrain(type, Array.from({ length: n }, () => pick(...spec.cars)));
-    t.x = -lane.dir * (SPAN + t.len / 2 + 2);        // parked out of sight
+    t.x = -lane.dir * (PARK + t.len / 2);            // parked out of sight, hidden until it runs
     if (lane.dir < 0) t.mesh.rotation.y = Math.PI;
     t.mesh.position.x = t.x;
+    t.mesh.visible = false;
     if (sky.headlights) t.mesh.add(makeHeadlightCone(t.len * CONE * 0.4, t.len / 2 + 0.9, 0.05, 0, 1.1));
     lane.add(t.mesh);
     lane.movers.push(t);
@@ -77,13 +79,14 @@ export default {
       if (d.wait <= 0) { d.state = 'warn'; d.wait = WARN; if (near) sfx.horn(); }
     } else if (d.state === 'warn') {
       d.wait -= dt;
-      if (d.wait <= 0) { d.state = 'run'; if (near) sfx.rumble(); }
+      if (d.wait <= 0) { d.state = 'run'; t.mesh.visible = true; if (near) sfx.rumble(); }
     } else {
       t.x += lane.dir * lane.speed * dt;
       t.mesh.position.x = t.x;
-      if (Math.abs(t.x) > SPAN + t.len / 2 + 2) {
-        t.x = -lane.dir * (SPAN + t.len / 2 + 2);
+      if (Math.abs(t.x) > PARK + t.len / 2) {
+        t.x = -lane.dir * (PARK + t.len / 2);
         t.mesh.position.x = t.x;
+        t.mesh.visible = false;
         d.state = 'idle';
         d.wait = rand(5, 11);
       }
