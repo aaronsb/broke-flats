@@ -381,6 +381,9 @@ if (script === 'battle') {
     if (i === 4) await key('ShiftLeft', 'Shift');
   }
   console.log('battle mid', await state(), await evaluate(`[__game.mode.targets.length, __game.mode.eggs.length, __game.mode.points]`));
+  console.log('plow', await evaluate(`(() => { const m = __game.mode; const dir = m.rowDir.land; const car = __meshes.makeCar(); car.kind = 'land'; car.points = 10; car.dir = dir; car.speed = 3; car.z = 4; car.x = 0; car.mesh.position.set(0, 0, -4); m.group.add(car.mesh); m.targets.push(car);
+    const train = __meshes.makeTrain('bullet', ['closed', 'closed']); train.kind = 'land'; train.points = 60; train.dir = dir; train.speed = 7; train.z = 4; train.x = 0.3; train.mesh.position.set(0.3, 0, -4); m.group.add(train.mesh); m.targets.push(train);
+    m.plow(); return [m.targets.includes(train), m.targets.includes(car)]; })()`));
   console.log('one way', await evaluate(`(() => { const m = __game.mode; const dirs = {}; for (const t of m.targets) (dirs[t.kind] ??= new Set()).add(t.dir); return Object.fromEntries(Object.entries(dirs).map(([k, v]) => [k, v.size])); })()`));
   await evaluate(`__game.mode.timeLeft = 0.1`);
   await sleep(4000);

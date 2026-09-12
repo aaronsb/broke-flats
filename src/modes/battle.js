@@ -248,6 +248,24 @@ export class BattleMode {
     });
   }
 
+  // Overlap on a row: the slower one loses. A train catching a queue of cars
+  // plows straight through them.
+  plow() {
+    const dead = new Set();
+    const list = this.targets;
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.kind !== b.kind || Math.abs(a.x - b.x) >= (a.len + b.len) / 2 - 0.1) continue;
+        dead.add(a.speed < b.speed ? a : b);
+      }
+    }
+    if (!dead.size) return;
+    for (const t of dead) this.debris.explode(t.mesh, 1.2);
+    this.targets = list.filter((t) => !dead.has(t));
+    sfx.boom(1.1);
+  }
+
   // Everything on a row travels the same way, and a newcomer waits until the
   // entry point is clear of the last one.
   spawn(kind) {
@@ -318,6 +336,7 @@ export class BattleMode {
       if (gone) this.group.remove(t.mesh);
       return !gone;
     });
+    this.plow();
     this.updateTipping(dt);
     this.debris.update(dt);
 
