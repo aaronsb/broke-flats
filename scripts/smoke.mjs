@@ -306,6 +306,23 @@ if (script === 'debug') {
   await key('Backquote', '`'); await sleep(100);
   console.log('panel hidden', await evaluate(`document.getElementById('debug').hidden`));
 }
+if (script === 'phone') {
+  const fs = await import('node:fs');
+  const out = process.env.OUT ?? '.';
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  // The touch layout at a real phone width: the badge, the picks and the
+  // framed intro all have to share about 400 x 720.
+  await send('Emulation.setDeviceMetricsOverride', { width: 400, height: 720, deviceScaleFactor: 1, mobile: true });
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await send('Page.navigate', { url: 'http://localhost:5173/' });
+  const shown = `document.getElementById('intro')?.classList.contains('show')`;
+  while (!(await evaluate(shown))) await sleep(50);
+  await sleep(2400); await shot('phone-intro');
+  for (let i = 0; i < 200 && (await evaluate(`document.getElementById('intro')?.hidden`)) === false; i++) await sleep(100);
+  await sleep(700); await shot('phone-title');
+  await send('Emulation.clearDeviceMetricsOverride');
+  console.log('phone shots written to', out);
+}
 if (script === 'logo') {
   const fs = await import('node:fs');
   const out = process.env.OUT ?? '.';

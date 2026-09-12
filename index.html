@@ -51,14 +51,15 @@
     #over p { margin: 8px 0; }
     #over p.keys { opacity: .8; }
     #over button { margin-top: 22px; background: var(--hot); }
-    #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; flex-direction: column; padding: 56px 0 60px; box-sizing: border-box; pointer-events: auto; }
+    #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; flex-direction: column; padding: 56px 0 60px; box-sizing: border-box; pointer-events: auto; }
     #title.hide { display: none; }
     #title h1 { font-size: 36px; margin: 0; letter-spacing: 2px; text-shadow: 4px 4px 0 var(--edge); }
     /* Title logo and attract intro. One SVG sign asset (src/logo.js) mounts
        static in the title and the about panel, and animated inside the framed
        scene that takes the screen for an eighth of the attract loop. */
-    #logo { margin: 0; line-height: 0; }
-    #logo .sign { width: min(520px, 80vw); height: auto; display: block; }
+    /* The sign rides in the corner as a badge. The framed intro is where it plays big. */
+    #logo { position: absolute; top: 46px; left: 10px; margin: 0; line-height: 0; }
+    #logo .sign { width: min(250px, 46vw); height: auto; display: block; }
     #about-sign { line-height: 0; margin: 0 0 2em; }
     #about-sign .sign { width: min(320px, 62%); height: auto; }
     #title h1, #title .picks, #title .about { transition: opacity .3s; }
