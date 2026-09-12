@@ -98,9 +98,9 @@ export default {
 
   onLand(lane, player) {
     const m = lane.moverAt(player.x, 0.3);
-    if (!m || m.submerged) return 'water';
+    if (!m || m.submerged) return player.swims ? null : 'water';     // waterfowl just swim
     if (m.head && within(lane, m, m.head, player.x)) return 'chomped';
-    if (!within(lane, m, m.bed, player.x)) return lane.riding(m, player) ? 'bounce' : 'water';
+    if (!within(lane, m, m.bed, player.x)) return lane.riding(m, player) ? 'bounce' : player.swims ? null : 'water';
     player.carrier = m;
     return null;
   },

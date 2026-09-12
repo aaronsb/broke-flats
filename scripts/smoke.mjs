@@ -212,6 +212,14 @@ if (script === 'mines') {
   await sleep(6000); await key('Enter', 'Enter'); await sleep(800);
   console.log('after', await evaluate(`[__game.run.level, __game.mode.constructor.name]`));
 }
+if (script === 'swim') {
+  await send('Page.navigate', { url: 'http://localhost:5173/?start&force=river&chars=duck&coins=50' }); await sleep(3500);
+  const r = await evaluate(`(() => { const p = __game.mode.players[0]; const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'river'); for (const m of lane.movers) { m.x = -12; m.mesh.position.x = -12; } p.row = lane.r; p.col = 3; p.x = 3; p.z = -lane.r; p.mesh.position.set(3, 0, p.z); p.land(); return [p.swims, p.alive, !!p.carrier]; })()`);
+  await sleep(400);
+  console.log('duck swims', r, await evaluate(`[__game.mode.players[0].alive, Math.round(__game.mode.players[0].y * 10) / 10]`));
+  await send('Page.navigate', { url: 'http://localhost:5173/?start&level=4&gauntlet=mines' }); await sleep(3500);
+  console.log('mines url', await evaluate(`[__game.run.gauntlet, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 12).map(l => l.scenario.id))].join(',')]`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);

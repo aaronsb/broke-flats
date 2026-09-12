@@ -163,7 +163,8 @@ export class Train {
       const lane = this.world.laneAt(k.rec.row);
       const hit = lane?.scenario.lethalAt?.(lane, k.mesh.position.x);
       if (hit && hit !== 'bounce') this.lose(k);
-      else if (Math.abs(k.mesh.position.x) > OFF_EDGE || k.rec.carrier?.submerged) this.lose(k, lane?.scenario.id === 'river');
+      else if (Math.abs(k.mesh.position.x) > OFF_EDGE) this.lose(k, lane?.scenario.id === 'river');
+      else if (k.rec.carrier?.submerged && !this.player.swims) this.lose(k, true);
     }
   }
 

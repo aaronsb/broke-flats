@@ -14,7 +14,7 @@ export function readPlaytest(search = location.search) {
   if (!PLAYTEST_URL) return null;
   const q = new URLSearchParams(search);
   if ([...q.keys()].length === 0) return null;
-  const hazards = ['road', 'river', 'runway', 'rail'];
+  const hazards = Object.values(SCENARIOS).filter((s) => s.danger).map((s) => s.id);
   const o = {
     level: num(q.get('level'), 1, 99),
     force: oneOf(q.get('force'), Object.keys(SCENARIOS).filter((k) => k !== 'finish')),

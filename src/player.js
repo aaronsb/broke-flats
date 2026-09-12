@@ -19,6 +19,7 @@ export class Player {
     this.scene = scene;
     this.world = world;
     this.variant = variant;
+    this.swims = !!character.swims;   // water is just another surface for waterfowl
     this.mesh = character.make(variant);
     this.voice = voices[character.voice];
     scene.add(this.mesh);
@@ -249,10 +250,12 @@ export class Player {
         this.x = this.carrier.x + this.carrierOffset;
         this.col = Math.round(this.x);
         this.y = this.carrier.wing ? this.carrier.y + 0.4 : (this.carrier.rideY ?? 0) + Math.min(0, this.carrier.mesh.position.y);
-        if (this.carrier.submerged) { this.die('water'); return; }
+        if (this.carrier.submerged) { if (this.swims) { this.carrier = null; this.y = -0.2; } else { this.die('water'); return; } }
         if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
+      // A swimmer sits low in the water when not aboard anything.
+      if (!this.carrier && this.swims && this.world.laneAt(this.row)?.scenario.id === 'river') this.y = -0.2;
     }
 
     // Hazard check against whichever row the chicken is mostly in. Nothing
