@@ -328,7 +328,7 @@ if (script === 'phone') {
   await key('Space', ' '); await sleep(1800); await shot('phone-iso');
   await key('Space', ' '); await sleep(400);
   await evaluate(`__game.mode.finished = true`); await sleep(9000);
-  await key('Enter', 'Enter'); await sleep(2500); await shot('phone-battle');
+  await key('Enter', 'Enter'); await sleep(6000); await shot('phone-battle');
   await key('ShiftLeft', 'Shift'); await sleep(1600);
   await shot('phone-battle-sea');   // the placard is the only visible aim control on touch
   console.log('aim placard:', await evaluate(`document.getElementById('view').textContent`));

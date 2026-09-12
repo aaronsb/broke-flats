@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { damp, lerp } from './util.js';
+import { clamp, damp, lerp } from './util.js';
 
 // rig (yaw) -> pivot (tilt) -> perspective camera on the pivot's local +y axis,
 // looking straight down. Tilt 0 is Frogger top-down. Tilting swings the camera
@@ -17,15 +17,23 @@ import { damp, lerp } from './util.js';
 // taller and narrows instead, landing near ten cells across on a phone.
 const HALF = 10.5;
 const HALF_H_MAX = 9;
+// Battle views carry `span`: the vertical half-extent that framing the pilot's
+// row together with the row being aimed at needs. Distance is derived from it,
+// so the same tuning holds at any window shape. Wider than the reference the
+// span is already enough and holds; narrower, the camera pulls back to widen
+// the gallery, up to BATTLE_PULL. A phone turned sideways lands on the
+// reference and looks like a desktop.
+const BATTLE_REF = 1.78;
+const BATTLE_PULL = 1.6;
 const PRESETS = {
   top:        { tilt: 0,    yaw: 0,   fov: 12 },
   iso:        { tilt: 0.85, yaw: 0.55, fov: 20 },   // near-orthographic isometric
   select:     { tilt: 1.2,  yaw: 0,    fov: 38, dist: 9 },
   // Battle: camera about 9-10 units up and 8-9 behind the chicken; the tilt
   // picks which row sits mid-screen. Targets are set by the battle mode.
-  battleLand: { tilt: 0.95, yaw: 0,   fov: 50, dist: 15.8 },
-  battleSea:  { tilt: 1.1,  yaw: 0,   fov: 50, dist: 20.3 },
-  battleAir:  { tilt: 1.2,  yaw: 0,   fov: 50, dist: 27.6 },
+  battleLand: { tilt: 0.95, yaw: 0,   fov: 50, span: 7.37 },
+  battleSea:  { tilt: 1.1,  yaw: 0,   fov: 50, span: 9.47 },
+  battleAir:  { tilt: 1.2,  yaw: 0,   fov: 50, span: 12.87 },
 };
 
 export class CameraRig {
@@ -50,7 +58,9 @@ export class CameraRig {
 
   applyView() {
     const c = this.camera, v = this.view;
-    const halfH = Math.min(HALF / this.aspect, HALF_H_MAX);
+    const halfH = v.span > 0
+      ? v.span * clamp(BATTLE_REF / this.aspect, 1, BATTLE_PULL)
+      : Math.min(HALF / this.aspect, HALF_H_MAX);
     const derived = halfH / Math.tan((v.fov * Math.PI) / 360);
     this.distance = v.dist > 0 ? v.dist : derived;
     c.fov = v.fov;
@@ -76,6 +86,7 @@ export class CameraRig {
     this.view.yaw = lerp(this.view.yaw, this.goal.yaw, k);
     this.view.fov = lerp(this.view.fov, this.goal.fov, k);
     this.view.dist = lerp(this.view.dist ?? 0, this.goal.dist ?? 0, k);
+    this.view.span = lerp(this.view.span ?? 0, this.goal.span ?? 0, k);
     const f = damp(5, dt);
     this.rig.position.x = lerp(this.rig.position.x, tx, f);
     this.rig.position.z = lerp(this.rig.position.z, tz, f);
