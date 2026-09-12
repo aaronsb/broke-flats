@@ -8,7 +8,7 @@ import { music } from './music.js';
 import { installDebug } from './debug.js';
 import { Select } from './select.js';
 import { Attract } from './attract.js';
-import { mountSign, startTitleCycle, stopTitleCycle } from './logo.js';
+import { mountSign, startTitleCycle, stopTitleCycle, bumpTitleCycle } from './logo.js';
 import { installTouch } from './touch.js';
 import { readPlaytest, applyBeforeStart, applyAfterStart } from './playtest.js';
 
@@ -61,7 +61,7 @@ let attract = new Attract(scene, sky);
 function begin() {
   if (started || select.confirming || inserting) return;
   sfx.unlock();
-  stopTitleCycle(ui.intro, ui.title);
+  stopTitleCycle();
   inserting = true;
   game.insertCoin(() => select.confirm(game.picks, () => {
     started = true;
@@ -111,6 +111,7 @@ if (!playtest?.start) startTitleCycle(ui.intro, ui.title);
 // About: a crawl over the title with its own epilogue theme.
 function openAbout() {
   if (started || ui.about.classList.contains('show')) return;
+  bumpTitleCycle();
   sfx.unlock();
   ui.about.classList.add('show');
   music.reset({ epilogue: true });
@@ -140,6 +141,7 @@ const fullEl = () => document.fullscreenElement ?? document.webkitFullscreenElem
 const canFull = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
 fullBtn.hidden = !canFull;
 fullBtn.addEventListener('click', () => {
+  bumpTitleCycle();
   const el = document.documentElement;
   const done = fullEl() ? (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())
                         : (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.());
@@ -152,6 +154,7 @@ for (const ev of ['fullscreenchange', 'webkitfullscreenchange'])
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (!started) {
+    bumpTitleCycle();   // anything but starting means someone is picking; hold the title off
     if (ui.about.classList.contains('show')) { if (e.code === 'Escape' || e.code === 'KeyI' || e.code === 'Enter') closeAbout(); return; }
     if (e.code === 'KeyI') { openAbout(); return; }
     if (e.code === 'Backquote') { debugKey(e); return; }

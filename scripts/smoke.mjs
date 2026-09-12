@@ -381,7 +381,17 @@ if (script === 'logo') {
   await at(2300, 'logo-creak');  // leaning on the post that gave
   await at(4600, 'logo-title');  // frame gone, insert-coin screen with the static sign
   await key('KeyI', 'i'); await sleep(6000); await shot('logo-about');
-  await key('Escape', 'Escape');
+  await key('Escape', 'Escape'); await sleep(500);
+  // Browsing the roster must not be interrupted: a pick keypress drops the
+  // sign at once and starts the idle count again.
+  await send('Page.navigate', { url: 'http://localhost:5173/' });
+  while (!(await evaluate(shown))) await sleep(50);
+  await sleep(1200);
+  const up = await evaluate(shown);
+  await key('ArrowRight'); await sleep(600);
+  console.log('sign up, then a pick keypress:', up, '->', await evaluate(shown));
+  await sleep(3000);
+  console.log('still held off 3s later:', (await evaluate(shown)) === false);
   console.log('logo shots written to', out);
 }
 if (script === 'shots') {

@@ -119,36 +119,60 @@ const CREAK = 1500;   // ms: the post gives and it leans
 const INTRO = 3400;   // ms the frame stays up: the slam, the creak, then a beat to read it
 const CYCLE = 27200;  // ms for the whole loop — the sign gets an eighth of it
 
+const IDLE = CYCLE - INTRO;   // how long the insert-coin screen holds between showings
+
 let timers = [];
+let els = null;               // { intro, title } while the cycle is running
 const clear = () => { timers.forEach(clearTimeout); timers = []; };
 const later = (fn, ms) => timers.push(setTimeout(fn, ms));
 const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+function hide() {
+  if (!els || els.intro.hidden) return;
+  els.intro.classList.remove('show');
+  els.title?.classList.remove('dim');
+  later(() => { els.intro.hidden = true; els.intro.innerHTML = ''; }, 400);
+}
+
 // One showing: mount a fresh scene so its animations start from the top.
-function showIntro(intro, title) {
-  intro.innerHTML = `<div class="frame">${sceneSvg()}</div>`;
-  intro.hidden = false;
-  requestAnimationFrame(() => intro.classList.add('show'));
-  title?.classList.add('dim');
+function show() {
+  if (!els) return;
+  // The about crawl paints under the intro, so wait rather than cover it.
+  if (document.getElementById('about')?.classList.contains('show')) { later(show, IDLE); return; }
+  els.intro.innerHTML = `<div class="frame">${sceneSvg()}</div>`;
+  els.intro.hidden = false;
+  requestAnimationFrame(() => els?.intro.classList.add('show'));
+  els.title?.classList.add('dim');
   if (!still()) { later(() => sfx.slam(), SLAM); later(() => sfx.creak(), CREAK); }
-  later(() => {
-    intro.classList.remove('show');
-    title?.classList.remove('dim');
-    later(() => { intro.hidden = true; intro.innerHTML = ''; }, 400);
-  }, INTRO);
+  later(hide, INTRO);
+  later(show, CYCLE);
 }
 
 export function startTitleCycle(intro, title) {
-  stopTitleCycle(intro, title);
+  stopTitleCycle();
   if (!intro) return;
   // Reduced motion still gets the postcard — the CSS holds it at its settled
-  // pose and showIntro keeps the slam quiet. Less motion, not less game.
-  const turn = () => { showIntro(intro, title); later(turn, CYCLE); };
-  turn();
+  // pose and show() keeps the slam quiet. Less motion, not less game.
+  els = { intro, title };
+  show();
 }
 
-export function stopTitleCycle(intro, title) {
+// Someone is at the controls: drop the sign if it is up and start the idle
+// count over, so picking through the roster is never interrupted by the title.
+export function bumpTitleCycle() {
+  if (!els) return;
   clear();
-  title?.classList.remove('dim');
-  if (intro) { intro.classList.remove('show'); intro.hidden = true; intro.innerHTML = ''; }
+  hide();
+  later(show, IDLE);
+}
+
+export function stopTitleCycle() {
+  clear();
+  if (els) {
+    els.title?.classList.remove('dim');
+    els.intro.classList.remove('show');
+    els.intro.hidden = true;
+    els.intro.innerHTML = '';
+  }
+  els = null;
 }
