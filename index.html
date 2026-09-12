@@ -42,8 +42,21 @@
     #touchbar .act.b { right: 14px; bottom: 100px; }
     #touchbar .act.c { right: 14px; bottom: 12px; }
     #touchbar .act.s { right: 150px; bottom: 12px; font-size: var(--ui); }
-    body.touch #hint, body.touch #view, body.touch #debug { bottom: 158px; }
+    body.touch #hud #view, body.touch #debug { bottom: 158px; }
+    /* The hint names keyboard keys a phone does not have, and on the title the
+       picks already say what to press. Both only crowd the screen. */
+    body.touch #hint { display: none; }
+    body.touch #hud:has(#title:not(.hide)) #view { display: none; }
+    body.touch #title button.about { top: 64px; right: 10px; bottom: auto; left: auto; }
     body.touch #title { padding-bottom: 170px; }
+    /* Narrow screens: one step down the text scale, and a status bar that wraps
+       instead of clipping BEST off the end. */
+    @media (max-width: 560px) {
+      :root { --ui: 10px; --ui-big: 20px; }
+      #bar { height: auto; min-height: 40px; flex-wrap: wrap; justify-content: center; gap: 0 12px; padding: 5px 10px; letter-spacing: 0; }
+      #card { top: 78px; }
+      #logo { top: 64px; }
+    }
     /* Overlays */
     #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(20, 40, 70, .45); pointer-events: auto; }
     #over.show { display: flex; }
@@ -53,7 +66,10 @@
     #over button { margin-top: 22px; background: var(--hot); }
     #title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; flex-direction: column; padding: 56px 0 60px; box-sizing: border-box; pointer-events: auto; }
     #title.hide { display: none; }
-    #title h1 { font-size: 36px; margin: 0; letter-spacing: 2px; text-shadow: 4px 4px 0 var(--edge); }
+    #title .picks { text-align: center; max-width: 100%; padding: 0 12px; box-sizing: border-box; }
+    #title p { margin: 14px 0 0; }
+    #title p.go { margin-top: 26px; opacity: .85; }
+    #title button.about { position: absolute; bottom: 44px; left: 16px; }
     /* Title logo and attract intro. One SVG sign asset (src/logo.js) mounts
        static in the title and the about panel, and animated inside the framed
        scene that takes the screen for an eighth of the attract loop. */

@@ -320,6 +320,8 @@ if (script === 'phone') {
   await sleep(2400); await shot('phone-intro');
   for (let i = 0; i < 200 && (await evaluate(`document.getElementById('intro')?.hidden`)) === false; i++) await sleep(100);
   await sleep(700); await shot('phone-title');
+  await key('Enter', 'Enter'); await sleep(5000);
+  await shot('phone-play');   // in game: the hint and the tilt placard come back
   await send('Emulation.clearDeviceMetricsOverride');
   console.log('phone shots written to', out);
 }
