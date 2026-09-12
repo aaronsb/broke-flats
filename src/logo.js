@@ -111,6 +111,32 @@ export const sceneSvg = () => `
 
 export function mountSign(el) { if (el) el.innerHTML = signSvg(); }
 
+// --- the Department seal --------------------------------------------------
+// A round rubber-stamp badge: DPG large in the middle, the department's full
+// name around the rim. Red ink on nothing, so it sits on any panel.
+const INK = '#e0392e';
+export const sealSvg = () => `
+  <svg class="dpg" viewBox="0 0 120 120" role="img" aria-label="Department of Pedestrian Grievances">
+    <defs><path id="dpg-rim" d="M 60 60 m -44 0 a 44 44 0 1 1 88 0 a 44 44 0 1 1 -88 0"/></defs>
+    <g fill="none" stroke="${INK}">
+      <circle cx="60" cy="60" r="56" stroke-width="4"/>
+      <circle cx="60" cy="60" r="52" stroke-width="1.5"/>
+      <circle cx="60" cy="60" r="35" stroke-width="2.5"/>
+    </g>
+    <text fill="${INK}" font-size="6.6" letter-spacing=".6">
+      <textPath href="#dpg-rim" startOffset="50%" text-anchor="middle" textLength="270" lengthAdjust="spacingAndGlyphs">DEPARTMENT OF PEDESTRIAN GRIEVANCES ·</textPath>
+    </text>
+    <text x="60" y="69" text-anchor="middle" font-size="22" fill="${INK}">DPG</text>
+    <g fill="${INK}"><rect x="52" y="76" width="16" height="2"/><rect x="52" y="42" width="16" height="2"/></g>
+  </svg>`;
+
+// The seal as a DOM element, ready to append.
+export function makeSeal() {
+  const holder = document.createElement('div');
+  holder.innerHTML = sealSvg();
+  return holder.firstElementChild;
+}
+
 // --- attract intro -----------------------------------------------------
 // The framed scene holds the screen for an eighth of the loop, then hands it
 // back to the insert-coin screen until the next turn.

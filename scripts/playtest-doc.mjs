@@ -35,7 +35,8 @@ Playtest parameters are ${PLAYTEST_URL ? 'ON' : 'OFF'} in \`src/config.js\` (\`P
 
 ${table(['Parameter', 'Values', 'Effect'], [
   ['`start`', 'flag', 'Skip the title and coin slot, start with 4 lives'],
-  ['`battle`', 'flag', 'Like `start`, then straight into the Air-Sea Battle'],
+  ['`battle`', 'flag', 'Like `start`, then straight into the hearing at the Department of Pedestrian Grievances'],
+  ['`hearing`', 'flag', 'Alias of `battle`'],
   ['`level`', '1–99', 'Start on this level'],
   ['`force`', forceable.map((k) => `\`${k}\``).join(' '), 'Every band on the board is this scenario'],
   ['`gauntlet`', hazards.map((k) => `\`${k}\``).join(' '), 'A gauntlet level of this hazard'],
@@ -52,7 +53,7 @@ Flags are present-or-absent. Without \`start\` the options are staged and apply 
 
 ## Levels
 
-${table(['Level', 'Sky', 'Scenery', 'Danger bands', 'Battle mix', 'Play'], LEVELS.map((l, i) => [
+${table(['Level', 'Sky', 'Scenery', 'Danger bands', 'Hearing mix', 'Play'], LEVELS.map((l, i) => [
   String(i + 1), l.sky, l.scenery, String(l.bands), `air ${l.battle.air} · sea ${l.battle.sea} · land ${l.battle.land}`, link(`start&level=${i + 1}`),
 ]))}
 Levels past ${LEVELS.length} repeat the table with rising difficulty: ${link(`start&level=${LEVELS.length + 1}`)}, ${link(`start&level=${LEVELS.length * 2}`)}.
@@ -69,7 +70,7 @@ ${table(['Scenario', 'What it exercises', 'Day', 'Night', 'High level'], forceab
 ${table(['Hazard', 'Play'], hazards.map((k) => [`\`${k}\``, link(`start&level=4&gauntlet=${k}`)]))}
 ## Skies and scenery
 
-${table(['Sky', 'Level 1 board', 'Battle'], Object.keys(SKIES).map((k) => [`\`${k}\``, link(`start&sky=${k}`), link(`battle&sky=${k}`)]))}
+${table(['Sky', 'Level 1 board', 'Hearing'], Object.keys(SKIES).map((k) => [`\`${k}\``, link(`start&sky=${k}`), link(`battle&sky=${k}`)]))}
 ${table(['Scenery', 'Hunting maze in it'], Object.keys(SCENERY).map((k) => [`\`${k}\``, link(`start&force=grass&scenery=${k}&coins=30`)]))}
 ## Characters
 
@@ -80,7 +81,7 @@ ${table(['Character', 'Perk', 'Tally ×', 'Solo', 'With a follower on the way'],
 ]))}
 Co-op: ${link(`start&chars=${CHARACTERS[0].id},${CHARACTERS[1].id}`)} · title with a pick staged: ${link(`chars=${CHARACTERS[CHARACTERS.length - 1].id}`)}
 
-## Battle
+## Hearing
 
 ${table(['Case', 'Play'], [
   ['Level 1 mix', link('battle&level=1')], ['Night with headlights', link('battle&level=3')], ['High difficulty', link('battle&level=9')],

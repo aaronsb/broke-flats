@@ -10,7 +10,7 @@ export function installDebug(game, ui) {
   const render = () => {
     panel.innerHTML = [
       '<b>DEBUG</b> (` closes)',
-      '1-4 level &nbsp; 5 battle &nbsp; N next level',
+      '1-4 level &nbsp; 5 hearing &nbsp; N next level',
       'Q road &nbsp; E river &nbsp; I runway &nbsp; O rail &nbsp; L mines &nbsp; T grass &nbsp; Y hedge &nbsp; U meadow &nbsp; 0 clear',
       'K sky &nbsp; J scenery &nbsp; V gauntlet &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
       `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · scenery: ${game.debug.scenery ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,

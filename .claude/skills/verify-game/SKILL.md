@@ -24,16 +24,16 @@ container, a machine with only Chromium — put a path in `CHROME_BIN`:
 
 ## Scenario names
 
-`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `halt` `halt-crash` `gauntlet` (scenario mechanics) · `perks` (chicken fences, pig bushes, frog long jump, robot heavy) · `perks2` (cat nine lives, goose honk) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
+`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, hearing pilots) · `battle` (the hearing: kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `halt` `halt-crash` `gauntlet` (scenario mechanics) · `perks` (chicken fences, pig bushes, frog long jump, robot heavy) · `perks2` (cat nine lives, goose honk) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
 
 The list lives in `scripts/smoke.mjs`; `make` prints it.
 
 ## Device shapes
 
 `touch.png` only ever framed the crossing board, so nothing was watching the
-title, the character row or the battle at a phone's proportions — and that is
+title, the character row or the hearing at a phone's proportions — and that is
 where they broke. `phone` (400x720) and `tablet` (820x1180) share one branch and
-play a whole run: intro, title, a pick two along, the board, a peek, the battle,
+play a whole run: intro, title, a pick two along, the board, a peek, the hearing,
 an aim cycle. They write `<shape>-intro`, `-title`, `-select`, `-play`, `-iso`,
 `-battle` and `-battle-sea`.
 
@@ -47,7 +47,7 @@ keep proving:
 
 ## Timing caveat
 
-Software-rendered Chrome runs the game clock slower than wall time. Waits in the harness are generous: 4.5 s for the coin slot at start, about 14 s for the finish tally to reach the battle, 3 s for a death to resolve. If a check reads a state "too early", lengthen the sleep before suspecting the game.
+Software-rendered Chrome runs the game clock slower than wall time. Waits in the harness are generous: 4.5 s for the coin slot at start, about 14 s for the finish tally to reach the hearing, 3 s for a death to resolve. If a check reads a state "too early", lengthen the sleep before suspecting the game.
 
 Where a frame has to land inside a game-clock window, do not sleep for it at
 all — poll the clock. A second of wall time was less than half a second of

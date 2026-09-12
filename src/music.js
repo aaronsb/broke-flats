@@ -1,7 +1,8 @@
 // Adaptive chiptune music. A lookahead scheduler walks 16th-note steps; every
 // step reads the current mood and picks voices from it, so the music reacts
-// within a beat. Moods: calm (safe row), danger (road or river), and a
-// "peek" overlay while the camera is tilted.
+// within a beat. Moods: calm (safe row), danger (road or river), hearing
+// (hold music while the complaints get filed), and a "peek" overlay while
+// the camera is tilted.
 
 import { ac } from './sfx.js';
 
@@ -18,18 +19,19 @@ const LYDIAN = [57, 59, 61, 63, 64, 66, 68, 69, 71, 73, 75, 76]; // A lydian
 const MOODS = {
   calm: { bpm: 92, cutoff: 700 },
   danger: { bpm: 150, cutoff: 1800 },
-  battle: { bpm: 164, cutoff: 2600 },
+  hearing: { bpm: 96, cutoff: 1400 },
   gauntlet: { bpm: 184, cutoff: 3200 },
   attract: { bpm: 112, cutoff: 1600 },
   epilogue: { bpm: 74, cutoff: 1200 },
   tally: { bpm: 132, cutoff: 2400 },
 };
-const BATTLE_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [57, 60, 64]]; // C F G Am
+// Hold music: a soft bossa loop of sevenths. Cmaj7 Am7 Dm7 G7, the elevator's own.
+const HEARING_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [50, 53, 57, 60], [43, 47, 50, 53]];
 
 let ctx, master, bus, delayBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
-const QUIET = { danger: false, tilted: false, dead: false, battle: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false };
+const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false };
 const TALLY_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55]]; // C F G C
 const EPILOGUE_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [53, 57, 60, 64], [55, 59, 62, 65]]; // Cmaj7 Am7 Fmaj7 G7
 let mood = { ...QUIET };
@@ -120,16 +122,16 @@ const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, {
 
 // ---------- step sequencer ----------
 function scheduleStep(s, t) {
-  const target = MOODS[mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.battle ? 'battle' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm'];
+  const target = MOODS[mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.hearing ? 'hearing' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm'];
   // A running continue countdown pushes the tempo up toward the end.
   const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : target.bpm;
   bpm += (goalBpm - bpm) * 0.12;
   const beat = 60 / bpm, sixteenth = beat / 4;
-  const prog = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.battle ? BATTLE_PROG : mood.tilted ? PEEK_PROG : CALM_PROG;
+  const prog = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : mood.tilted ? PEEK_PROG : CALM_PROG;
   const chord = prog[bar % prog.length];
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
-  const danger = (mood.danger || mood.battle || mood.gauntlet) && !mood.dead;
+  const danger = (mood.danger || mood.gauntlet) && !mood.dead;
 
   filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff, t, 0.2);
 
@@ -152,6 +154,18 @@ function scheduleStep(s, t) {
     if (s === 0) pad(chord, t, beat * 4);
     if (s === 0 || s === 8) osc('sine', N(root - 12), t, beat * 1.9, 0.3, bus, { attack: 0.05 });
     if (s % 4 === 2 && Math.random() < 0.75) lead(chord[((s / 4) | 0 + bar) % chord.length] + 12, t, sixteenth * 5, 0.05);
+    return;
+  }
+
+  if (mood.hearing) {
+    // Hold music: pad, a lazy two-beat bass, chord tones on the off-beats, a
+    // sine lead ambling down the chord, shaker on the eights. Under the booms.
+    if (s === 0) pad(chord, t, beat * 4);
+    if (s === 0 || s === 6) bass(root, t, beat * 1.4, false);
+    if (s === 10) bass(root + 7, t, beat * 1.2, false);
+    if (s === 3 || s === 11) for (const n of chord.slice(1)) osc('triangle', N(n + 12), t, sixteenth * 1.8, 0.035, bus, { attack: 0.01 });
+    if (s % 4 === 1 && Math.random() < 0.7) osc('sine', N(chord[chord.length - 1 - (((s >> 2) + bar) % chord.length)] + 24), t, sixteenth * 3.5, 0.06, delayBus, { attack: 0.01 });
+    if (s % 2 === 0) shaker(t, s % 4 === 0 ? 0.06 : 0.03);
     return;
   }
 
@@ -222,7 +236,7 @@ export const music = {
   // Scene change: drop every flag, snap the tempo to the new mood, restart on the downbeat.
   reset(m = {}) {
     mood = { ...QUIET, ...m };
-    const name = mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.battle ? 'battle' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm';
+    const name = mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.hearing ? 'hearing' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm';
     bpm = MOODS[name].bpm;
     step = 0; bar = 0;
     if (ctx) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);

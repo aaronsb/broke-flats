@@ -226,6 +226,20 @@ export function makeEgg() {
   return g;
 }
 
+// A stamped complaint form: a pale slip lying flat, a red stamp square in one
+// corner and two dark lines of text. The hearing's projectile.
+const formMat = new THREE.MeshLambertMaterial({ color: 0xf6f1e4, emissive: 0x2a2820 });
+const stampMat = new THREE.MeshBasicMaterial({ color: 0xd8302a });
+const inkMat = new THREE.MeshBasicMaterial({ color: 0x2a2a30 });
+export function makeForm() {
+  const g = new THREE.Group();
+  g.add(box(0.5, 0.02, 0.36, formMat, 0, 0));
+  g.add(box(0.12, 0.012, 0.12, stampMat, 0.15, 0.02, -0.09, false));
+  g.add(box(0.3, 0.01, 0.03, inkMat, -0.06, 0.02, 0.04, false));
+  g.add(box(0.22, 0.01, 0.03, inkMat, -0.1, 0.02, 0.11, false));
+  return g;
+}
+
 const navRed = new THREE.MeshBasicMaterial({ color: 0xff4040 });
 const navGreen = new THREE.MeshBasicMaterial({ color: 0x40ff60 });
 const lantern = new THREE.MeshBasicMaterial({ color: 0xfff0a0 });

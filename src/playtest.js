@@ -26,8 +26,8 @@ export function readPlaytest(search = location.search) {
     lives: num(q.get('lives'), 0, 99),
     god: q.has('god'),
     debug: q.has('debug'),
-    start: q.has('start') || q.has('battle'),
-    battle: q.has('battle'),
+    start: q.has('start') || q.has('battle') || q.has('hearing'),
+    battle: q.has('battle') || q.has('hearing'),   // `hearing` is the stage's name; `battle` the code's
   };
   return o;
 }

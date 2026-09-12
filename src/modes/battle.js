@@ -1,9 +1,11 @@
-// Air-Sea Battle. The board is gone; the chicken slides along the bottom row
-// and lobs eggs up-screen at cars, boats and planes crossing at three depths.
-// Timed. Ends the level and hands the run record to the next one.
+// The hearing at the Department of Pedestrian Grievances. The board is gone;
+// the chicken slides along the bottom row and files complaint forms up-screen
+// at the cars, boats and planes that nearly ran it over all day, crossing at
+// three depths. Each hit is damages awarded. Timed: the office closes, the
+// case closes, and the run record goes on to the next day.
 import * as THREE from 'three';
 import {
-  makeGround, makeCar, makeTruck, makeBoat, makePlane, makeEgg, makeHeadlightCone,
+  makeGround, makeCar, makeTruck, makeBoat, makePlane, makeForm, makeHeadlightCone,
   makeTrain, makeTree, makeHedge, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
 } from '../meshes.js';
 import { Footprints } from '../scenery/footprints.js';
@@ -18,12 +20,13 @@ import { rand, randInt, pick, clamp } from '../util.js';
 const ROWS = { land: 4, sea: 8, air: 12 };            // z depth of each target row
 const POINTS = { land: 10, sea: 20, air: 30 };
 const TILTS = ['land', 'sea', 'air'];                 // each tilt aims at one row
+const DESK = { land: 'ROADS', sea: 'HARBOR', air: 'AVIATION' };   // what the placard calls each row
 // [camera preset, ground point the camera looks at]
 const VIEW = { land: ['battleLand', 3.5], sea: ['battleSea', 8.7], air: ['battleAir', 13.7] };
 const FIELD_W = 400;   // wide enough to reach the fog at every tilt
 const GRID_X = 40;     // props are placed on cells out to ±GRID_X
 // Field themes: prop mix (weighted by repetition), building style and how
-// often a footprint is attempted per side per row. One is picked per battle.
+// often a footprint is attempted per side per row. One is picked per hearing.
 const tall = () => makeTree(true);
 const CHAR = new THREE.MeshLambertMaterial({ color: 0x1a1410 });   // what is left of a tree
 const CHAR_HOLD = 0.7;    // seconds the black stick stands before it crumbles
@@ -34,12 +37,12 @@ const THEMES = {
   parking:     { props: [makeParkedCar, makeFence, makeFence, makePlanter, makePlanter, makeShrub, makeTree, makeHedge], building: 'tower', buildProb: 0.15 },
 };
 const HEIGHT = { land: 0.6, sea: 0.6, air: 3.2 };
-const NEXT = { land: 'sea', sea: 'air' };            // where a missed egg bounces on to
-const FAR = ROWS.air + 2;                             // eggs past here burst in the air
+const NEXT = { land: 'sea', sea: 'air' };            // where a missed form bounces on to
+const FAR = ROWS.air + 2;                             // forms past here burst in the air
 const PROP_POINTS = 5;
 const SLIDE = 7, EGG_SPEED = 14, COOLDOWN = 0.3;
 const ARC = 2.2, BOUNCE_ARC = 0.55;                   // first-arc height and the bounce's share of it
-const VOLLEY_MS = 60;                                 // stagger between follower eggs
+const VOLLEY_MS = 60;                                 // stagger between follower forms
 const YOUNG_DMG = 0.5, YOUNG_SCALE = 0.6;
 // Per-pilot keys: player 1 moves on the arrows and fires with Space, player 2
 // moves on WASD and fires with Q. Shift cycles the aim for everyone.
@@ -53,10 +56,10 @@ const FORWARD = 2.5;   // how far up the field a pilot may advance
 export class BattleMode {
   constructor(game) {
     this.game = game;
-    this.hint = 'arrows move · SPACE fire · SHIFT tilt to aim land, sea or air';
+    this.hint = 'arrows move · SPACE file a complaint · SHIFT tilt to the next window';
   }
 
-  get mood() { return { battle: true }; }
+  get mood() { return { hearing: true }; }
 
   enter() {
     const { scene, level, sky } = this.game;
@@ -66,10 +69,11 @@ export class BattleMode {
     this.timeLeft = this.mix.duration;
     this.points = 0;
     this.tally = { land: 0, sea: 0, air: 0, train: 0, props: 0 };
+    this.crossedUnhit = 0;           // targets that left the field without taking a hit
     this.targets = [];
     this.eggs = [];
     this.spawnClock = { land: 1, sea: 2, air: 3 };
-    this.rowDir = { land: pick(-1, 1), sea: pick(-1, 1), air: pick(-1, 1) };   // one way per row, all battle
+    this.rowDir = { land: pick(-1, 1), sea: pick(-1, 1), air: pick(-1, 1) };   // one way per row, all hearing
     this.keys = {};
     this.ending = 0;
     this.props = [];                 // breakable scenery inside the strip
@@ -92,12 +96,12 @@ export class BattleMode {
       }
       return { mesh, cx, cz: 0, cooldown: 0, keys: PILOT_KEYS[i], young, trail: [{ x: cx, z: 0 }] };
     });
-    if (roster.length > 1) this.hint = 'P1 arrows + SPACE · P2 WASD + Q · SHIFT tilt to aim';
+    if (roster.length > 1) this.hint = 'P1 arrows + SPACE · P2 WASD + Q · SHIFT tilt to the next window';
 
     this.aim = 'land';
     this.showAim();
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
-    this.game.card(`LEVEL ${level.number} CLEAR · BATTLE`);
+    this.game.card(`DAY ${level.number} · YOUR CASE IS CALLED`);
   }
 
   // Grid the field and fill it in one theme's style. Target rows and the
@@ -160,7 +164,7 @@ export class BattleMode {
     this.burning = [];
   }
 
-  // An egg that clips scenery breaks it apart. Tall buildings take several
+  // A form that clips scenery breaks it apart. Tall buildings take several
   // hits: each one cracks, leans the tower further and sheds windows; the
   // last tips it over before it shatters.
   hitProps(e, y) {
@@ -243,12 +247,12 @@ export class BattleMode {
   onViewButton() { this.cycleAim(); }
 
   // The placard doubles as the aim control here — onViewButton cycles it — so
-  // it has to be on screen and has to say which row the eggs are going to.
+  // it has to be on screen and has to name the window the forms are going to.
   // Without it a touch player has no visible way to shift aim at all.
   showAim() {
     const v = this.game.ui.view;
     v.hidden = false;
-    v.textContent = this.aim.toUpperCase();
+    v.textContent = DESK[this.aim];
     v.classList.remove('on', 'broke', 'nudge');
   }
 
@@ -260,8 +264,8 @@ export class BattleMode {
     sfx.tilt();
   }
 
-  // The pilot's egg leads and the flock's follow, one every few frames, all
-  // at the row that was aimed when the trigger went.
+  // The pilot's form leads and the flock's follow, one every few frames, all
+  // at the window that was aimed when the trigger went.
   fire(pilot) {
     if (pilot.cooldown > 0 || this.ending) return;
     pilot.cooldown = COOLDOWN;
@@ -278,11 +282,11 @@ export class BattleMode {
   }
 
   launch(x, z, aim, dmg, scale) {
-    const egg = makeEgg();
-    egg.scale.setScalar(scale);
-    egg.position.set(x, 0.6, -z);
-    this.group.add(egg);
-    this.eggs.push({ mesh: egg, x, z, from: z, to: ROWS[aim], kind: aim, h0: 0, h1: HEIGHT[aim], amp: ARC, dmg, bounced: false });
+    const form = makeForm();
+    form.scale.setScalar(scale);
+    form.position.set(x, 0.6, -z);
+    this.group.add(form);
+    this.eggs.push({ mesh: form, x, z, from: z, to: ROWS[aim], kind: aim, h0: 0, h1: HEIGHT[aim], amp: ARC, dmg, bounced: false });
     sfx.plink();
   }
 
@@ -424,7 +428,7 @@ export class BattleMode {
     }
     this.targets = this.targets.filter((t) => {
       const gone = Math.abs(t.x) > OFFSCREEN + 3 + t.len / 2;
-      if (gone) this.group.remove(t.mesh);
+      if (gone) { this.group.remove(t.mesh); if (t.hp === 1) this.crossedUnhit++; }
       return !gone;
     });
     this.plow();
@@ -442,15 +446,16 @@ export class BattleMode {
       return false;
     });
 
-    // Eggs arc to the row they were aimed at and only hit targets there. A
+    // Forms arc to the row they were aimed at and only hit targets there. A
     // miss skips once, lower and on to the next row; a miss after that drops
-    // in the sea or flies off the back and bursts.
+    // in the harbor or flies off the back and bursts.
     for (const e of this.eggs) {
       e.z += EGG_SPEED * dt;
       const k = Math.min(1, (e.z - e.from) / (e.to - e.from));
       const y = 0.6 + Math.sin(k * Math.PI) * e.amp + e.h0 + (e.h1 - e.h0) * k;
       e.mesh.position.set(e.x, y, -e.z);
       e.mesh.rotation.x += dt * 10;
+      e.mesh.rotation.z += dt * 6.5;   // a second axis: the slip flutters rather than spins
       if (this.hitProps(e, y) || this.hitTargets(e)) { e.gone = true; continue; }
       if (e.z > FAR) { this.airburst(e.mesh.position); e.gone = true; continue; }
       if (e.z <= e.to + 0.6 || e.kind === 'air') continue;
@@ -481,17 +486,21 @@ export class BattleMode {
       return;
     }
     this.timeLeft -= dt;
-    game.card(`BATTLE ${Math.ceil(this.timeLeft)} · +${this.points}`);
+    game.card(`OFFICE CLOSES IN ${Math.ceil(this.timeLeft)} · AWARDED ${this.points}`);
     if (this.timeLeft <= 0) {
       this.ending = 0.001;
       game.card('');
       music.reset({ tally: true });
       const T = this.tally;
-      game.summary.show('BATTLE OVER', [
-        { label: 'LAND', count: T.land, each: POINTS.land }, { label: 'SEA', count: T.sea, each: POINTS.sea },
-        { label: 'AIR', count: T.air, each: POINTS.air }, { label: 'TRAINS', count: T.train, each: 60 },
-        { label: 'SCENERY', count: T.props, each: PROP_POINTS },
-      ], { mul: game.scoreMul(), onTotal: (v) => { game.run.score += v; }, done: () => { this.summaryDone = true; } });
+      game.summary.show('CASE CLOSED', [
+        { label: 'ROAD CLAIMS', count: T.land, each: POINTS.land }, { label: 'MARINE CLAIMS', count: T.sea, each: POINTS.sea },
+        { label: 'AVIATION CLAIMS', count: T.air, each: POINTS.air }, { label: 'RAIL CLAIMS', count: T.train, each: 60 },
+        { label: 'COLLATERAL (UNCONTESTED)', count: T.props, each: PROP_POINTS },
+      ], {
+        mul: game.scoreMul(), onTotal: (v) => { game.run.score += v; }, done: () => { this.summaryDone = true; },
+        stamp: `CASE CLOSED · DAY ${game.level.number}`,
+        ruling: { text: this.crossedUnhit === 0 ? 'UPHELD' : 'DISMISSED', bonus: 0 },
+      });
     }
   }
 }

@@ -14,12 +14,14 @@ import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
 import { stampOf } from '../stamp.js';
 import { GAUNTLET_BONUS } from '../game.js';
+import { grievanceFor } from '../grievances.js';
 
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
 const LED_BONUS = 50;    // per follower led across the line
 const FOUND_BONUS = 20;  // per follower that made its own way to the finish
 const FOLLOWER_MUL = 0.5; // added to the score multiplier per follower carried over
+const UPHELD_BONUS = 250; // a clean day: every egg hatched, every follower led rather than found
 const TALLY_TIME = 6;    // seconds to run around while the score counts up
 const LEASH = 8;       // rows a player may lead the other by
 const HONK_RADIUS = 3;   // cells either side a goose's honk reaches, on road rows within HONK_ROWS
@@ -94,7 +96,7 @@ export class CrossingMode {
       p.onLandedHint = landed;
       // Remember the way they went out. A solo death rebuilds the whole mode,
       // so it rides on the run to become the way they come back.
-      p.onDie = (cause) => { run.lastPose = p.deathAnim; if (cause === 'water') this.fx.splash(p.mesh.position); };
+      p.onDie = (cause) => { run.lastPose = p.deathAnim; run.lastCause = cause; if (cause === 'water') this.fx.splash(p.mesh.position); };
       p.isOccupied = (col, row) => this.blocked(p, col, row);
       const col = roster.length > 1 ? (i === 0 ? -1 : 1) : 0;
       p.col = col; p.x = col; p.mesh.position.x = col;
@@ -380,7 +382,15 @@ export class CrossingMode {
     const owners = T.per.flatMap((n, k) => Array(n).fill(k));
     const stamp = (k) => { const c = game.roster[k], v = game.run.variants[k]; return stampOf(`${c.id}:${v}`, () => c.young(v)); };
     if (T.led + T.found) stamp(owners[0] ?? 0);   // first render compiles shaders; do it before the cadence starts
-    T.summaryMs = game.summary.show(`LEVEL ${game.level.number} CLEAR`, lines, {
+    const level = game.level.number;
+    const quip = grievanceFor({ scenarios: [...this.world.rows.values()].map((l) => l.scenario.id), lastDeath: game.run.lastCause ?? null, level, rows: T.rows });
+    // A clean day is UPHELD: nothing missed, nothing merely found. A day with
+    // no eggs and no followers at all is a clean walk and counts.
+    const ruling = T.missed === 0 && T.found === 0 ? { text: 'UPHELD', bonus: UPHELD_BONUS } : { text: 'NOTED', bonus: 0 };
+    T.summaryMs = game.summary.show(`DAY ${level} · CLAIM FILED`, lines, {
+      quip,
+      stamp: `FILED · DAY ${level}`,
+      ruling,
       mul: game.scoreMul(),
       stamps: { count: T.led + T.found, image: (i) => stamp(owners[i] ?? 0), each: FOLLOWER_MUL },
       onTotal: (v) => { game.run.score += v; },
@@ -396,6 +406,7 @@ export class CrossingMode {
     if (!T.opened && T.t > (T.mines ? 2.6 : 0.6)) { T.opened = true; this.openSummary(); }
     if (T.summaryDone) {
       if (T.gauntlet) game.run.gauntlet = null;
+      game.run.lastCause = null;       // the next day's grievance is its own
       // Everyone carries over, gathered or not.
       this.trains.forEach((t, i) => { game.run.flock[i] = { count: t.total, waiting: 0 }; });
       game.card('');

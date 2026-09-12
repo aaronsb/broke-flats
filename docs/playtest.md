@@ -10,7 +10,8 @@ Playtest parameters are ON in `src/config.js` (`PLAYTEST_URL`). When off, every 
 | Parameter | Values | Effect |
 | --- | --- | --- |
 | `start` | flag | Skip the title and coin slot, start with 4 lives |
-| `battle` | flag | Like `start`, then straight into the Air-Sea Battle |
+| `battle` | flag | Like `start`, then straight into the hearing at the Department of Pedestrian Grievances |
+| `hearing` | flag | Alias of `battle` |
 | `level` | 1–99 | Start on this level |
 | `force` | `meadow` `grass` `road` `river` `runway` `rail` `mines` `hedge` | Every band on the board is this scenario |
 | `gauntlet` | `road` `river` `runway` `rail` `mines` | A gauntlet level of this hazard |
@@ -27,7 +28,7 @@ Flags are present-or-absent. Without `start` the options are staged and apply wh
 
 ## Levels
 
-| Level | Sky | Scenery | Danger bands | Battle mix | Play |
+| Level | Sky | Scenery | Danger bands | Hearing mix | Play |
 | --- | --- | --- | --- | --- | --- |
 | 1 | day | forest | 8 | air 1 · sea 1 · land 2 | [`?start&level=1`](https://aaronsb.github.io/broke-flats/?start&level=1) |
 | 2 | sunset | residential | 9 | air 2 · sea 2 · land 2 | [`?start&level=2`](https://aaronsb.github.io/broke-flats/?start&level=2) |
@@ -63,7 +64,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 
 ## Skies and scenery
 
-| Sky | Level 1 board | Battle |
+| Sky | Level 1 board | Hearing |
 | --- | --- | --- |
 | `day` | [`?start&sky=day`](https://aaronsb.github.io/broke-flats/?start&sky=day) | [`?battle&sky=day`](https://aaronsb.github.io/broke-flats/?battle&sky=day) |
 | `sunset` | [`?start&sky=sunset`](https://aaronsb.github.io/broke-flats/?start&sky=sunset) | [`?battle&sky=sunset`](https://aaronsb.github.io/broke-flats/?battle&sky=sunset) |
@@ -91,7 +92,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 
 Co-op: [`?start&chars=chicken,goose`](https://aaronsb.github.io/broke-flats/?start&chars=chicken,goose) · title with a pick staged: [`?chars=robot`](https://aaronsb.github.io/broke-flats/?chars=robot)
 
-## Battle
+## Hearing
 
 | Case | Play |
 | --- | --- |

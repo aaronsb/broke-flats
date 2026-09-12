@@ -92,10 +92,10 @@ export class Game {
     const coins = Math.floor(this.run.coins), lives = this.run.lives;
     this.ui.overScore.textContent = `SCORE ${this.run.score} · LEVEL ${this.run.level} · LIVES ${lives}`;
     this.ui.overCoins.textContent = coins >= LIFE_COST
-      ? `C INSERT COIN · ${LIFE_COST} OF YOUR ${coins} COINS BUYS A LIFE`
-      : `NO COINS LEFT (${coins})`;
-    this.ui.retry.textContent = lives > 0 ? 'RESUME (ENTER)' : coins >= LIFE_COST ? 'INSERT COIN (C)' : 'NEW GAME (R)';
-    if (this.countdown !== null && this.countdown !== undefined) this.ui.overTitle.textContent = `CONTINUE? ${Math.ceil(this.countdown)}`;
+      ? `C PAY THE FILING FEE · ${LIFE_COST} OF YOUR ${coins} COINS BUYS AN APPEAL`
+      : `NO FEE MONEY LEFT (${coins})`;
+    this.ui.retry.textContent = lives > 0 ? 'RESUME (ENTER)' : coins >= LIFE_COST ? 'PAY FEE (C)' : 'NEW GAME (R)';
+    if (this.countdown !== null && this.countdown !== undefined) this.ui.overTitle.textContent = `APPEAL? ${Math.ceil(this.countdown)}`;
   }
 
   get roster() { return this.picks.map((i) => CHARACTERS[i]); }
@@ -186,6 +186,7 @@ export class Game {
     this.ui.hint.textContent = mode.hint;
   }
 
+  // The board is crossed: the day's grievances go to the hearing.
   stageClear() { this.setMode(new BattleMode(this)); }
 
   nextLevel() {
@@ -220,7 +221,7 @@ export class Game {
     this.over = true;
     if (this.run.score > this.best) { this.best = this.run.score; localStorage.setItem('rc-best', this.best); }
     this.ui.best.textContent = this.best;
-    this.ui.overTitle.textContent = 'GAME OVER';
+    this.ui.overTitle.textContent = 'CLAIM DENIED';
     this.countdown = CONTINUE_TIME;
     this.renderOver();
     this.ui.over.classList.add('show');

@@ -95,7 +95,14 @@ if (script === 'tally') {
   await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch(); __game.mode.trains[0].waiting = 2`);
   await evaluate(`__game.mode.finished = true`); await sleep(4000);
   console.log('tally', await evaluate(`[document.getElementById('summary').classList.contains('show'), [...document.querySelectorAll('#summary .row')].map(r => r.textContent).join(' | ')]`));
-  await sleep(6000);
+  await sleep(7000);
+  // The grievance report: header, quip, the FILED stamp and the ruling stamp.
+  const report = await evaluate(`({ header: document.querySelector('#summary .header')?.textContent, title: document.getElementById('summary-title').textContent, quip: document.querySelector('#summary .quip')?.textContent, stamp: document.querySelector('#summary .rubber.filed')?.textContent ?? null, ruling: document.querySelector('#summary .rubber.ruling')?.textContent ?? null, seal: !!document.querySelector('#summary .seal .dpg') })`);
+  console.log('report', report);
+  if (report.header !== 'DEPARTMENT OF PEDESTRIAN GRIEVANCES') errors.push(`tally: header read ${JSON.stringify(report.header)}`);
+  if (!report.stamp) errors.push('tally: the FILED stamp never landed');
+  if (!report.ruling) errors.push('tally: no ruling stamp');
+  { const fsT = await import('node:fs'); const r = await send('Page.captureScreenshot', { format: 'png' }); fsT.writeFileSync(`${OUT}/report.png`, Buffer.from(r.data, 'base64')); }
   await key('ArrowUp'); await sleep(300);
   console.log('hop kept panel', await evaluate(`[document.getElementById('summary').classList.contains('show'), __game.summary.ready]`));
   await key('Enter', 'Enter'); await sleep(800);
@@ -592,9 +599,9 @@ if (script === 'shots') {
   await sleep(500); await shot('night-top');
   await key('Space', ' '); await sleep(1500); await shot('night-iso');
   await evaluate(`for (let i = 0; i < 3; i++) __game.mode.trains[0].hatch(true); __game.mode.finished = true`); await sleep(7500); await shot('tally');
-  await sleep(4000); await key('Enter', 'Enter'); await sleep(1500); await shot('battle-land');
+  await sleep(4000); await key('Enter', 'Enter'); await sleep(1200); await key('Space', ' '); await sleep(300); await shot('battle-land');
   await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-sea');
-  await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-air');
+  await key('ShiftLeft', 'Shift'); await sleep(1200); await key('Space', ' '); await sleep(350); await shot('battle-air');
   await evaluate(`__game.run.level = 1; __game.nextLevel()`); await sleep(500);
   await key('Space', ' '); await sleep(1500); await shot('sunset-iso');
   await evaluate(`__game.run.level = 3; __game.nextLevel()`); await sleep(500);

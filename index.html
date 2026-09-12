@@ -137,19 +137,40 @@
     #about .crawl h2 { font-size: var(--ui); margin: 0 0 1.6em; color: var(--accent); }
     @keyframes crawl { from { transform: translateY(0); } to { transform: translateY(calc(-100% - min(70vh, 520px))); } }
     #about .close { position: absolute; top: 12px; right: 12px; }
-    /* Cash-in summary: a framed panel of lines that count up */
-    #summary { pointer-events: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(640px, 66vw); min-height: 30vh; display: none; flex-direction: column; justify-content: center; background: rgba(12, 24, 44, .62); border: 4px solid rgba(255, 255, 255, .85); border-radius: 8px; padding: 14px 22px 18px; box-sizing: border-box; }
+    /* Grievance report: a framed panel of lines that count up, then a stamp comes down on it */
+    #summary { pointer-events: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(640px, 66vw); min-height: 30vh; display: none; flex-direction: column; justify-content: center; background: rgba(12, 24, 44, .62); border: 4px solid rgba(255, 255, 255, .85); border-radius: 8px; padding: 14px 22px 18px; box-sizing: border-box; transition: transform .12s ease-out; }
     #summary.show { display: flex; }
+    #summary.cocked { transform: translate(-50%, -50%) rotate(-3deg); }
+    #summary.shake { animation: thump .25s ease-out; }
+    @keyframes thump { 0% { transform: translate(-50%, calc(-50% + 7px)) rotate(-3deg); } 35% { transform: translate(calc(-50% - 5px), calc(-50% - 3px)) rotate(-2.2deg); } 65% { transform: translate(calc(-50% + 3px), calc(-50% + 2px)) rotate(-3.5deg); } 100% { transform: translate(-50%, -50%) rotate(-3deg); } }
+    #summary .header { font-size: calc(var(--ui) * .75); letter-spacing: 1px; opacity: .8; text-align: center; margin: 0 0 6px; padding-right: 110px; }
+    #summary .quip { font-size: calc(var(--ui) * .85); opacity: .7; text-align: center; margin: -4px 0 10px; }
+    #summary .quip[hidden] { display: none; }
+    #summary .seal { position: absolute; top: 8px; right: 10px; display: flex; align-items: flex-end; gap: 4px; pointer-events: none; }
+    #summary .seal .dpg { width: 68px; height: 68px; transform: rotate(-8deg); opacity: .92; }
+    #summary .seal text { font-family: 'Arcade', ui-monospace, monospace; text-shadow: none; }
+    #summary .seal .mark { width: 42px; }
+    #summary .seal .mark .sign { width: 100%; height: auto; display: block; }
     #summary .go { text-align: center; margin-top: 12px; opacity: .9; animation: pulse .6s infinite alternate; }
     #summary h2 { font-size: var(--ui); margin: 0 0 10px; color: var(--accent); text-align: center; }
     #summary .row { display: flex; justify-content: space-between; gap: 16px; }
     #summary .row .value { color: var(--accent); min-width: 5ch; text-align: right; }
     #summary .row.total { margin-top: 8px; border-top: 2px solid var(--edge); padding-top: 6px; }
+    #summary .row.bonus .value { color: #6fbf52; }
     #summary .row.stamps .label { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     #summary .strip { display: inline-flex; gap: 2px; flex-wrap: wrap; }
     #summary .stamp { width: 28px; height: 28px; image-rendering: pixelated; animation: stamp .18s ease-out; }
     #summary span.stamp { color: var(--accent); text-align: center; line-height: 28px; }
+    #summary.cheer .stamp { animation: bounce .45s ease-in-out 2; animation-delay: calc(var(--i, 0) * 60ms); }
     @keyframes stamp { from { transform: scale(2.2) rotate(-14deg); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px) rotate(8deg); } }
+    /* The rubber stamps: red ink, bordered, at an angle, landing from above */
+    #summary .rubber { position: absolute; color: #e0392e; border: 4px solid #e0392e; border-radius: 6px; padding: 6px 10px; font-size: calc(var(--ui) * 1.5); letter-spacing: 1px; text-shadow: none; white-space: nowrap; pointer-events: none; opacity: .9; animation: slamdown .2s cubic-bezier(.2, .8, .3, 1) both; mix-blend-mode: screen; }
+    #summary .rubber.filed { left: 30%; bottom: 8%; --tilt: -9deg; }
+    #summary .rubber.ruling { left: 44%; bottom: 40%; --tilt: 7deg; }
+    @keyframes slamdown { from { transform: rotate(var(--tilt)) scale(1.6); opacity: 0; } 60% { opacity: .95; } to { transform: rotate(var(--tilt)) scale(1); opacity: .9; } }
+    #summary .confetti { position: absolute; width: 7px; height: 7px; pointer-events: none; animation: confetti 1.1s ease-in both; }
+    @keyframes confetti { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; } }
   </style>
 </head>
 <body>
@@ -188,7 +209,7 @@
           <p>Dad watched the kids play a round and thought: I bet I could build my own game like that with Claude, in a single session.</p>
           <p>So that evening he did. The chicken hopped, the cars came, and the first version was playable before dinner was cold.</p>
           <p>Then the kids got to play it. And the kids had ideas.</p>
-          <p>A tilt to peek in 3D. Coins that pay for the peeking. Hidden tunnels through the hedges. Eggs that hatch into followers who trail you like a snake. Boats, submarines, alligators. Planes you can ride on the wing. Trains with crossing gates. An arcade battle at the end of every level. Insert coin to continue.</p>
+          <p>A tilt to peek in 3D. Coins that pay for the peeking. Hidden tunnels through the hedges. Eggs that hatch into followers who trail you like a snake. Boats, submarines, alligators. Planes you can ride on the wing. Trains with crossing gates. A hearing at the Department of Pedestrian Grievances at the end of every day. Insert coin to continue.</p>
           <p>Most of it went in the same day.</p>
           <h2>MADE WITH</h2>
           <p>three.js for the voxels. Vite for the build. Press Start 2P for the letters. Every sound and every note is synthesized in your browser as you play.</p>
@@ -201,11 +222,11 @@
       </div>
     </div>
     <div id="over">
-      <h1 id="over-title">GAME OVER</h1>
+      <h1 id="over-title">CLAIM DENIED</h1>
       <p id="over-score">SCORE 0</p>
       <p id="over-coins"></p>
-      <p class="keys">C insert coin · ENTER resume · R new game</p>
-      <button id="retry">INSERT COIN (C)</button>
+      <p class="keys">C pay fee · ENTER resume · R new game</p>
+      <button id="retry">PAY FEE (C)</button>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

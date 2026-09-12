@@ -204,4 +204,15 @@ export const sfx = {
   },
   over: () => voice({ wave: 'square', freq: N(64), arp: [N(60), N(57), N(52)], arpStep: 0.16, attack: 0.005, decay: 0.05, sustain: 0.7, hold: 0.55, release: 0.25, vol: 0.07 }),
   start: () => voice({ wave: 'square', freq: N(60), arp: [N(64), N(67), N(72), N(76)], arpStep: 0.07, attack: 0.005, decay: 0.03, sustain: 0.7, hold: 0.3, release: 0.15, vol: 0.07 }),
+  // The report panel cocks on its desk: a wooden knock with a little rattle after.
+  kathunk: () => { voice({ wave: 'noise', freq: 700, slideTo: 120, filter: 'lowpass', attack: 0.001, decay: 0.03, sustain: 0.4, hold: 0.03, release: 0.1, vol: 0.14 });
+                   voice({ wave: 'square', freq: N(40), slideTo: N(33), attack: 0.002, decay: 0.05, sustain: 0.4, hold: 0.04, release: 0.1, vol: 0.08 });
+                   setTimeout(() => voice({ wave: 'noise', freq: 1600, slideTo: 500, filter: 'bandpass', attack: 0.001, decay: 0.02, sustain: 0.3, hold: 0.01, release: 0.05, vol: 0.05 }), 110); },
+  // A rubber stamp landing: a sharp click, then the thump of the desk under it.
+  kerchunk: () => { voice({ wave: 'noise', freq: 3800, slideTo: 900, filter: 'highpass', attack: 0.001, decay: 0.015, sustain: 0.3, hold: 0.01, release: 0.03, vol: 0.12 });
+                    setTimeout(() => { voice({ wave: 'noise', freq: 500, slideTo: 90, filter: 'lowpass', attack: 0.001, decay: 0.04, sustain: 0.5, hold: 0.04, release: 0.14, vol: 0.2 });
+                                       voice({ wave: 'sine', freq: N(36), slideTo: N(29), attack: 0.002, decay: 0.06, sustain: 0.5, hold: 0.06, release: 0.16, vol: 0.12 }); }, 45); },
+  // A short rising triad with the octave on top: the ruling went your way.
+  fanfare: () => { [72, 76, 79, 84].forEach((n, i) => setTimeout(() => voice({ wave: 'square', freq: N(n), attack: 0.004, decay: 0.03, sustain: 0.7, hold: i === 3 ? 0.32 : 0.08, release: i === 3 ? 0.3 : 0.06, vol: 0.07 }), i * 95));
+                   setTimeout(() => voice({ wave: 'triangle', freq: N(76), attack: 0.01, decay: 0.05, sustain: 0.6, hold: 0.3, release: 0.3, vol: 0.05 }), 285); },
 };
