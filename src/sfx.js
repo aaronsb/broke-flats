@@ -111,6 +111,9 @@ export const voices = Object.fromEntries(Object.keys(CALLS).map((k) => [k, (pitc
 
 export const sfx = {
   unlock: () => ac(),
+  // A goose honk: the goose call, lower and about twice as loud.
+  honk: () => { voice({ wave: 'sawtooth', freq: vary(170, 0.08), slideTo: 260, attack: 0.02, decay: 0.05, sustain: 0.8, hold: 0.18, release: 0.1, vol: 0.13 });
+                setTimeout(() => voice({ wave: 'sawtooth', freq: vary(240, 0.08), slideTo: 150, attack: 0.01, decay: 0.05, sustain: 0.7, hold: 0.14, release: 0.12, vol: 0.12 }), 200); },
   boom,
   // Slide whistle: up, hang, and down. The classic "phew".
   phew: () => { voice({ wave: 'triangle', freq: 420, slideTo: 1500, attack: 0.02, decay: 0.05, sustain: 0.8, hold: 0.28, release: 0.05, vol: 0.07 });

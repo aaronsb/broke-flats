@@ -167,16 +167,23 @@ const small = (make) => (variant) => { const m = make(variant); m.scale.setScala
 
 // A character may list visual `variants`; make(variant) and young(variant)
 // take the one the run rolled so a player's followers match their parent.
-// `scoreMul` scales every cash-in: perks that make crossing easier cost a
-// little, handicaps pay a little. `swims` is the first perk (see issue #1).
+// Perks are plain fields the player copies; `scoreMul` scales every cash-in:
+// perks that make crossing easier cost a little, handicaps pay a little.
+//   swims      open water is a surface; logs pick you up, boats run you down
+//   fences     fence cells are passable
+//   bushes     shrub and hedge cells are passable (tunnels stay the way through a hedge wall)
+//   longJump   a quick double-tap forward hops two rows
+//   heavy      never bounces off a bumper, sinks the moment it touches water
+//   nineLives  the first death on each level is free
+//   honk       a key that makes nearby stalled vehicles pull away
 export const CHARACTERS = [
-  { id: 'chicken', name: 'CHICKEN', voice: 'chicken', make: makeChicken, young: makeChick },
-  { id: 'goose',   name: 'GOOSE',   voice: 'goose',   make: makeGoose,   young: small(makeGoose), swims: true, scoreMul: 0.9 },
+  { id: 'chicken', name: 'CHICKEN', voice: 'chicken', make: makeChicken, young: makeChick, fences: true, scoreMul: 0.95 },
+  { id: 'goose',   name: 'GOOSE',   voice: 'goose',   make: makeGoose,   young: small(makeGoose), swims: true, honk: true, scoreMul: 0.9 },
   { id: 'duck',    name: 'DUCK',    voice: 'duck',    make: makeDuck,    young: small(makeDuck),  swims: true, scoreMul: 0.9 },
-  { id: 'frog',    name: 'FROG',    voice: 'frog',    make: makeFrog,    young: small(makeFrog) },
-  { id: 'cat',     name: 'CAT',     voice: 'cat',     make: makeCat,     young: small(makeCat), variants: Object.keys(CATS) },
-  { id: 'pig',     name: 'PIG',     voice: 'pig',     make: makePig,     young: small(makePig) },
-  { id: 'robot',   name: 'ROBOT',   voice: 'robot',   make: makeRobot,   young: small(makeRobot) },
+  { id: 'frog',    name: 'FROG',    voice: 'frog',    make: makeFrog,    young: small(makeFrog), longJump: true, scoreMul: 0.9 },
+  { id: 'cat',     name: 'CAT',     voice: 'cat',     make: makeCat,     young: small(makeCat), variants: Object.keys(CATS), nineLives: true, scoreMul: 0.92 },
+  { id: 'pig',     name: 'PIG',     voice: 'pig',     make: makePig,     young: small(makePig), bushes: true, scoreMul: 0.9 },
+  { id: 'robot',   name: 'ROBOT',   voice: 'robot',   make: makeRobot,   young: small(makeRobot), heavy: true, scoreMul: 1.05 },
 ];
 
 export const rollVariant = (c) => (c.variants ? c.variants[Math.floor(Math.random() * c.variants.length)] : undefined);

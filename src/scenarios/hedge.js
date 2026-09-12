@@ -23,7 +23,7 @@ export default {
     for (let c = -W; c <= W; c++) {
       if (c === gap) continue;
       lane.add(c === tunnel ? makeTunnel() : makeHedge(), c);
-      if (c !== tunnel) lane.block(c);
+      if (c !== tunnel) lane.block(c, 'bush');   // a bushes player pushes through; the tunnel is for everyone
     }
   },
 };

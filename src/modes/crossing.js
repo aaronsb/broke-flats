@@ -5,6 +5,7 @@ import { World } from '../world.js';
 import { Player, BACK_LIMIT, DEATH_FLAP } from '../player.js';
 import { Train } from '../train.js';
 import { sfx } from '../sfx.js';
+import { DEATHS } from '../deaths.js';
 import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
 import { W } from '../lane.js';
@@ -21,6 +22,9 @@ const FOUND_BONUS = 20;  // per follower that made its own way to the finish
 const FOLLOWER_MUL = 0.5; // added to the score multiplier per follower carried over
 const TALLY_TIME = 6;    // seconds to run around while the score counts up
 const LEASH = 8;       // rows a player may lead the other by
+const HONK_RADIUS = 3;   // cells either side a goose's honk reaches, on road rows within HONK_ROWS
+const HONK_ROWS = 2;
+const HONK_COOLDOWN = 1.5; // seconds between honks
 
 // Player 1 on the arrows, player 2 on WASD. Solo, both sets drive player 1.
 export const KEYMAPS = [
@@ -69,6 +73,9 @@ export class CrossingMode {
     document.body.classList.toggle('mines', this.mines);
     if (this.mines) this.hint = 'arrows hop · Q/E turn · F flag the cell you face · followers sweep: beep and a red blink on a mine';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
+    const geese = this.players.filter((p) => p.honk);
+    document.body.classList.toggle('honk', geese.length > 0);
+    if (geese.length) this.hint += this.game.roster.length > 1 ? ` · ${geese.map((p) => (p.index ? 'G' : 'H')).join('/')} honk` : ' · H honk';
   }
 
   buildPlayers() {
@@ -79,6 +86,9 @@ export class CrossingMode {
       p.index = i;
       p.fx = this.fx;                 // poses that throw blocks or sparkles need it
       p.invincible = debug.god;
+      p.nineLives = !!c.nineLives;    // the first death on each level is free
+      p.honk = !!c.honk;              // H (G for player 2) moves stalled traffic on
+      p.honkReady = 0;
       p.onCoin = () => { run.coins += 1; };
       const landed = () => this.hintNearby(p);
       p.onLandedHint = landed;
@@ -110,9 +120,11 @@ export class CrossingMode {
     const flock = this.game.flockFor(i);
     flock.count = 0; flock.waiting = t.waiting;
     const partner = this.alive()[0];
-    if (!partner) { this.game.splat(p.deadBy); return; }
-    // With a partner still going, coming back costs a life; none left means sitting out.
-    if (!this.game.spendLife()) { p.gone = true; return; }
+    if (!partner) { this.game.splat(p.deadBy, p); return; }
+    // With a partner still going, coming back costs a life (a cat's first on
+    // the level is free); none left means sitting out.
+    const free = this.game.freeDeath(p);
+    if (!free && !this.game.spendLife()) { p.gone = true; return; }
     let row = Math.max(0, partner.row - 2);
     while (row > 0 && this.world.laneAt(row)?.scenario.danger) row--;
     const pose = p.deathAnim;
@@ -121,7 +133,8 @@ export class CrossingMode {
     p.mesh.position.set(p.x, 0, p.z);
     p.arrive(pose);
     t.trail = [];
-    this.game.card(''); 
+    this.game.card(free ? `${DEATHS[p.deadBy]?.title ?? 'OUCH'} · NINE LIVES` : '');
+    if (free) setTimeout(() => this.game.card(''), 1200);
   }
 
   // Swap characters while the title card is up.
@@ -138,7 +151,7 @@ export class CrossingMode {
     for (const p of this.players) p.dispose();
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
-    document.body.classList.remove('mines');
+    document.body.classList.remove('mines', 'honk');
   }
 
   alive() { return this.players.filter((p) => p.alive); }
@@ -171,6 +184,7 @@ export class CrossingMode {
     if (e.code === 'KeyQ' || e.code === 'KeyE') { this.players[0].turn(e.code === 'KeyQ' ? 1 : -1); return true; }
     if (e.code === 'KeyF') { this.plantFlag(this.players[0]); return true; }
     const solo = this.players.length === 1;
+    if (e.code === 'KeyH' || e.code === 'KeyG') { this.honk(this.players[solo || e.code === 'KeyH' ? 0 : 1]); return true; }
     for (let i = 0; i < KEYMAPS.length; i++) {
       const d = KEYMAPS[i][e.code];
       if (!d) continue;
@@ -179,6 +193,21 @@ export class CrossingMode {
       return true;
     }
     return false;
+  }
+
+  // A goose honks: stalled traffic on the road rows around it pulls away.
+  honk(p) {
+    if (!p?.honk || !p.alive) return 0;
+    const now = performance.now();
+    if (now < p.honkReady) return 0;
+    p.honkReady = now + HONK_COOLDOWN * 1000;
+    sfx.honk();
+    let n = 0;
+    for (let r = p.row - HONK_ROWS; r <= p.row + HONK_ROWS; r++) {
+      const lane = this.world.laneAt(r);
+      if (lane?.halts) n += lane.honk(p.x, HONK_RADIUS, this.fx);
+    }
+    return n;
   }
 
   // Toggle a flag on the cell the player faces, on any row.

@@ -136,6 +136,7 @@ export function makeHedge() {
   const g = new THREE.Group();
   g.add(box(0.98, HEDGE_H, 0.98, HEDGE));
   greeble(g, HEDGE_H);
+  g.userData.kind = 'bush';
   return g;
 }
 
@@ -325,6 +326,7 @@ export function makeFence(along = 'x') {
   g.add(box(1, 0.08, 0.08, c, 0, 0.25));
   for (const x of [-0.35, 0, 0.35]) g.add(box(0.1, 0.8, 0.1, c, x, 0));
   if (along === 'z') g.rotation.y = Math.PI / 2;
+  g.userData.kind = 'fence';
   return g;
 }
 
@@ -332,6 +334,7 @@ export function makeShrub() {
   const g = new THREE.Group();
   g.add(box(0.8, 0.6, 0.8, pick(...GREENS)));
   g.add(box(0.5, 0.3, 0.5, pick(...GREENS), 0, 0.6));
+  g.userData.kind = 'bush';
   return g;
 }
 

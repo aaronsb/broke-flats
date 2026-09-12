@@ -49,11 +49,13 @@ export class World {
     return null;
   }
   // Static blocks, plus scenario rules that depend on which row you come from
-  // (crossing gates block entry under an arm, and exit toward one).
-  isBlocked(c, r, fromRow = null) {
+  // (crossing gates block entry under an arm, and exit toward one). A player
+  // with the matching perk passes a fence or a bush.
+  isBlocked(c, r, fromRow = null, player = null) {
     const lane = this.rows.get(r);
     if (!lane) return false;
-    if (lane.blocked.has(c)) return true;
+    const kind = lane.blockKind(c);
+    if (kind && !player?.passes?.(kind)) return true;
     if (fromRow !== null && lane.scenario.blockedFrom?.(lane, c, fromRow)) return true;
     const from = fromRow !== null ? this.rows.get(fromRow) : null;
     if (from?.scenario.blockedExit?.(from, c, r)) return true;

@@ -36,7 +36,8 @@ export class Train {
   record() {
     const p = this.player;
     const carrier = p.carrier;
-    return { row: p.row, x: p.x, carrier, offset: carrier ? p.x - carrier.x : 0, rideY: carrier?.rideY ?? 0 };
+    // y remembers a perch (a fences leader on a fence rail) so the young sit there too.
+    return { row: p.row, x: p.x, carrier, offset: carrier ? p.x - carrier.x : 0, rideY: carrier?.rideY ?? 0, y: carrier ? 0 : p.y };
   }
 
   resolveX(rec) { return rec.carrier ? rec.carrier.x + rec.offset : rec.x; }
@@ -71,10 +72,11 @@ export class Train {
     return this.chicks.find((k) => k.rec && k.rec.row === r && Math.round(this.resolveX(k.rec)) === c) ?? null;
   }
 
-  // Open water for a swimmer's young means swimming depth.
+  // Open water for a swimmer's young means swimming depth; a fence rail the
+  // leader perched on holds the young at the same height.
   restY(rec) {
     if (rec.carrier) return rec.carrier.wing ? rec.carrier.y + 0.4 : rec.rideY;
-    return this.player.swims && this.world.laneAt(rec.row)?.scenario.id === 'river' ? SWIM_Y : 0;
+    return this.player.swims && this.world.laneAt(rec.row)?.scenario.id === 'river' ? SWIM_Y : rec.y ?? 0;
   }
 
   sendTo(k, target, delay = 0) {

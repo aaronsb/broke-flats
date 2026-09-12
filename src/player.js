@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { makeChicken, setFrame } from './characters.js';
 import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
@@ -5,9 +6,14 @@ import { SWIM_Y } from './scenarios/river.js';
 import { DEATHS } from './deaths.js';
 import { POSES, pickPose } from './poses.js';
 import { sfx, voices } from './sfx.js';
-import { lerp } from './util.js';
+import { lerp, rand, pick } from './util.js';
 
 const HOP = 0.16;             // seconds per hop
+const ARC = 0.55;             // height of a hop
+const LONG_WINDOW = 0.18;     // a second forward press this soon after a hop makes it a long jump
+const LONG_ARC = 0.9;
+const PERCH_Y = 0.58;         // where a fences player stands on a fence: the top rail
+const LEAF = [0x3a8c3a, 0x45a045, 0x2a6e2a, 0x6bbf3a];
 export const BACK_LIMIT = 12; // rows allowed behind the furthest row reached
 
 const HOVER = 0.5;        // seconds hanging in the air after leaving a high wing
@@ -21,7 +27,12 @@ export class Player {
     this.scene = scene;
     this.world = world;
     this.variant = variant;
-    this.swims = !!character.swims;   // water is just another surface for waterfowl
+    // Perks, plain fields copied off the roster entry (see characters.js).
+    this.swims = !!character.swims && !character.heavy;   // water is just another surface for waterfowl
+    this.fences = !!character.fences;     // fence cells are passable: the chicken perches on the rail
+    this.bushes = !!character.bushes;     // shrub and hedge cells are passable: the pig pushes through
+    this.longJump = !!character.longJump; // a double-tap forward hops two rows
+    this.heavy = !!character.heavy;       // never bounces off a bumper, sinks on touching water
     this.mesh = character.make(variant);
     this.voice = voices[character.voice];
     scene.add(this.mesh);
@@ -44,6 +55,7 @@ export class Player {
     this.col = 0; this.row = 0;
     this.x = 0; this.z = 0; this.y = 0;
     this.moving = false; this.t = 0;
+    this.long = false; this.arc = ARC;
     this.buffered = null;
     this.facing = 0;
     this.alive = true; this.deadBy = null; this.deadFor = 0;
@@ -74,13 +86,32 @@ export class Player {
     this.scene.remove(this.mesh);
   }
 
+  // Which kinds of static block this player walks through.
+  passes(kind) {
+    return (kind === 'fence' && this.fences) || (kind === 'bush' && this.bushes);
+  }
+
+  // Ground height on arrival at a cell: a fence rail for a fences player,
+  // swimming depth for a swimmer bound for open water, otherwise the ground.
+  restY(c, r) {
+    const lane = this.world.laneAt(r);
+    if (this.fences && lane.blockKind(c) === 'fence') return PERCH_Y;
+    if (this.swims && lane?.scenario.id === 'river') return SWIM_Y;
+    return 0;
+  }
+
   hop(dc, dr) {
     if (!this.alive || this.frozen) return;
-    if (this.moving) { if (!this.bouncing) this.buffered = [dc, dr]; return; }   // a bounce swallows queued input
+    if (this.moving) {
+      if (this.bouncing) return;   // a bounce swallows queued input
+      if (this.longJump && this.extend(dc, dr)) return;
+      this.buffered = [dc, dr];
+      return;
+    }
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     const tc = Math.round(this.x) + dc;
     const tr = this.row + dr;
-    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr, this.row) || this.isOccupied?.(tc, tr)) {
+    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr, this.row, this) || this.isOccupied?.(tc, tr)) {
       this.bump = 0.12;
       sfx.bump();
       return;
@@ -96,14 +127,34 @@ export class Player {
     // Leaving something tall: the hop keeps its altitude, then comes the drop.
     // A swimmer bound for open water settles at swimming depth.
     const high = this.y > 0.6;
-    const toWater = this.swims && this.world.laneAt(tr)?.scenario.id === 'river';
-    this.to = { x: tc, z: -tr, y: high ? this.y : toWater ? SWIM_Y : 0 };
+    this.to = { x: tc, z: -tr, y: high ? this.y : this.restY(tc, tr) };
     this.airborne = high ? { hover: HOVER, vy: 0 } : null;
     this.tcol = tc; this.trow = tr;
     this.moving = true; this.t = 0;
+    this.long = false; this.arc = ARC;
     this.carrier = null;
     sfx.hop();
     this.call();
+  }
+
+  // A second forward press inside LONG_WINDOW of a forward hop stretches it
+  // one row further. The row in between is never landed on: a long jump clears
+  // a one-row hazard. The hop keeps its place and height as it stretches, then
+  // finishes over twice the distance in twice the time.
+  extend(dc, dr) {
+    if (dr !== 1 || dc !== 0 || this.long || this.hopDir?.[0] !== 0 || this.hopDir?.[1] !== 1) return false;
+    if (this.hopCarrier || this.airborne || this.paddling || this.t >= 1) return false;
+    if (performance.now() / 1000 - this.lastHop > LONG_WINDOW) return false;
+    const tc = this.tcol, tr = this.trow + 1;
+    if (!this.world.laneAt(tr) || this.world.isBlocked(tc, tr, this.trow, this) || this.isOccupied?.(tc, tr)) return false;
+    const t = this.t;
+    this.arc = Math.max(0.35, Math.min(LONG_ARC, 2 * ARC * Math.cos((Math.PI * t) / 2)));
+    this.t = t / 2;
+    this.long = true;
+    this.trow = tr;
+    this.to = { ...this.to, z: -tr, y: this.restY(tc, tr) };
+    sfx.hop();
+    return true;
   }
 
   // Turn a quarter without moving; the flag goes where you face.
@@ -140,12 +191,13 @@ export class Player {
     const fromDeck = this.moving && this.hopCarrier;
     const col = fromDeck ? Math.round(this.from.x) : Math.round(this.x) - lane.dir;
     const row = this.moving ? this.trow : this.row;
-    if (Math.abs(col) > W || this.world.isBlocked(col, row, row) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
+    if (Math.abs(col) > W || this.world.isBlocked(col, row, row, this) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
     this.row = row; this.col = col;
     this.from = { x: this.x, z: this.z, y: this.y };
     this.to = { x: col, z: -row };
     this.tcol = col; this.trow = row;
     this.moving = true; this.t = 0;
+    this.long = false; this.arc = ARC;
     this.carrier = null;
     this.facing = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     this.bounces = (this.bounces ?? 0) + 1;
@@ -185,10 +237,15 @@ export class Player {
     // A wing over this cell catches you before whatever is below can.
     const wing = this.world.wingAt(this.x, this.row);
     if (wing) { this.mount(wing); this.onLanded?.(); this.onLandedHint?.(); return; }
-    const cause = lane.scenario.onLand?.(lane, this);
-    if (cause === 'bounce') { this.moving = true; this.t = 1; this.bounce(lane); return; }
+    let cause = lane.scenario.onLand?.(lane, this);
+    if (cause === 'bounce') {
+      if (!this.heavy) { this.moving = true; this.t = 1; this.bounce(lane); return; }
+      // Heavy: past the end of a log is open water; a bumper on land pulls away.
+      cause = lane.scenario.id === 'river' ? 'water' : null;
+    }
     if (cause) { this.die(cause); return; }
     if (this.carrier) this.carrierOffset = this.x - this.carrier.x;
+    if (this.bushes && lane.blockKind(this.col) === 'bush') this.rustle();
     if (lane.takeCoin(this.col)) this.gotCoin();
     if (this.carrier && Math.abs(this.x - this.carrier.x) < 0.6 && lane.takeMoverCoin(this.carrier)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
@@ -196,6 +253,15 @@ export class Player {
     this.onLandedHint?.();
     if (lane.takeEgg(this.col)) this.onEgg?.();
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
+  }
+
+  // Leaves shaken loose by pushing through a bush.
+  rustle() {
+    if (this.fx) {
+      const at = new THREE.Vector3(this.x, this.y, this.z);
+      for (let i = 0; i < 6; i++) this.fx.puff(at, pick(...LEAF), rand(0.08, 0.16), rand(0.4, 0.7), new THREE.Vector3(rand(-1.2, 1.2), rand(1, 2.5), rand(-1.2, 1.2)), -1);
+    }
+    sfx.puff();
   }
 
   // Flap between the two frames for a moment, then play the death pose.
@@ -253,7 +319,7 @@ export class Player {
     if (this.idle > 9 && Math.random() < dt * 0.15) { this.idle = 0; this.voice?.(); }
 
     if (this.moving) {
-      this.t += dt / HOP;
+      this.t += dt / (this.long ? 2 * HOP : HOP);
       const t = Math.min(1, this.t);
       if (this.hopCarrier) {
         const dx = this.hopCarrier.x - this.hopCarrierX;
@@ -262,7 +328,7 @@ export class Player {
       this.x = lerp(this.from.x, this.to.x, t);
       this.z = lerp(this.from.z, this.to.z, t);
       const s = this.paddling ? 0 : Math.sin(Math.PI * t);   // paddling glides flat
-      this.y = lerp(this.from.y, this.to.y ?? 0, t) + s * 0.55;
+      this.y = lerp(this.from.y, this.to.y ?? 0, t) + s * this.arc;
       sy = 1 + 0.25 * s; sx = 1 - 0.12 * s;
       setFrame(m, !this.paddling && t > 0.2 && t < 0.85 ? 1 : 0);
       if (this.t >= 1) {
@@ -305,7 +371,7 @@ export class Player {
       const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
       const lane = this.world.laneAt(checkRow);
       const cause = lane?.scenario.lethalAt?.(lane, this.x, this);
-      if (cause === 'bounce') this.bounce(lane);
+      if (cause === 'bounce') { if (!this.heavy) this.bounce(lane); }   // heavy: the bumper pulls away
       else if (cause) this.die(cause);
     }
 

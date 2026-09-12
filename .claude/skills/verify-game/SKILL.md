@@ -24,7 +24,7 @@ container, a machine with only Chromium — put a path in `CHROME_BIN`:
 
 ## Scenario names
 
-`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `halt` `halt-crash` `gauntlet` (scenario mechanics) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
+`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `halt` `halt-crash` `gauntlet` (scenario mechanics) · `perks` (chicken fences, pig bushes, frog long jump, robot heavy) · `perks2` (cat nine lives, goose honk) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
 
 The list lives in `scripts/smoke.mjs`; `make` prints it.
 

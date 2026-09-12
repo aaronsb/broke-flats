@@ -31,6 +31,8 @@ const HALT_LOOK = 1 / EASE;
 const REACT = 0.4;
 const BRAKE_SEEN = 0.9;
 const FOLLOW_BRAKE = 4;
+const HONK_V = 1.2;          // a honked vehicle pulls away at this speed and eases back to 1
+const HONK_WAIT = [4, 12];   // seconds a honked staller keeps going before its next stop
 const TOUCH = 0.05;          // bumpers this close have met
 const CRASH_DV = 0.15;       // meeting while this much faster than the vehicle ahead is a crash
 
@@ -45,6 +47,7 @@ export class Lane {
     this.group = new THREE.Group();
     this.group.position.z = -r;
     this.blocked = new Set();
+    this.kinds = new Map();      // block kind per cell: 'solid', 'fence', 'bush'; a perk may pass one
     this.coins = new Map();
     this.eggs = new Map();
     this.flags = new Map();      // player-planted markers, any row
@@ -82,7 +85,8 @@ export class Lane {
     for (const s of [-1, 1]) this.add(makeGround(VERGE_W, shade, top + 0.012, 0.02), s * (W + 0.5 + VERGE_W / 2));
   }
 
-  block(c) { this.blocked.add(c); }
+  block(c, kind = 'solid') { this.blocked.add(c); this.kinds.set(c, kind); }
+  blockKind(c) { return this.blocked.has(c) ? this.kinds.get(c) ?? 'solid' : null; }
 
   // Fill outside the playable strip with the level's scenery.
   edges() { this.scenery.edge(this, this.world); }
@@ -212,6 +216,28 @@ export class Lane {
     return n;
   }
 
+  // A goose honks at x: every stalled or braking vehicle whose nearer bumper
+  // is within `radius` pulls away. A vehicle halted for a blocker still ahead
+  // stays put: the honk clears stallers, it does not override the flock halt.
+  // Returns the vehicles it moved on.
+  honk(x, radius, fx = null) {
+    let n = 0;
+    for (const m of this.movers) {
+      if (m.wrecked) continue;
+      const stalled = m.staller?.phase === 'stop' || (m.braking ?? 0) > 0 || (m.v ?? 1) < BRAKE_SEEN;
+      if (!stalled || Math.abs(m.x - x) - m.len / 2 > radius || this.blockerAhead(m)) continue;
+      if (m.staller) { m.staller.phase = 'go'; m.staller.wait = rand(...HONK_WAIT); }
+      m.braking = 0;
+      m.v = HONK_V;
+      n++;
+      if (fx) {
+        const at = new THREE.Vector3(m.x - this.dir * m.len / 2, 0.2, -this.r);
+        for (let i = 0; i < 3; i++) fx.puff(at, 0x9a9a9a, rand(0.12, 0.2), rand(0.5, 0.9), new THREE.Vector3(-this.dir * rand(0.5, 1.5), rand(0.8, 1.6), rand(-0.3, 0.3)), 1.6);
+      }
+    }
+    return n;
+  }
+
   advance(dt) {
     // Stallers: go -> slowing -> stopped -> go, each phase eased.
     for (const m of this.movers) {
@@ -248,7 +274,7 @@ export class Lane {
         }
         m.v += (target - m.v) * Math.min(1, dt * rate);
         m.braking = m.v < BRAKE_SEEN ? (m.braking ?? 0) + dt : 0;
-        const lit = target < m.v - 0.02;
+        const lit = target < Math.min(m.v, 1) - 0.02;   // pulling away from a honk is not braking
         if (lit !== !!m.lit) { m.lit = lit; setBrake(m.mesh, lit); }
       }
       let v = m.v ?? 1;

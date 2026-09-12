@@ -30,7 +30,8 @@ export default {
     for (let c = -W; c <= W; c++) {
       if (c === world.pathCol) continue;
       if (shade !== null && Math.abs(c - shade) <= 1) continue;
-      if (Math.random() < 0.22) { lane.add(scenery.obstacle(), c); lane.block(c); }
+      // Fences and shrubs carry a kind that a perk can pass; the rest are solid.
+      if (Math.random() < 0.22) { const o = scenery.obstacle(); lane.add(o, c); lane.block(c, o.userData.kind); }
       else if (Math.random() < 0.04) lane.coin(c);
     }
   },

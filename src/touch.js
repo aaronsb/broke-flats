@@ -16,6 +16,8 @@ const BUTTONS = [
   { code: 'KeyQ', key: 'q', label: '↺', cls: 'mine q', title: 'turn left' },
   { code: 'KeyF', key: 'f', label: '⚑', cls: 'mine f', title: 'flag the cell you face' },
   { code: 'KeyE', key: 'e', label: '↻', cls: 'mine e', title: 'turn right' },
+  // Goose only: the honk that moves stalled traffic on.
+  { code: 'KeyH', key: 'h', label: 'H', cls: 'perk honk', title: 'honk' },
 ];
 
 export function wantsTouch() {

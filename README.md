@@ -17,8 +17,10 @@ Play it: **https://aaronsb.github.io/broke-flats/**
 - **Hop** with the arrows or WASD. Roads have traffic, rivers have logs, and some trucks have a flatbed you can ride.
 - **Peek** with Space (or hold Shift). The camera tilts to isometric and drains one coin per second. At zero coins you are stuck top-down.
 - **Hidden things** only show from the side: coins under wide canopies, carports and bus shelters, and the tunnel through each hedge wall. The tunnel roof matches the hedge exactly from above, so you have to remember where it was.
-- **Eggs** hide under shelters too. Landing on one hatches a chick that follows you snake-style. Chicks ride the same logs you did, block the cell behind you, and die to traffic. Every chick that reaches the finish line is worth a bonus.
-- **Finish line** ends the crossing and starts the **Air-Sea Battle**: slide along the bottom row and lob eggs at cars, boats and planes. Down or S tilts the aim between land, sea and air. Boats are slow and cheap, planes are fast and rich.
+- **Eggs** hide under shelters too. Landing on one hatches a chick that follows you snake-style. Chicks ride the same logs you did, block the cell behind you, and die to traffic. Every chick that reaches the finish line is worth a bonus, and each one multiplies the day's tally by another half.
+- **A flock halts traffic.** Road vehicles brake for a leader with followers, harder the more there are. Car following has a reaction delay, so a hard stop in front of a tight queue puts the car behind into the one in front. The faster car is the one that goes.
+- **Characters carry a perk**, priced into the tally. Goose and duck swim. Chicken hops fences. Pig pushes through hedges and shrubs. Frog double-taps for a two-row jump. Cat's first death each level is free. Robot never bounces off a bumper and sinks on contact with water, and earns a little extra for it. The goose also honks (H): stalled traffic nearby pulls away.
+- **Finish line** ends the crossing and starts the **Air-Sea Battle**: slide along the bottom row and lob eggs at cars, boats and planes. Down or S tilts the aim between land, sea and air. Boats are slow and cheap, planes are fast and rich. Your followers throw with you at half weight. An egg that misses its row skips on to the next, and one that flies off the back bursts.
 - **Levels** cycle day, sunset, night and rain with forest, residential, city and parking scenery. Night traffic runs on real headlights.
 - **Attract** cycles: for an eighth of each loop a framed postcard of Broke Flats takes the screen, where the town sign slams down over the crossing sign and creaks askew.
 
@@ -35,6 +37,7 @@ Play it: **https://aaronsb.github.io/broke-flats/**
 | Shift | Hold to peek |
 | Q / E | Turn in place (minefield) |
 | F | Flag the cell you face (minefield) |
+| H / G | Honk (goose): player 1 / player 2 |
 | S / Down (battle) | Cycle aim: land, sea, air |
 | Space / W / Up (battle) | Fire an egg |
 | M | Mute music |

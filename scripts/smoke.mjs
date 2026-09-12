@@ -664,6 +664,143 @@ if (script === 'battle') {
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(220); }
   console.log('level 2 hops', await state());
 }
+if (script === 'perks') {
+  // Movement perks: the chicken over fences, the pig through bushes, the frog's
+  // long jump, the robot that never bounces and never swims. Each run lays its
+  // own obstacle so the board's dice do not decide the test.
+  const load = async (q) => {
+    await send('Page.navigate', { url: BASE + q }); await sleep(3500);
+  };
+  const check = (ok, msg) => { if (!ok) errors.push(`perks: ${msg}`); };
+
+  await load('?start&force=meadow&scenery=residential&chars=chicken');
+  const chicken = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const r = p.row + 1; const lane = w.laneAt(r);
+    lane.add(__meshes.makeFence(), 0); lane.block(0, 'fence'); lane.add(__meshes.makeShrub(), 2); lane.block(2, 'bush');
+    const before = [w.isBlocked(0, r, r - 1), w.isBlocked(0, r, r - 1, p), w.isBlocked(2, r, r - 1, p)];
+    p.hop(0, 1); for (let i = 0; i < 12 && p.moving; i++) p.update(0.02);
+    const perch = +p.y.toFixed(2); const tr = __game.mode.trains[0]; tr.hatch(true); const y = tr.chicks[0] ? +tr.restY(tr.chicks[0].rec).toFixed(2) : null;
+    p.hop(0, 1); for (let i = 0; i < 12 && p.moving; i++) p.update(0.02);
+    return { fences: p.fences, blockedForAll: before[0], fenceForChicken: before[1], bushForChicken: before[2], row: p.row - r, perch, youngY: y, off: +p.y.toFixed(2) }; })()`);
+  console.log('chicken', chicken);
+  check(chicken.fences && chicken.blockedForAll && !chicken.fenceForChicken, 'a fence cell is not passable for the chicken alone');
+  check(chicken.bushForChicken, 'the chicken walked through a shrub');
+  check(chicken.row === 1 && chicken.perch > 0.5, `the chicken did not perch on the fence (row +${chicken.row}, y ${chicken.perch})`);
+  check(chicken.youngY === chicken.perch, `a hatched chick did not share the perch (${chicken.youngY})`);
+  check(chicken.off === 0, `the chicken did not come back down off the fence (y ${chicken.off})`);
+
+  await load('?start&force=hedge&chars=pig');
+  const pig = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const lane = [...w.rows.values()].filter(l => l.scenario.id === 'hedge' && l.r > p.row).sort((a, b) => a.r - b.r)[0];
+    if (!lane) return { none: true };
+    const c = [...lane.blocked].find(k => lane.blockKind(k) === 'bush' && Math.abs(k) < 8);
+    p.row = lane.r - 1; p.z = -p.row; p.x = c; p.col = c; p.mesh.position.set(c, 0, p.z);
+    const puffs = __game.mode.fx.puffs.length;
+    const before = [w.isBlocked(c, lane.r, lane.r - 1), w.isBlocked(c, lane.r, lane.r - 1, p)];
+    p.hop(0, 1); for (let i = 0; i < 12 && p.moving; i++) p.update(0.02);
+    return { bushes: p.bushes, cell: c, blockedForAll: before[0], forPig: before[1], row: p.row - lane.r, puffs: __game.mode.fx.puffs.length - puffs }; })()`);
+  console.log('pig', pig);
+  check(!pig.none, 'no hedge row was built');
+  check(pig.bushes && pig.blockedForAll && !pig.forPig, 'a hedge cell is not passable for the pig alone');
+  check(pig.row === 0, `the pig did not push into the hedge (row ${pig.row})`);
+  check(pig.puffs > 0, 'no leaves flew when the pig pushed through');
+
+  await load('?start&force=meadow&chars=frog');
+  const frog = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const r0 = p.row;
+    const run = () => { for (let i = 0; i < 40 && p.moving; i++) p.update(0.02); };
+    p.hop(0, 1); p.update(0.02); const top = []; p.hop(0, 1); const long = p.long; for (let i = 0; i < 40 && p.moving; i++) { p.update(0.02); top.push(p.y); }
+    const twoRows = p.row - r0;
+    p.hop(0, 1); run(); p.hop(0, 1); run();   // two taps a whole hop apart are two hops
+    const single = p.row - r0 - twoRows;
+    const lane = w.laneAt(p.row + 2); lane.add(__meshes.makeHedge(), p.col); lane.block(p.col, 'bush');
+    const r1 = p.row; p.hop(0, 1); p.update(0.02); const refused = !p.extend(0, 1); run();
+    return { longJump: p.longJump, long, twoRows, peak: +Math.max(...top).toFixed(2), single, refused, intoBlock: p.row - r1 }; })()`);
+  console.log('frog', frog);
+  check(frog.longJump && frog.long && frog.twoRows === 2, `the double-tap did not land two rows up (+${frog.twoRows})`);
+  check(frog.peak > 0.6, `the long jump arc stayed low (${frog.peak})`);
+  check(frog.single === 2, `two spaced taps did not make two single hops (+${frog.single})`);
+  check(frog.refused && frog.intoBlock === 1, 'a long jump was allowed into a blocked row');
+
+  await load('?start&force=road&chars=robot');
+  const robot = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const lane = [...w.rows.values()].filter(l => l.scenario.id === 'road' && l.r > p.row).sort((a, b) => a.r - b.r)[0];
+    const m = lane.movers[0]; lane.movers.forEach((o, i) => { o.x = i === 0 ? 2 : -12 - i * 4; o.mesh.position.x = o.x; o.v = 1; o.staller = null; });
+    const park = (x) => { p.row = lane.r; p.z = -lane.r; p.x = x; p.col = Math.round(x); p.mesh.position.set(x, 0, p.z); };
+    park(m.x - lane.dir * (m.len / 2 + 0.3)); const x0 = p.x;
+    for (let i = 0; i < 10; i++) { p.update(0.02); m.x += lane.dir * 0.02; m.mesh.position.x = m.x; }
+    const rear = { alive: p.alive, bounces: p.bounces ?? 0, moved: +Math.abs(p.x - x0).toFixed(2) };
+    park(m.x); p.update(0.02);
+    const under = { alive: p.alive, by: p.deadBy };
+    return { heavy: p.heavy, swims: p.swims, rear, under }; })()`);
+  console.log('robot road', robot);
+  check(robot.heavy && !robot.swims, 'the robot is not heavy or still swims');
+  check(robot.rear.alive && robot.rear.bounces === 0 && robot.rear.moved === 0, 'the robot bounced or died at a rear bumper');
+  check(!robot.under.alive && robot.under.by === 'car', `the robot under a car did not die of it (${robot.under.by})`);
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'river'; __game.restartStage()`); await sleep(500);
+  const sink = await evaluate(`(() => { const p = __game.mode.players[0]; const lane = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'river' && l.r > p.row).sort((a, b) => a.r - b.r)[0];
+    for (const o of lane.movers) { o.x = -20; o.mesh.position.x = -20; }
+    p.row = lane.r; p.z = -lane.r; p.x = 0; p.col = 0; p.mesh.position.set(0, 0, p.z); p.land();
+    return { alive: p.alive, by: p.deadBy }; })()`);
+  console.log('robot river', sink);
+  check(!sink.alive && sink.by === 'water', `the robot on open water did not sink (${sink.by})`);
+}
+if (script === 'perks2') {
+  // Cat: the first death on each level is free and the card says so; the second costs a life.
+  await send('Page.navigate', { url: BASE + '?start&chars=cat' }); await sleep(3500);
+  console.log('cat', await evaluate(`[__game.roster[0].id, __game.mode.players[0].nineLives, __game.run.freeDeathUsed]`));
+  const dieAndWatch = async () => {
+    await evaluate(`__game.run.lives = __game.run.lives; __game.mode.players[0].die('car')`);
+    let card = '';
+    for (let i = 0; i < 30; i++) { await sleep(100); const c = await evaluate(`document.getElementById('card').textContent`); if (c.includes('NINE')) card = c; }
+    return card;
+  };
+  await evaluate(`__game.run.lives = 2`);
+  const card1 = await dieAndWatch();
+  const free = await evaluate(`[__game.run.lives, __game.run.freeDeathUsed, __game.over]`);
+  console.log('free death', { card: card1, lives: free[0], used: free[1], over: free[2] });
+  if (free[0] !== 2) errors.push(`perks2: the cat's first death spent a life (lives ${free[0]})`);
+  if (!card1.includes('NINE LIVES')) errors.push('perks2: the death card never said NINE LIVES');
+  const card2 = await dieAndWatch();
+  const paid = await evaluate(`[__game.run.lives, __game.run.freeDeathUsed]`);
+  console.log('second death', { card: card2, lives: paid[0], used: paid[1] });
+  if (paid[0] !== 1) errors.push(`perks2: the cat's second death did not cost a life (lives ${paid[0]})`);
+  if (card2) errors.push('perks2: the second death was called free');
+  await evaluate(`__game.nextLevel()`); await sleep(300);
+  console.log('next level resets', await evaluate(`[__game.run.level, __game.run.freeDeathUsed]`));
+  if (await evaluate(`__game.run.freeDeathUsed`)) errors.push('perks2: a new level did not give the free death back');
+
+  // Goose: H moves a stalled car on; a car halted for a blocker stays; the button shows on touch.
+  await send('Page.navigate', { url: BASE + '?touch=1&start&force=road&chars=goose&god' }); await sleep(3500);
+  const setup = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road' && l.r > 0).sort((a, b) => a.r - b.r)[0];
+    const p = __game.mode.players[0];
+    // A mover parked in a clear cell near the middle as a stopped staller; the goose one row short of it.
+    const park = (m) => { for (let c = 0; c <= 8; c = c > 0 ? -c : -c + 1) { if (lane.movers.every(o => o === m || Math.abs(o.x - c) > (o.len + m.len) / 2 + 1)) { m.x = c; m.mesh.position.x = c; return c; } } return null; };
+    const stall = (m) => { m.staller ??= { phase: 'go', wait: 5 }; m.staller.phase = 'stop'; m.staller.wait = 99; m.v = 0; m.braking = 1; return park(m); };
+    const m = [...lane.movers].sort((a, b) => Math.abs(a.x) - Math.abs(b.x))[0];
+    const x = stall(m);
+    window.__honk = { lane, m, stall };
+    p.row = lane.r - 1; p.z = -p.row; p.x = x; p.col = x; p.mesh.position.set(x, 0, p.z);
+    return { r: lane.r, moverX: +m.x.toFixed(1), player: x, honk: p.honk, hint: __game.mode.hint, body: document.body.classList.contains('honk'),
+      button: getComputedStyle(document.querySelector('#touchbar .perk.honk')).display }; })()`);
+  console.log('goose setup', setup);
+  if (!setup.hint.includes('H honk')) errors.push('perks2: the hint does not mention the honk');
+  if (!setup.body || setup.button !== 'block') errors.push('perks2: the honk button is not shown for a goose');
+  await sleep(300);
+  console.log('before honk', await evaluate(`[+__honk.m.v.toFixed(2), __honk.m.staller.phase]`));
+  await key('KeyH', 'h');
+  let v = 0, phase = '';
+  for (let i = 0; i < 20 && v <= 0.5; i++) { await sleep(100); [v, phase] = await evaluate(`[__honk.m.v, __honk.m.staller.phase]`); }
+  console.log('after honk', { v: +v.toFixed(2), phase, again: await evaluate(`__game.mode.honk(__game.mode.players[0])`) });
+  if (v <= 0.5) errors.push(`perks2: the stalled car did not pull away after the honk (v ${v.toFixed(2)})`);
+  if (phase !== 'go') errors.push('perks2: the honked staller is still in its stop phase');
+  await sleep(1600);   // past the cooldown
+  const held = await evaluate(`(() => { const { lane, stall } = __honk; const m = __honk.m;
+    const x = stall(m);   // stopped again, this time behind a blocker
+    lane.blockers = [{ x: m.x + lane.dir * (m.len / 2 + 0.5), n: 1 }];
+    const p = __game.mode.players[0]; p.x = x; p.col = x; p.mesh.position.x = x;
+    const n = __game.mode.honk(p); const v = m.v; lane.blockers = null; return { x, scattered: n, v: +v.toFixed(2), phase: m.staller.phase }; })()`);
+  console.log('blocked car', held);
+  if (held.scattered !== 0 || held.v > 0.2) errors.push('perks2: a honk moved a car that was halted for a blocker');
+  const chickenHonk = await evaluate(`(() => { const p = __game.mode.players[0]; p.honk = false; return __game.mode.honk(p); })()`);
+  if (chickenHonk !== 0) errors.push('perks2: a non-goose honked');
+}
 console.log('errors:', errors.length ? errors : 'none');
 ws.close();
 process.exit(0);

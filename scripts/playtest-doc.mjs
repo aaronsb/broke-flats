@@ -73,8 +73,10 @@ ${table(['Sky', 'Level 1 board', 'Battle'], Object.keys(SKIES).map((k) => [`\`${
 ${table(['Scenery', 'Hunting maze in it'], Object.keys(SCENERY).map((k) => [`\`${k}\``, link(`start&force=grass&scenery=${k}&coins=30`)]))}
 ## Characters
 
-${table(['Character', 'Solo', 'With a follower on the way'], CHARACTERS.map((c) => [
-  `\`${c.id}\`${c.variants ? ` (variants: ${c.variants.join(', ')})` : ''}`, link(`start&chars=${c.id}`), link(`start&chars=${c.id}&force=grass&coins=30`),
+${table(['Character', 'Perk', 'Tally ×', 'Solo', 'With a follower on the way'], CHARACTERS.map((c) => [
+  `\`${c.id}\`${c.variants ? ` (variants: ${c.variants.join(', ')})` : ''}`,
+  ['swims', 'fences', 'bushes', 'longJump', 'heavy', 'nineLives', 'honk'].filter((k) => c[k]).join(', ') || '—',
+  (c.scoreMul ?? 1).toFixed(2), link(`start&chars=${c.id}`), link(`start&chars=${c.id}&force=grass&coins=30`),
 ]))}
 Co-op: ${link(`start&chars=${CHARACTERS[0].id},${CHARACTERS[1].id}`)} · title with a pick staged: ${link(`chars=${CHARACTERS[CHARACTERS.length - 1].id}`)}
 

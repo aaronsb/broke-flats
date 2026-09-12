@@ -38,7 +38,7 @@ export class Game {
     this.hud(0);
   }
 
-  freshRun(coins) { return { level: 1, score: 0, coins, lives: 0, flock: [], tries: 0, variants: [] }; }
+  freshRun(coins) { return { level: 1, score: 0, coins, lives: 0, flock: [], tries: 0, variants: [], freeDeathUsed: false }; }
 
   // Back to the title with a fresh pocket of coins.
   newSession() {
@@ -151,6 +151,7 @@ export class Game {
 
   setLevel(n) {
     this.level = levelFor(n);
+    if (n !== this.run.level) this.run.freeDeathUsed = false;   // a cat's free death comes back with each new level
     this.run.level = n;
     const skyName = this.debug.sky ?? (n === 1 ? this.run.oddSky : null) ?? this.level.sky;
     this.sky.apply(skyName);
@@ -193,13 +194,24 @@ export class Game {
     this.setMode(new CrossingMode(this));
   }
 
-  // Death costs a life and resets the stage; with no lives left it is game over.
-  splat(cause) {
-    this.card(DEATHS[cause]?.title ?? 'OUCH');
+  // Nine lives: a cat's first death on each level costs nothing. True, and
+  // the free death is spent, when `p` is a cat and this level still has it.
+  freeDeath(p) {
+    if (!p?.nineLives || this.run.freeDeathUsed) return false;
+    this.run.freeDeathUsed = true;
+    sfx.halo();
+    return true;
+  }
+
+  // Death costs a life and resets the stage; with no lives left it is game
+  // over. `who` is the player that died, for the cat's free death.
+  splat(cause, who = this.mode?.players?.[0]) {
+    const free = this.freeDeath(who);
+    this.card((DEATHS[cause]?.title ?? 'OUCH') + (free ? ' · NINE LIVES' : ''));
     setTimeout(() => this.card(''), 1200);
     if (this.run.score > this.best) { this.best = this.run.score; localStorage.setItem('rc-best', this.best); }
     this.ui.best.textContent = this.best;
-    if (!this.spendLife()) { this.gameOver(cause); return; }
+    if (!free && !this.spendLife()) { this.gameOver(cause); return; }
     this.run.gauntlet = null;      // no second run at a gauntlet
     this.restartStage();
   }
