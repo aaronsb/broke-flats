@@ -152,6 +152,7 @@ export class Player {
     const spec = DEATHS[cause];
     // Sometimes the 80s way out: a stepped spin and a halo instead of the usual pose.
     this.deathAnim = Math.random() < 0.35 ? 'halo' : (spec?.anim ?? 'flat');
+    this.fall = [['x', -1], ['x', 1], ['z', 1], ['z', -1]][Math.floor(Math.random() * 4)];   // back, face, left, right
     // Impact first, the character's own cry a beat later, the halo chime after that.
     if (spec?.sfx) sfx[spec.sfx]?.();
     setTimeout(() => this.voice?.(0.85), 160);
@@ -202,7 +203,7 @@ export class Player {
       // Knocked flat on its back, then a red X over it.
       const k = Math.min(1, t / 0.15);
       m.position.y = this.y + 0.05;
-      m.rotation.x = -k * (Math.PI / 2);
+      m.rotation[this.fall[0]] = this.fall[1] * k * (Math.PI / 2);
       if (k >= 1 && !this.xMark) {
         this.xMark = makeRedX();
         this.xMark.position.set(this.x, this.y + 0.9, this.z);
