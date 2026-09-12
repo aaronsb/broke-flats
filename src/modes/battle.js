@@ -62,6 +62,7 @@ export class BattleMode {
     this.targets = [];
     this.eggs = [];
     this.spawnClock = { land: 1, sea: 2, air: 3 };
+    this.rowDir = { land: pick(-1, 1), sea: pick(-1, 1), air: pick(-1, 1) };   // one way per row, all battle
     this.keys = {};
     this.ending = 0;
     this.props = [];                 // breakable scenery inside the strip
@@ -218,30 +219,16 @@ export class BattleMode {
     sfx.plink();
   }
 
-  // Two targets meeting on the same row wreck each other; replacements come in
-  // from opposite ends so they cannot meet again at the edge.
-  collide() {
-    const hit = [];
-    const list = this.targets;
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i], b = list[j];
-        if (a.kind === b.kind && Math.abs(a.x - b.x) < (a.len + b.len) / 2 - 0.2) { hit.push(a, b); }
-      }
-    }
-    if (!hit.length) return;
-    const dead = new Set(hit);
-    for (const t of dead) this.debris.explode(t.mesh, 1.2);
-    this.targets = list.filter((t) => !dead.has(t));
-    sfx.boom(1.3);
-    if (!this.ending) for (const t of dead) this.spawn(t.kind, t.dir);
-  }
-
-  spawn(kind, dir = pick(-1, 1)) {
+  // Everything on a row travels the same way, and a newcomer waits until the
+  // entry point is clear of the last one.
+  spawn(kind) {
+    const dir = this.rowDir[kind];
     const train = kind === 'land' && Math.random() < 0.15;
     const t = train ? makeTrain(pick('steam', 'diesel', 'bullet'), Array.from({ length: randInt(2, 4) }, () => 'closed'))
       : kind === 'land' ? (Math.random() < 0.3 ? makeTruck() : makeCar())
       : kind === 'sea' ? makeBoat() : makePlane();
+    const entry = -dir * (SPAN + 2 + t.len / 2);
+    if (this.targets.some((o) => o.kind === kind && Math.abs(o.x - entry) < (o.len + t.len) / 2 + 1.5)) return false;
     t.kind = kind;
     t.points = train ? 60 : POINTS[kind];
     t.dir = dir;
@@ -259,6 +246,7 @@ export class BattleMode {
     }
     this.group.add(t.mesh);
     this.targets.push(t);
+    return true;
   }
 
   update(dt) {
@@ -287,7 +275,7 @@ export class BattleMode {
       const n = this.mix[kind];
       if (!n) continue;
       this.spawnClock[kind] -= dt;
-      if (this.spawnClock[kind] <= 0) { this.spawn(kind); this.spawnClock[kind] = rand(2.5, 4.5) / n; }
+      if (this.spawnClock[kind] <= 0) this.spawnClock[kind] = this.spawn(kind) ? rand(2.5, 4.5) / n : 0.3;   // entry blocked: try again shortly
     }
 
     // Move targets, cull those that crossed
@@ -300,7 +288,6 @@ export class BattleMode {
       if (gone) this.group.remove(t.mesh);
       return !gone;
     });
-    this.collide();
     this.updateTipping(dt);
     this.debris.update(dt);
 
