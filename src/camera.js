@@ -10,7 +10,13 @@ import { damp, lerp } from './util.js';
 // tilt: radians from vertical. fov: degrees. Distance is derived so the
 // visible height at the target stays HALF/aspect world units, unless the
 // preset fixes `dist` (the battle views frame a fixed camera spot instead).
+//
+// Holding the width constant keeps the same span of lanes on any window, but a
+// tall portrait phone drives the derived height to three times a desktop's,
+// which reads as badly zoomed out. Past HALF_H_MAX the view stops growing
+// taller and narrows instead, landing near ten cells across on a phone.
 const HALF = 10.5;
+const HALF_H_MAX = 9;
 const PRESETS = {
   top:        { tilt: 0,    yaw: 0,   fov: 12 },
   iso:        { tilt: 0.85, yaw: 0.55, fov: 20 },   // near-orthographic isometric
@@ -44,7 +50,7 @@ export class CameraRig {
 
   applyView() {
     const c = this.camera, v = this.view;
-    const halfH = HALF / this.aspect;
+    const halfH = Math.min(HALF / this.aspect, HALF_H_MAX);
     const derived = halfH / Math.tan((v.fov * Math.PI) / 360);
     this.distance = v.dist > 0 ? v.dist : derived;
     c.fov = v.fov;

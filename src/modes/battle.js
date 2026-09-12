@@ -87,6 +87,7 @@ export class BattleMode {
     if (roster.length > 1) this.hint = 'P1 arrows + SPACE · P2 WASD + Q · SHIFT tilt to aim';
 
     this.aim = 'land';
+    this.showAim();
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
     this.game.card(`LEVEL ${level.number} CLEAR · BATTLE`);
   }
@@ -143,6 +144,9 @@ export class BattleMode {
     this.debris.dispose();
     this.game.scene.remove(this.group);
     this.game.card('');
+    const v = this.game.ui.view;
+    v.hidden = true;
+    v.textContent = 'TILT';
   }
 
   // An egg that clips scenery breaks it apart. Tall buildings take several
@@ -209,10 +213,21 @@ export class BattleMode {
   }
   onViewButton() { this.cycleAim(); }
 
+  // The placard doubles as the aim control here — onViewButton cycles it — so
+  // it has to be on screen and has to say which row the eggs are going to.
+  // Without it a touch player has no visible way to shift aim at all.
+  showAim() {
+    const v = this.game.ui.view;
+    v.hidden = false;
+    v.textContent = this.aim.toUpperCase();
+    v.classList.remove('on', 'broke', 'nudge');
+  }
+
   // The tilt is the aim: boats are slow and cheap, planes fast and rich.
   cycleAim() {
     this.aim = TILTS[(TILTS.indexOf(this.aim) + 1) % TILTS.length];
     this.game.camera.setGoal(VIEW[this.aim][0]);
+    this.showAim();
     sfx.tilt();
   }
 

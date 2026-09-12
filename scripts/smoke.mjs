@@ -324,6 +324,14 @@ if (script === 'phone') {
   await shot('phone-select');   // a pick two along has to sit centred, not half off
   await key('Enter', 'Enter'); await sleep(5000);
   await shot('phone-play');   // in game: the hint and the tilt placard come back
+  await evaluate(`__game.run.coins = 50`);
+  await key('Space', ' '); await sleep(1800); await shot('phone-iso');
+  await key('Space', ' '); await sleep(400);
+  await evaluate(`__game.mode.finished = true`); await sleep(9000);
+  await key('Enter', 'Enter'); await sleep(2500); await shot('phone-battle');
+  await key('ShiftLeft', 'Shift'); await sleep(1600);
+  await shot('phone-battle-sea');   // the placard is the only visible aim control on touch
+  console.log('aim placard:', await evaluate(`document.getElementById('view').textContent`));
   await send('Emulation.clearDeviceMetricsOverride');
   console.log('phone shots written to', out);
 }
