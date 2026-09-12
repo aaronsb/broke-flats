@@ -165,7 +165,7 @@ games, clear on npm. It is the best *money plus road* name available.
 Cost: it drops the flat. It names the currency and the crossing but says
 nothing about the view, which is the half of the hook that is actually novel.
 
-### Crossing Flat Broke — the inversion, and the one to ship
+### Crossing Flat Broke — the inversion
 
 Reversing the words is not a reshuffle, it changes what the name does.
 
@@ -221,6 +221,12 @@ The town is **Broke Flats** — the idiom bent into a place name, the way wester
 flats are named (Bonneville Salt Flats, Sand Flats). It keeps both halves of
 the lose condition, reads as a dot on a map rather than a category, and is
 clear of games, npm and this account's repos.
+
+The art settled the argument that the shortlist could not. Once the title was
+going to be a sign, the name had to be something a sign would say, and signs
+say place names — not verb phrases. *Crossing Flat Broke* is the better
+sentence; *Broke Flats* is the one you can paint on a board and plant in a
+verge, which is what the title sequence needed.
 
 The title sequence carries it. An eighth of every attract loop, a framed
 postcard takes the screen: a flat daytime street — buildings, trees, a car —
