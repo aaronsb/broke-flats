@@ -58,6 +58,7 @@ export class BattleMode {
     this.mix = level.battle;
     this.timeLeft = this.mix.duration;
     this.points = 0;
+    this.tally = { land: 0, sea: 0, air: 0, train: 0, props: 0 };
     this.targets = [];
     this.eggs = [];
     this.spawnClock = { land: 1, sea: 2, air: 3 };
@@ -161,6 +162,7 @@ export class BattleMode {
     this.debris.explode(p.mesh, 0.8 + p.h * 0.1);
     this.props = this.props.filter((q) => q !== p);
     this.points += PROP_POINTS * Math.ceil(p.h / 2);
+    this.tally.props++;
     sfx.boom(0.6 + p.h * 0.1);
   }
 
@@ -316,6 +318,7 @@ export class BattleMode {
         this.targets = this.targets.filter((q) => q !== t);
         e.z = 99;
         this.points += t.points;
+        this.tally[t.points === 60 ? 'train' : t.kind]++;
         game.run.coins += 1;
         sfx.boom(t.kind === 'air' ? 1.3 : t.kind === 'sea' ? 0.8 : 1);
         if (t.kind === 'sea') sfx.splash();
@@ -336,11 +339,21 @@ export class BattleMode {
 
     if (this.ending) {
       this.ending += dt;
-      if (this.ending > 2.5) { game.run.score += this.points; game.nextLevel(); }
+      if (this.summaryDone) game.nextLevel();
       return;
     }
     this.timeLeft -= dt;
     game.card(`BATTLE ${Math.ceil(this.timeLeft)} · +${this.points}`);
-    if (this.timeLeft <= 0) { this.ending = 0.001; game.card(`BATTLE OVER · +${this.points}`); sfx.start(); }
+    if (this.timeLeft <= 0) {
+      this.ending = 0.001;
+      game.card('');
+      music.reset({ tally: true });
+      const T = this.tally;
+      game.summary.show('BATTLE OVER', [
+        { label: 'LAND', count: T.land, each: POINTS.land }, { label: 'SEA', count: T.sea, each: POINTS.sea },
+        { label: 'AIR', count: T.air, each: POINTS.air }, { label: 'TRAINS', count: T.train, each: 60 },
+        { label: 'SCENERY', count: T.props, each: PROP_POINTS },
+      ], { onLine: (v) => { game.run.score += v; }, done: () => { this.summaryDone = true; } });
+    }
   }
 }

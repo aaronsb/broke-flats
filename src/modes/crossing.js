@@ -288,31 +288,36 @@ export class CrossingMode {
     sfx.start();
   }
 
+  // The cash-in panel, once the minefield finale (if any) has had its moment.
+  openSummary() {
+    const { game } = this;
+    const T = this.tally;
+    const lines = [{ label: 'ROWS', count: T.rows, each: 1 }, { label: 'LED HOME', count: T.led, each: LED_BONUS }, { label: 'FOUND', count: T.found, each: FOUND_BONUS }];
+    if (T.missed) lines.push({ label: 'MISSED', count: T.missed, each: 0 });
+    if (T.mines) {
+      const rows = [...this.world.rows.values()].filter((l) => l.scenario.id === 'mines');
+      const hits = rows.reduce((a, l) => a + (l.data.hits ?? 0), 0);
+      lines.push({ label: 'FLAGS RIGHT', count: hits, each: FLAG_BONUS });
+    }
+    if (T.gauntlet) lines.push({ label: 'PHEW, MADE IT', each: GAUNTLET_BONUS });
+    game.run.coins += T.led + T.found;
+    game.run.score -= T.rows;        // rows were credited at the line; the panel counts them again
+    music.reset({ tally: true });
+    if (T.gauntlet) sfx.phew();
+    T.summaryMs = game.summary.show(`LEVEL ${game.level.number} CLEAR`, lines, {
+      onLine: (v) => { game.run.score += v; },
+      done: () => { T.summaryDone = true; },
+    });
+  }
+
   updateTally(dt) {
     const { game } = this;
     const T = this.tally;
     T.t += dt;
     for (const t of this.trains) t.gather();
-    const lines = [`ROWS ${T.rows}`];
-    if (T.t > 0.8) lines.push(`LED HOME ×${T.led}  +${T.led * LED_BONUS}`);
-    if (T.t > 1.8) lines.push(`FOUND ×${T.found}  +${T.found * FOUND_BONUS}`);
-    if (T.t > 2.8 && T.missed) lines.push(`MISSED ×${T.missed}`);
-    if (T.t > 3.4 && T.mines) {
-      const rows = [...this.world.rows.values()].filter((l) => l.scenario.id === 'mines');
-      const hits = rows.reduce((a, l) => a + (l.data.hits ?? 0), 0);
-      const flags = rows.reduce((a, l) => a + l.data.flags.size, 0);
-      lines.push(`FLAGS ${hits}/${flags} RIGHT  +${hits * FLAG_BONUS}`);
-      if (!T.flagged) { T.flagged = true; game.run.score += hits * FLAG_BONUS; }
-    }
-    if (T.t > 3.4 && T.gauntlet) lines.push(`PHEW, MADE IT  +${GAUNTLET_BONUS}`);
-    game.card(lines.join('   ·   '));
-    if (T.t > 1.8 && !T.paid) {
-      T.paid = true;
-      game.run.score += T.led * LED_BONUS + T.found * FOUND_BONUS;
-      game.run.coins += T.led + T.found;
-    }
-    if (T.t > 3.4 && T.gauntlet && !T.phew) { T.phew = true; game.run.score += GAUNTLET_BONUS; game.run.gauntlet = null; sfx.phew(); }
-    if (T.t > TALLY_TIME + (T.mines ? 2 : 0)) {
+    if (!T.opened && T.t > (T.mines ? 2.6 : 0.6)) { T.opened = true; this.openSummary(); }
+    if (T.summaryDone) {
+      if (T.gauntlet) game.run.gauntlet = null;
       // Everyone carries over, gathered or not.
       this.trains.forEach((t, i) => { game.run.flock[i] = { count: t.total, waiting: 0 }; });
       game.card('');

@@ -80,15 +80,15 @@ if (script === 'respawn') {
   for (let i = 0; i < 3; i++) { await key('ArrowUp'); await sleep(220); }
   await evaluate(`__game.mode.players[0].die('car')`); await sleep(1400);
   console.log('after death', await state(), await evaluate(`[__game.mode.players[0].row, __game.mode.players[0].alive, __game.run.flock]`));
-  await evaluate(`__game.mode.finished = true`); await sleep(14000);
+  await evaluate(`__game.mode.finished = true`); await sleep(10000); await key('Enter', 'Enter'); await sleep(800);
   console.log('finish flock', await evaluate(`__game.run.flock`));
 }
 if (script === 'tally') {
   await start();
   await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch(); __game.mode.trains[0].waiting = 2`);
-  await evaluate(`__game.mode.finished = true`); await sleep(2200);
-  console.log('tally', await state(), await evaluate(`[__game.mode.tally, __game.run.score, __game.mode.trains[0].waitingMeshes?.length]`));
-  await sleep(12000);
+  await evaluate(`__game.mode.finished = true`); await sleep(4000);
+  console.log('tally', await evaluate(`[document.getElementById('summary').classList.contains('show'), [...document.querySelectorAll('#summary .row')].map(r => r.textContent).join(' | ')]`));
+  await sleep(6000); await key('Enter', 'Enter'); await sleep(800);
   console.log('after tally', await state(), await evaluate(`[__game.mode.constructor.name, __game.run.flock]`));
 }
 if (script === 'river') {
@@ -123,7 +123,7 @@ if (script === 'gauntlet') {
   await start();
   await evaluate(`__game.debug.god = true; __game.run.gauntlet = 'river'; __game.restartStage()`); await sleep(2500);
   console.log('gauntlet', await evaluate(`[document.getElementById('level').textContent, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 20).map(l => l.scenario.id))].join(','), [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'river').reduce((a, l) => a + l.coins.size + l.eggs.size, 0)]`));
-  await evaluate(`__game.mode.finished = true`); await sleep(9000);
+  await evaluate(`__game.mode.finished = true`); await sleep(9000); await key('Enter', 'Enter'); await sleep(500);
   console.log('phew', await evaluate(`[document.getElementById('card').textContent.includes('PHEW'), __game.run.score >= 500, __game.run.gauntlet]`));
 }
 if (script === 'bounce') {
@@ -209,7 +209,7 @@ if (script === 'mines') {
   console.log('flagged', flagged);
   await evaluate(`__game.mode.finished = true`); await sleep(6500);
   console.log('finale', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'mines'); return [rows.reduce((a, l) => a + l.data.mines.size, 0), rows.reduce((a, l) => a + (l.data.hits ?? 0), 0), document.getElementById('card').textContent.includes('FLAGS')]; })()`));
-  await sleep(10000);
+  await sleep(6000); await key('Enter', 'Enter'); await sleep(800);
   console.log('after', await evaluate(`[__game.run.level, __game.mode.constructor.name]`));
 }
 if (script === 'train') {
@@ -286,8 +286,8 @@ if (script === 'shots') {
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(500); await shot('night-top');
   await key('Space', ' '); await sleep(1500); await shot('night-iso');
-  await evaluate(`__game.mode.finished = true`); await sleep(3000); await shot('tally');
-  await sleep(12000); await shot('battle-land');
+  await evaluate(`__game.mode.finished = true`); await sleep(5000); await shot('tally');
+  await sleep(4000); await key('Enter', 'Enter'); await sleep(1500); await shot('battle-land');
   await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-sea');
   await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-air');
   await evaluate(`__game.run.level = 1; __game.nextLevel()`); await sleep(500);
@@ -328,14 +328,14 @@ if (script === 'coop') {
   console.log('rows', await evaluate(`__game.mode.players.map(p => [p.row, Math.round(p.x), p.alive])`));
   for (let i = 0; i < 12; i++) { await key('ArrowUp'); await sleep(200); }   // leash should stop P1
   console.log('leash', await evaluate(`__game.mode.players.map(p => p.row)`));
-  await evaluate(`__game.mode.finished = true`); await sleep(14000);
+  await evaluate(`__game.mode.finished = true`); await sleep(10000); await key('Enter', 'Enter'); await sleep(800);
   await key('KeyQ', 'q'); await key('Space', ' '); await sleep(300);
   console.log('battle', await evaluate(`[__game.mode.pilots.length, __game.mode.eggs.length]`));
 }
 if (script === 'battle') {
   await start();
   await evaluate(`__game.mode.finished = true`);
-  await sleep(14000);
+  await sleep(10000); await key('Enter', 'Enter'); await sleep(800);
   console.log('battle enter', await state());
   for (let i = 0; i < 12; i++) {
     await send('Input.dispatchKeyEvent', { type: 'keyDown', code: i % 2 ? 'ArrowLeft' : 'ArrowRight', key: i % 2 ? 'Left' : 'Right' });
@@ -348,7 +348,9 @@ if (script === 'battle') {
   // Force a head-on: two land targets placed nose to nose, then one frame.
   console.log('collision', await evaluate(`(() => { const m = __game.mode; m.spawn('land'); m.spawn('land'); const [a, b] = m.targets.filter(t => t.kind === 'land').slice(-2); a.x = 0; b.x = 0.5; a.dir = 1; b.dir = -1; const before = m.targets.length; m.update(0.016); return [before, m.targets.length, m.debris.pieces.length > 0]; })()`));
   await evaluate(`__game.mode.timeLeft = 0.1`);
-  await sleep(3500);
+  await sleep(4000);
+  console.log('battle summary', await evaluate(`[...document.querySelectorAll('#summary .row')].map(r => r.textContent).join(' | ')`));
+  await sleep(5000); await key('Enter', 'Enter'); await sleep(800);
   console.log('next level', await state());
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(220); }
   console.log('level 2 hops', await state());

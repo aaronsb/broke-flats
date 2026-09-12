@@ -38,6 +38,7 @@ const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), coinCount: $('coin-count'), level: $('level'), card: $('card'), tries: $('tries'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'), about: $('about'),
+  summary: $('summary'), summaryTitle: $('summary-title'), summaryBody: $('summary-body'),
   p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
 };
 const game = new Game({ scene, camera, sky, ui, headlights });
@@ -139,6 +140,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 3 ? 1 : pixelScale + 1; resize(); return; }
   if (debugKey(e)) { e.preventDefault(); return; }
+  if (game.summary.ready) { game.summary.confirm(); e.preventDefault(); return; }
   if (game.over) {
     if (e.code === 'KeyC') game.buyLife();
     else if (e.code === 'Enter' || e.code === 'Space') game.resume();
@@ -147,12 +149,27 @@ addEventListener('keydown', (e) => {
   }
   if (game.mode.onKey(e)) e.preventDefault();
 });
-addEventListener('keyup', (e) => { if (started && !game.over) game.mode.onKeyUp(e); });
+addEventListener('keyup', (e) => { held.delete(e.code); if (started && !game.over) game.mode.onKeyUp(e); });
+
+// Key repeat for hops: a movement key held past half a second fires again at
+// the hop cadence. The battle handles held keys itself.
+const REPEAT_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const held = new Map();
+addEventListener('keydown', (e) => { if (!e.repeat && REPEAT_KEYS.has(e.code) && !held.has(e.code)) held.set(e.code, { since: performance.now(), next: performance.now() + 500 }); });
+addEventListener('blur', () => held.clear());
+function repeatHeld(now) {
+  if (!started || game.over || !game.mode?.players) return;
+  for (const [code, h] of held) {
+    if (now < h.next) continue;
+    h.next = now + 180;
+    game.mode.onKey({ code, repeat: true });
+  }
+}
 ui.view.addEventListener('click', () => { begin(); if (!game.over) game.mode.onViewButton(); });
 $('retry').addEventListener('click', () => { if (game.run.lives > 0) game.resume(); else if (!game.buyLife()) toTitle(); });
 
 let touchStart = null;
-canvas.addEventListener('pointerdown', (e) => { begin(); touchStart = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerdown', (e) => { begin(); if (game.summary.ready) { game.summary.confirm(); return; } touchStart = { x: e.clientX, y: e.clientY }; });
 canvas.addEventListener('pointerup', (e) => {
   if (!touchStart) return;
   const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
@@ -166,6 +183,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   time += dt;
+  repeatHeld(now);
   if (started) game.update(dt, time);
   else if (select) {
     attract.update(dt, time);

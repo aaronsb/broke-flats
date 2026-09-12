@@ -1,6 +1,6 @@
 # Screenshots
 
-Captured by `make shots` on 2026-09-11.
+Captured by `make shots` on 2026-09-12.
 
 ## about
 

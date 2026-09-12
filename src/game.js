@@ -7,6 +7,7 @@ import { SKIES } from './sky.js';
 import { SCENERY } from './scenery/index.js';
 import { DEATHS } from './deaths.js';
 import { CHARACTERS } from './characters.js';
+import { Summary } from './summary.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
 
@@ -26,6 +27,7 @@ export class Game {
     this.sky = sky;
     this.headlights = headlights;
     this.ui = ui;
+    this.summary = new Summary(ui);
     this.mode = null;
     this.over = false;
     this.best = Number(localStorage.getItem('rc-best') || 0);
@@ -169,6 +171,7 @@ export class Game {
   restartStage() { this.setLevel(this.run.level); this.setMode(new CrossingMode(this)); }
 
   setMode(mode) {
+    this.summary.clear();
     this.mode?.exit();
     this.mode = mode;
     music.reset(mode.mood ?? {});
