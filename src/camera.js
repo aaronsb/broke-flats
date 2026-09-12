@@ -62,6 +62,7 @@ export class CameraRig {
       : Math.min(HALF / this.aspect, HALF_H_MAX);
     const derived = halfH / Math.tan((v.fov * Math.PI) / 360);
     this.distance = derived;
+    this.halfW = halfH * this.aspect;   // world units visible either side of the target
     c.fov = v.fov;
     c.aspect = this.aspect;
     c.position.set(0, this.distance, 0);

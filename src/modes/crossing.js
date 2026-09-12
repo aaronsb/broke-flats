@@ -246,16 +246,21 @@ export class CrossingMode {
     this.sinceTilt += dt;
     game.ui.view.classList.toggle('nudge', !this.tilted && game.run.coins >= 1 && this.sinceTilt > NUDGE_AFTER);
 
-    // Camera: centre of the living players. Top-down barely follows x since
-    // the whole width is on screen; tilted, it follows fully and keeps the
-    // characters nearer the middle of the screen.
+    // Camera: centre of the living players. Where the whole board fits across
+    // the window, top-down barely follows x — the wide-screen feel, board held
+    // still — and tilted it follows fully. A portrait window cannot hold all
+    // 2W + 1 columns, so top-down follows there too, pan-and-scan, or the
+    // player walks off the side. Panning past the playable edge is safe:
+    // movers live out to SPAN, five columns further than the board.
     if (alive.length) {
       this.focus.x = alive.reduce((a, p) => a + p.x, 0) / alive.length;
       this.focus.z = alive.reduce((a, p) => a + p.z, 0) / alive.length;
     }
     const cam = game.camera;
     const k = clamp(cam.tilt / 0.85, 0, 1);
-    const tx = lerp(clamp(this.focus.x, -3, 3) * 0.35, this.focus.x, k);
+    const fits = cam.halfW >= W + 0.5;
+    const flat = fits ? clamp(this.focus.x, -3, 3) * 0.35 : this.focus.x;
+    const tx = lerp(flat, this.focus.x, k);
     const lead = lerp(3, 1.2, k);
     cam.update(dt, tx, this.focus.z - lead);
     game.sky.update(dt, this.focus.x, this.focus.z, cam.distance);

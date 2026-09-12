@@ -330,6 +330,16 @@ if (script === 'phone' || script === 'tablet') {
   await shot(`${script}-select`);   // a pick two along has to sit centred, not half off
   await key('Enter', 'Enter'); await sleep(5000);
   await shot(`${script}-play`);
+  // Pan and scan: a narrow window cannot hold all 17 columns, so walking to the
+  // board edge must bring the view with it rather than leave the player off it.
+  await evaluate(`__game.debug.god = true`);
+  for (let i = 0; i < 10; i++) { await key('ArrowLeft'); await sleep(180); }
+  await sleep(900); await shot(`${script}-edge`);
+  console.log('at the left edge:', await evaluate(`(() => { const p = __game.mode.players[0], c = __game.camera;
+    return { x: Math.round(p.x * 10) / 10, cam: Math.round(c.rig.position.x * 10) / 10,
+             halfW: Math.round(c.halfW * 10) / 10, onScreen: Math.abs(p.x - c.rig.position.x) < c.halfW }; })()`));
+  for (let i = 0; i < 10; i++) { await key('ArrowRight'); await sleep(180); }
+  await sleep(600);
   await evaluate(`__game.run.coins = 50`);
   await key('Space', ' '); await sleep(1800); await shot(`${script}-iso`);
   await key('Space', ' '); await sleep(400);
