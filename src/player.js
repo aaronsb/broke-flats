@@ -79,8 +79,10 @@ export class Player {
     // Water to water for a swimmer is a paddle, not a flap.
     this.paddling = this.swims && !this.carrier && this.world.laneAt(this.row)?.scenario.id === 'river' && this.world.laneAt(tr)?.scenario.id === 'river';
     // Leaving something tall: the hop keeps its altitude, then comes the drop.
+    // A swimmer bound for open water settles at swimming depth.
     const high = this.y > 0.6;
-    this.to = { x: tc, z: -tr, y: high ? this.y : 0 };
+    const toWater = this.swims && this.world.laneAt(tr)?.scenario.id === 'river';
+    this.to = { x: tc, z: -tr, y: high ? this.y : toWater ? SWIM_Y : 0 };
     this.airborne = high ? { hover: HOVER, vy: 0 } : null;
     this.tcol = tc; this.trow = tr;
     this.moving = true; this.t = 0;
@@ -229,7 +231,7 @@ export class Player {
       }
       this.x = lerp(this.from.x, this.to.x, t);
       this.z = lerp(this.from.z, this.to.z, t);
-      const s = Math.sin(Math.PI * t);
+      const s = this.paddling ? 0 : Math.sin(Math.PI * t);   // paddling glides flat
       this.y = lerp(this.from.y, this.to.y ?? 0, t) + s * 0.55;
       sy = 1 + 0.25 * s; sx = 1 - 0.12 * s;
       setFrame(m, !this.paddling && t > 0.2 && t < 0.85 ? 1 : 0);
