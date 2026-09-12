@@ -191,6 +191,20 @@ if (script === 'wing') {
   console.log('hover', await evaluate(`[!!__game.mode.players[0].airborne, Math.round(__game.mode.players[0].y * 10) / 10]`));
   await sleep(2500);
   console.log('landed', await evaluate(`[!!__game.mode.players[0].airborne, Math.round(__game.mode.players[0].y * 10) / 10, __game.mode.players[0].row]`));
+  // Ride a take-off out: boarded low, carried up, past the hard edge and gone.
+  await evaluate(`__game.restartStage()`); await sleep(700);
+  console.log('boarded a take-off:', await evaluate(`(() => {
+    const lane = [...__game.mode.world.rows.values()].find((l) => l.scenario.id === 'runway');
+    lane.speed = 12;
+    const m = lane.movers[0]; m.kind = 'takeoff'; m.x = -10 * lane.dir; m.mesh.position.x = m.x; m.y = 0;   // inside the hard edge, or the ride never happens
+    for (const o of lane.movers) if (o !== m) o.x = 90 * lane.dir;   // clear the row so nothing overtakes the ride
+    const p = __game.mode.players[0]; p.invincible = false;
+    p.row = lane.r - 1; p.z = -p.row; p.x = m.x + lane.dir * 0.1; p.col = Math.round(p.x);
+    p.mesh.position.set(p.x, 0, p.z); p.land();
+    return !!p.carrier; })()`));
+  for (let i = 0; i < 400 && (await evaluate(`__game.mode.players[0].alive`)); i++) await sleep(50);
+  console.log('flown off:', await evaluate(`(() => { const p = __game.mode.players[0];
+    return { by: p.deadBy, pose: p.deathAnim, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }; })()`));
   console.log('spacing', await evaluate(`(() => { const rs = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'runway').map(l => l.r).sort((a, b) => a - b); let min = 99; for (let i = 1; i < rs.length; i++) min = Math.min(min, rs[i] - rs[i - 1]); return [rs.length, min]; })()`));
 }
 if (script === 'hint') {
@@ -422,7 +436,7 @@ if (script === 'poses') {
   // Poses are drawn at random, so force each one in turn. A train does the
   // killing: it has the longest squash, which makes the pancake obvious.
   await evaluate(`__game.run.lives = 99; __game.mode.players[0].invincible = false`);
-  for (const pose of ['flat', 'pancake', 'halo', 'pieces', 'hole', 'beam', 'roulette', 'fade']) {
+  for (const pose of ['flat', 'pancake', 'halo', 'pieces', 'hole', 'beam', 'roulette', 'fade', 'sink', 'launch']) {
     // `gone` holds the death open: without it the stage restarts 1.7s in and a
     // slow capture photographs the fresh player instead of the pose.
     await evaluate(`(() => { const p = __game.mode.players[0]; p.invincible = false; p.die('train'); p.deathAnim = '${pose}'; p.gone = true; })()`);

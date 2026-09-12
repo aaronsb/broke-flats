@@ -16,7 +16,10 @@ registerDeath('flown', { anim: 'launch', title: 'FLOWN OFF', sfx: 'splat' });
 const CLIMB = 4;          // height reached at the end of the row
 const LETHAL_BELOW = 1.0; // plane height under which it can hit you
 
-const WEIGHT = { taxi: 3, takeoff: 2, landing: 2 };
+// Take-offs carry the most: a wing boarded while it is still low is the only
+// way to be flown off the map, so they need to come round often enough to be
+// worth waiting for.
+const WEIGHT = { taxi: 3, takeoff: 3, landing: 2 };
 function pickComposition(level) {
   const kinds = kindsFor('runway', level);
   if (mixesAllowed(level) && kinds.length > 1 && Math.random() < 0.3) return kinds;

@@ -13,6 +13,7 @@ export const SPAN = 35;
 const RING = SPAN / VIEW;    // the ring grew by this much, so counts scale with it to hold the density
 export const OFF_EDGE = 11.6; // carried this far is off screen and lost
 export const GW = 120;       // ground width: far past any camera edge, even tilted
+export const VERGE_W = 1.1;  // width of the darker strip marking the edge of play
 export const DETAIL_W = 60;  // repeated details (dashes, stripes, sleepers) only span this
 
 // One board row. Scenarios fill it through these helpers; the board and the
@@ -41,7 +42,25 @@ export class Lane {
     return mesh;
   }
 
-  ground(color, top = 0, thick = 0.5) { this.add(makeGround(GW, color, top, thick)); }
+  ground(color, top = 0, thick = 0.5) {
+    this.add(makeGround(GW, color, top, thick));
+    this.verge(color, top);
+  }
+
+  // The play area ends at ±W and, on a road or a river, nothing said so: you
+  // walked over open ground into an invisible fence. A darker verge just
+  // outside the last column marks it on every row — including the ones where
+  // traffic runs through those columns and a fence post could not stand.
+  verge(color, top) {
+    if (typeof color !== 'number') return;
+    // Contrast against whatever it lies on rather than simply darker: a darker
+    // strip is invisible on a night road, and a lighter one is invisible on
+    // grass. Dark ground gets a pale verge, bright ground a deep one.
+    const c = new THREE.Color(color);
+    const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+    const shade = (lum > 0.3 ? c.multiplyScalar(0.55) : c.lerp(new THREE.Color(0xffffff), 0.42)).getHex();
+    for (const s of [-1, 1]) this.add(makeGround(VERGE_W, shade, top + 0.012, 0.02), s * (W + 0.5 + VERGE_W / 2));
+  }
 
   block(c) { this.blocked.add(c); }
 

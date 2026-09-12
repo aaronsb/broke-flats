@@ -250,11 +250,17 @@ export const POSES = {
     },
   },
 
-  // Carried off by something with wings.
+  // Carried past the hard edge still standing on the wing. Not lobbed — the
+  // plane is leaving and they are going with it, accelerating away from a
+  // ground that just keeps getting further off.
   launch: {
+    cue: ['jet', 100],
     update(p, t) {
-      p.mesh.position.y = t * 12 - t * t * 9;
-      p.mesh.rotation.x = t * 8;
+      const away = Math.sign(p.x) || 1;
+      p.mesh.position.y = p.y + t * t * 7;
+      p.mesh.position.x = p.x + away * t * t * 3.5;
+      p.mesh.rotation.z = -away * t * 1.4;
+      p.mesh.scale.setScalar(Math.max(0.04, 1 - t * 0.3));
     },
     // Dropped back in from wherever it was taken.
     spawn(p, t) {
