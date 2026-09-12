@@ -1,6 +1,7 @@
 # Naming the game
 
-`road-crosser` is a working title that describes the genre and nothing else. It
+`road-crosser`, the working title this started from, described the genre and
+nothing else. It
 puts the game in the same sentence as every other Crossy Road clone, which is
 the one sentence it does not belong in. This is the shortlist to replace it,
 and the reasoning behind it.
@@ -240,12 +241,17 @@ The sign pair is one asset (`src/logo.js`): static in the title card and the
 about crawl, animated inside the framed scene. `make smoke S=logo` captures it
 on each beat.
 
-### Still on Road Crosser
+### Carried through
 
-The in-game identity is Broke Flats: page title, title card, about crawl,
-README. The repository, `package.json` `name`, and the GitHub Pages URL are
-unchanged, because renaming those moves the published address — that is a call
-to make deliberately, not a side effect of a title screen.
+Everything now reads Broke Flats: page title, title card, about crawl, README,
+`package.json`, the repository and the GitHub Pages URL, which is
+https://aaronsb.github.io/broke-flats/.
+
+The rename cost nothing at build time — the Pages workflow derives the base
+path from the repository name (`BASE_PATH: /${{ github.event.repository.name }}/`),
+so it corrected itself on the next deploy. What it did cost is the old address:
+GitHub redirects repository and git URLs after a rename but not project Pages
+paths, so `aaronsb.github.io/road-crosser/` is gone rather than forwarded.
 
 ## Checks run
 

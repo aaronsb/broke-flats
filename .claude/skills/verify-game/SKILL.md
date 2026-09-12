@@ -1,6 +1,6 @@
 ---
 name: verify-game
-description: Build, smoke-test and visually verify road-crosser after a change using the headless Chrome harness (make smoke, make shots) and by reading the screenshots. Use after editing anything under src/, when asked to verify, check, test, screenshot or eyeball the game, or before committing gameplay changes.
+description: Build, smoke-test and visually verify broke-flats after a change using the headless Chrome harness (make smoke, make shots) and by reading the screenshots. Use after editing anything under src/, when asked to verify, check, test, screenshot or eyeball the game, or before committing gameplay changes.
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob
 ---
 

@@ -2,9 +2,9 @@
 
 A Crossy Road style hopper with a twist: the board is a top-down Frogger view, and tilting into 3D reveals what the flat view hides. Peeking costs coins, so the less you tilt, the more you keep. Every level ends in an Air-Sea Battle.
 
-The name is the lose condition: spend your coins looking and you end up flat and broke, stuck top-down with nothing left to spend. (The repo is still `road-crosser` — see [docs/naming.md](docs/naming.md).)
+The name is the lose condition: spend your coins looking and you end up flat and broke, stuck top-down with nothing left to spend. The long way round to it is in [docs/naming.md](docs/naming.md).
 
-Play it: **https://aaronsb.github.io/road-crosser/**
+Play it: **https://aaronsb.github.io/broke-flats/**
 
 ![Isometric peek over a day board](docs/screenshots/iso.png)
 

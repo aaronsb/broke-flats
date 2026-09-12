@@ -1,5 +1,5 @@
 {
-  "name": "road-crosser",
+  "name": "broke-flats",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -19,5 +19,5 @@
     "esbuild@0.25.12": true
   },
   "license": "AGPL-3.0-only",
-  "homepage": "https://aaronsb.github.io/road-crosser/"
+  "homepage": "https://aaronsb.github.io/broke-flats/"
 }

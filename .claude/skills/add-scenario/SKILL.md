@@ -1,6 +1,6 @@
 ---
 name: add-scenario
-description: Add a new band type (a crossing scenario such as a road, river, rail or hazard maze) to road-crosser end to end, from the scenario module through sequencer weights, debug keys, the smoke harness, the playtest doc and screenshots. Use when asked to add a lane type, crossing type, hazard, obstacle row, maze band or scenario.
+description: Add a new band type (a crossing scenario such as a road, river, rail or hazard maze) to broke-flats end to end, from the scenario module through sequencer weights, debug keys, the smoke harness, the playtest doc and screenshots. Use when asked to add a lane type, crossing type, hazard, obstacle row, maze band or scenario.
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob
 ---
 
