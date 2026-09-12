@@ -73,7 +73,16 @@ export class BattleMode {
     this.pilots = roster.map((c, i) => {
       const mesh = c.make(this.game.run.variants[i]);
       this.group.add(mesh);
-      return { mesh, cx: roster.length > 1 ? (i === 0 ? -2 : 2) : 0, cz: 0, cooldown: 0, keys: PILOT_KEYS[i] };
+      const cx = roster.length > 1 ? (i === 0 ? -2 : 2) : 0;
+      // The flock comes along for the show, trailing the pilot's path.
+      const young = [];
+      for (let k = 0; k < (this.game.flockFor(i).count ?? 0); k++) {
+        const m = c.young(this.game.run.variants[i]);
+        m.position.set(cx, 0, 0.7 * (k + 1));
+        this.group.add(m);
+        young.push(m);
+      }
+      return { mesh, cx, cz: 0, cooldown: 0, keys: PILOT_KEYS[i], young, trail: [{ x: cx, z: 0 }] };
     });
     if (roster.length > 1) this.hint = 'P1 arrows + SPACE · P2 WASD + Q · SHIFT tilt to aim';
 
@@ -219,6 +228,26 @@ export class BattleMode {
     sfx.plink();
   }
 
+  // Followers sit at fixed distances back along the pilot's recorded path.
+  trailFlock(p, moving) {
+    const head = p.trail[0];
+    if (Math.hypot(p.cx - head.x, -p.cz - head.z) > 0.08) p.trail.unshift({ x: p.cx, z: -p.cz });
+    if (p.trail.length > 400) p.trail.length = 400;
+    p.young.forEach((m, k) => {
+      let want = 0.7 * (k + 1), i = 0;
+      while (i + 1 < p.trail.length) {
+        const a = p.trail[i], b = p.trail[i + 1];
+        const seg = Math.hypot(b.x - a.x, b.z - a.z);
+        if (seg >= want) { const t = want / seg; m.position.set(a.x + (b.x - a.x) * t, 0, a.z + (b.z - a.z) * t); break; }
+        want -= seg; i++;
+      }
+      if (i + 1 >= p.trail.length) { const e = p.trail[p.trail.length - 1]; m.position.set(e.x, 0, e.z + want); }
+      const ahead = k === 0 ? p.mesh.position : p.young[k - 1].position;
+      m.rotation.y = Math.atan2(-(ahead.x - m.position.x), -(ahead.z - m.position.z));
+      setFrame(m, moving && Math.floor(performance.now() / 120) % 2 === 0 ? 1 : 0);
+    });
+  }
+
   // Everything on a row travels the same way, and a newcomer waits until the
   // entry point is clear of the last one.
   spawn(kind) {
@@ -267,6 +296,7 @@ export class BattleMode {
       p.cz = clamp(p.cz + vz * dt, 0, FORWARD);
       p.mesh.position.set(p.cx, 0, -p.cz);
       p.mesh.rotation.y = vx < 0 ? Math.PI / 2 : vx > 0 ? -Math.PI / 2 : vz < 0 ? Math.PI : 0;
+      this.trailFlock(p, vx !== 0 || vz !== 0);
     }
     const cx = this.pilots.reduce((a, p) => a + p.cx, 0) / this.pilots.length;
 

@@ -344,9 +344,11 @@ if (script === 'coop') {
   console.log('rows', await evaluate(`__game.mode.players.map(p => [p.row, Math.round(p.x), p.alive])`));
   for (let i = 0; i < 12; i++) { await key('ArrowUp'); await sleep(200); }   // leash should stop P1
   console.log('leash', await evaluate(`__game.mode.players.map(p => p.row)`));
-  await evaluate(`__game.mode.finished = true`); await sleep(10000); await key('Enter', 'Enter'); await sleep(800);
+  await evaluate(`__game.mode.trains[0].hatch(); __game.mode.trains[0].hatch(); __game.mode.finished = true`); await sleep(10000); await key('Enter', 'Enter'); await sleep(800);
   await key('KeyQ', 'q'); await key('Space', ' '); await sleep(300);
-  console.log('battle', await evaluate(`[__game.mode.pilots.length, __game.mode.eggs.length]`));
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'ArrowRight', key: 'Right' }); await sleep(600);
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'ArrowRight', key: 'Right' }); await sleep(200);
+  console.log('battle', await evaluate(`[__game.mode.pilots.length, __game.mode.eggs.length, __game.mode.pilots[0].young.length, __game.mode.pilots[0].young.map(m => Math.round(m.position.x * 10) / 10).join(',') , Math.round(__game.mode.pilots[0].cx * 10) / 10]`));
 }
 if (script === 'battle') {
   await start();
