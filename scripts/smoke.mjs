@@ -306,34 +306,35 @@ if (script === 'debug') {
   await key('Backquote', '`'); await sleep(100);
   console.log('panel hidden', await evaluate(`document.getElementById('debug').hidden`));
 }
-if (script === 'phone') {
+if (script === 'phone' || script === 'tablet') {
   const fs = await import('node:fs');
   const out = process.env.OUT ?? '.';
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${n}.png`, Buffer.from(r.data, 'base64')); };
-  // The touch layout at a real phone width: the badge, the picks and the
-  // framed intro all have to share about 400 x 720.
-  await send('Emulation.setDeviceMetricsOverride', { width: 400, height: 720, deviceScaleFactor: 1, mobile: true });
+  // A real device shape: the badge, the picks, the framed intro and the board
+  // all have to share it. Tablet portrait is the other side of the camera cap.
+  const size = script === 'tablet' ? { width: 820, height: 1180 } : { width: 400, height: 720 };
+  await send('Emulation.setDeviceMetricsOverride', { ...size, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await send('Page.navigate', { url: 'http://localhost:5173/' });
   const shown = `document.getElementById('intro')?.classList.contains('show')`;
   while (!(await evaluate(shown))) await sleep(50);
-  await sleep(2400); await shot('phone-intro');
+  await sleep(2400); await shot(`${script}-intro`);
   for (let i = 0; i < 200 && (await evaluate(`document.getElementById('intro')?.hidden`)) === false; i++) await sleep(100);
-  await sleep(700); await shot('phone-title');
+  await sleep(700); await shot(`${script}-title`);
   await key('ArrowRight'); await sleep(300); await key('ArrowRight'); await sleep(1200);
-  await shot('phone-select');   // a pick two along has to sit centred, not half off
+  await shot(`${script}-select`);   // a pick two along has to sit centred, not half off
   await key('Enter', 'Enter'); await sleep(5000);
-  await shot('phone-play');   // in game: the hint and the tilt placard come back
+  await shot(`${script}-play`);
   await evaluate(`__game.run.coins = 50`);
-  await key('Space', ' '); await sleep(1800); await shot('phone-iso');
+  await key('Space', ' '); await sleep(1800); await shot(`${script}-iso`);
   await key('Space', ' '); await sleep(400);
   await evaluate(`__game.mode.finished = true`); await sleep(9000);
-  await key('Enter', 'Enter'); await sleep(6000); await shot('phone-battle');
+  await key('Enter', 'Enter'); await sleep(6000); await shot(`${script}-battle`);
   await key('ShiftLeft', 'Shift'); await sleep(1600);
-  await shot('phone-battle-sea');   // the placard is the only visible aim control on touch
+  await shot(`${script}-battle-sea`);   // the placard is the only visible aim control on touch
   console.log('aim placard:', await evaluate(`document.getElementById('view').textContent`));
   await send('Emulation.clearDeviceMetricsOverride');
-  console.log('phone shots written to', out);
+  console.log(`${script} shots written to`, out);
 }
 if (script === 'logo') {
   const fs = await import('node:fs');
