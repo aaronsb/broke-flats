@@ -1,8 +1,12 @@
 # Broke Flats
 
-A Crossy Road style hopper with a twist: the board is a top-down Frogger view, and tilting into 3D reveals what the flat view hides. Peeking costs coins, so the less you tilt, the more you keep. Every level ends in an Air-Sea Battle.
+A road-crossing arcade game where looking costs you.
 
-The name is the lose condition: spend your coins looking and you end up flat and broke, stuck top-down with nothing left to spend. The long way round to it is in [docs/naming.md](docs/naming.md).
+The board is top-down and the flat view lies. Coins sit under canopies, eggs under bus shelters, and every hedge wall has exactly one tunnel through it — whose roof, from above, matches the hedge perfectly. Tilt into 3D and you can see all of it. But tilting drains a coin a second, and coins are lives: twenty-five buys one. Spend them looking and you end up flat broke, stuck top-down, crossing the rest from memory.
+
+That is the name, and it is the lose condition. The long way round to it is in [docs/naming.md](docs/naming.md).
+
+Every level ends in an Air-Sea Battle.
 
 Play it: **https://aaronsb.github.io/broke-flats/**
 
@@ -35,6 +39,11 @@ Play it: **https://aaronsb.github.io/broke-flats/**
 | P | Cycle pixel size |
 | ` | Debug panel: jump levels, force a scenario, cycle sky and scenery, god mode |
 
+On a phone or tablet the controls come up on screen: a d-pad, **A** to peek and
+fire, **B** to hold the peek on the board and cycle the aim in the battle, **¢**
+to feed the slot and **⏎** to start. The battle's corner placard reads the row
+your eggs are going to — LAND, SEA or AIR — and tapping it cycles.
+
 ## Running it
 
 ```sh
@@ -60,7 +69,7 @@ For jumping straight to a level, scenario, sky or character while playtesting, s
 - `src/logo.js` draws the Broke Flats signs as one SVG asset: static in the title and the about crawl, animated inside the framed attract postcard.
 - `src/music.js` is an adaptive chiptune sequencer, `src/sfx.js` a tiny ADSR synth, `src/headlights.js` a fixed spotlight pool.
 
-Built with [three.js](https://threejs.org/) and Vite.
+Built with [three.js](https://threejs.org/) and Vite. It started as one evening's dare after the kids found a Crossy Road cabinet at a roller rink, and then the kids had ideas — the whole story is the ABOUT crawl in the game.
 
 ## License
 
