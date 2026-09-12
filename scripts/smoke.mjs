@@ -146,7 +146,7 @@ if (script === 'unlock') {
     console.log('level ' + lv, await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()]; const kinds = {}; for (const l of rows) for (const m of l.movers) { const k = m.kind ?? m.type ?? (m.bed ? 'flatbed' : m.len > 2 ? 'truck' : 'car'); kinds[l.scenario.id + ':' + k] = (kinds[l.scenario.id + ':' + k] ?? 0) + 1; } return kinds; })()`));
   }
   await evaluate(`__game.debug.force = 'road'; __game.jumpLevel(9)`); await sleep(9000);
-  console.log('overlaps', await evaluate(`(() => { let n = 0; for (const l of __game.mode.world.rows.values()) { const o = [...l.movers].sort((a, b) => a.x * l.dir - b.x * l.dir); for (let i = 0; i + 1 < o.length; i++) if ((o[i+1].x - o[i].x) * l.dir - (o[i+1].len + o[i].len) / 2 < -0.3) n++; } return n; })()`));
+  console.log('overlaps', await evaluate(`(() => { const bad = []; for (const l of __game.mode.world.rows.values()) { const o = [...l.movers].sort((a, b) => a.x * l.dir - b.x * l.dir); for (let i = 0; i < o.length; i++) { const a = o[i], b = o[(i + 1) % o.length]; if (o.length < 2) continue; let g = (b.x - a.x) * l.dir - (b.len + a.len) / 2; if (i === o.length - 1) g += 26; if (g < -0.1) bad.push([l.scenario.id, l.r, +g.toFixed(2), !!a.reckless, !!b.staller, +a.x.toFixed(1), +b.x.toFixed(1)]); } } return bad; })()`));
   console.log('crashes', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road'); return [rows.reduce((a, l) => a + l.movers.filter(m => m.reckless).length, 0), __game.mode.fx.pieces.length + __game.mode.fx.puffs.length]; })()`));
 }
 if (script === 'traffic') {

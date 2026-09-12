@@ -162,14 +162,21 @@ export class Lane {
     for (let i = 0; i < n; i++) {
       const m = ordered[i], ahead = ordered[(i + 1) % n];
       let v = m.v ?? 1;
+      let step = this.speed * v * dt;
       if (n > 1 && gapMin > 0) {
         let gap = (ahead.x - m.x) * this.dir - (ahead.len + m.len) / 2;
         if (i === n - 1) gap += 2 * SPAN;
-        if (gap < gapMin && !m.reckless) v = Math.min(v, ahead.v ?? 1);
-        else if (m.reckless && gap < 0.05 && v > (ahead.v ?? 1) + 0.02) { this.crash(m, ahead); break; }
-        else if (m.reckless && gap < 0.05) v = Math.min(v, ahead.v ?? 1);   // same speed: ride the bumper, never overlap
+        if (m.reckless) {
+          // Never brakes: closes to the bumper, then crashes into anything slower or rides it.
+          if (gap <= 0.05 && v > (ahead.v ?? 1) + 0.02) { this.crash(m, ahead); break; }
+          if (gap <= 0.05) v = Math.min(v, ahead.v ?? 1);
+          step = Math.min(this.speed * v * dt, Math.max(0, gap));
+        } else {
+          if (gap < gapMin) v = Math.min(v, ahead.v ?? 1);
+          step = Math.min(this.speed * v * dt, Math.max(0, gap - gapMin + 0.02));   // never past the minimum gap
+        }
       }
-      m.x += this.dir * this.speed * v * dt;
+      m.x += this.dir * step;
       if (m.x > SPAN) m.x -= 2 * SPAN;
       if (m.x < -SPAN) m.x += 2 * SPAN;
       m.mesh.position.x = m.x;
