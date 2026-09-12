@@ -30,9 +30,10 @@ function pickComposition(level) {
 }
 
 // World-space test of a local x span on a mover, honouring its heading.
-function within(lane, m, span, x) {
+// `slack` widens the span: decks are forgiving, jaws are not.
+function within(lane, m, span, x, slack = 0.3) {
   const a = m.x + lane.dir * span[0], b = m.x + lane.dir * span[1];
-  return x > Math.min(a, b) + 0.1 && x < Math.max(a, b) - 0.1;
+  return x > Math.min(a, b) - slack && x < Math.max(a, b) + slack;
 }
 
 export default {
@@ -103,7 +104,7 @@ export default {
   swimContact(lane, player) {
     const m = lane.moverAt(player.x, 0.3);
     if (!m || m.submerged) return null;
-    if (m.head && within(lane, m, m.head, player.x)) return 'chomped';
+    if (m.head && within(lane, m, m.head, player.x, -0.1)) return 'chomped';
     if (m.kind === 'boat' || m.kind === 'sub') return 'rundown';
     if (within(lane, m, m.bed, player.x)) player.mount(m);
     return null;
@@ -112,7 +113,7 @@ export default {
   onLand(lane, player) {
     const m = lane.moverAt(player.x, 0.3);
     if (!m || m.submerged) return player.swims ? null : 'water';     // waterfowl just swim
-    if (m.head && within(lane, m, m.head, player.x)) return 'chomped';
+    if (m.head && within(lane, m, m.head, player.x, -0.1)) return 'chomped';
     if (!within(lane, m, m.bed, player.x)) return lane.riding(m, player) ? 'bounce' : player.swims ? null : 'water';
     player.carrier = m;
     return null;

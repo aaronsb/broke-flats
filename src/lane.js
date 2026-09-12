@@ -118,12 +118,13 @@ export class Lane {
     return true;
   }
 
-  // True when x sits on one of a mover's rideable spans (local, heading-aware).
-  onBed(m, x) {
+  // True when x sits on one of a mover's rideable spans (local, heading-aware),
+  // with a little slack past each end so an edge landing still counts.
+  onBed(m, x, slack = 0.25) {
     const spans = m.beds ?? (m.bed ? [m.bed] : []);
     for (const sp of spans) {
       const a = m.x + this.dir * sp[0], b = m.x + this.dir * sp[1];
-      if (x > Math.min(a, b) + 0.1 && x < Math.max(a, b) - 0.1) return true;
+      if (x > Math.min(a, b) - slack && x < Math.max(a, b) + slack) return true;
     }
     return false;
   }

@@ -229,6 +229,11 @@ if (script === 'swim') {
   await send('Page.navigate', { url: 'http://localhost:5173/?start&level=4&gauntlet=mines' }); await sleep(3500);
   console.log('mines url', await evaluate(`[__game.run.gauntlet, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 12).map(l => l.scenario.id))].join(',')]`));
 }
+if (script === 'logedge') {
+  await send('Page.navigate', { url: 'http://localhost:5173/?start&force=river&coins=50' }); await sleep(3500);
+  console.log('log ends', await evaluate(`(() => { const p = __game.mode.players[0]; const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'river'); lane.movers.forEach(o => lane.group.remove(o.mesh)); lane.movers = []; const len = 3; const m = { mesh: __meshes.makeLog(len), len, bed: [-len / 2, len / 2], rideY: 0, kind: 'log', x: 0, v: 1 }; lane.add(m.mesh, 0); lane.movers.push(m);
+    const out = []; for (const x of [-1.7, -1.45, 0, 1.45, 1.7, 2.0]) { p.reset(); p.row = lane.r; p.z = -lane.r; p.x = x; p.col = Math.round(x); p.mesh.position.set(x, 0, p.z); p.land(); out.push([x, p.alive && !!p.carrier ? 'ride' : p.alive ? 'swim?' : p.deadBy]); } return out; })()`));
+}
 if (script === 'train') {
   await start();
   await evaluate(`__game.mode.train.hatch(); __game.mode.train.hatch()`);
