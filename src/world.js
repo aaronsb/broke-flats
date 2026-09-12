@@ -27,7 +27,10 @@ export class World {
     this.rows.clear();
   }
 
-  ensure(upTo) { while (this.nextRow <= upTo) this.addRow(this.nextRow++); }
+  ensure(upTo) {
+    if (!this.backfilled) { this.backfilled = true; for (let r = -1; r >= -12; r--) this.addRow(r, SCENARIOS[INTRO]); }
+    while (this.nextRow <= upTo) this.addRow(this.nextRow++);
+  }
 
   cull(below) {
     for (const [r, lane] of this.rows) if (r < below) { this.scene.remove(lane.group); this.rows.delete(r); }
@@ -99,8 +102,9 @@ export class World {
     return this.queue.shift();
   }
 
-  addRow(r) {
-    const spec = this.nextSpec(r);
+  // Rows behind the start are plain meadow so the tilted view has ground behind the player.
+  addRow(r, filler = null) {
+    const spec = filler ? { scenario: filler, index: 0, count: 1 } : this.nextSpec(r);
     const lane = new Lane(r, spec.scenario, this);
     spec.scenario.build(lane, {
       world: this, index: spec.index, count: spec.count, prev: this.rows.get(r - 1),
