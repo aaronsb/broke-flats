@@ -40,6 +40,7 @@ export class Player {
       this.mesh.rotation.set(0, 0, 0);
     }
     this.squash = 1.7;        // a pancake needs one even on a player that never died
+    this.fall = this.fall ?? ['x', -1];   // and getting up needs a direction to get up from
     this.col = 0; this.row = 0;
     this.x = 0; this.z = 0; this.y = 0;
     this.moving = false; this.t = 0;

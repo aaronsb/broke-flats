@@ -29,6 +29,13 @@ export const POSES = {
       p.mesh.rotation[p.fall[0]] = p.fall[1] * k * (Math.PI / 2);
       if (k >= 1) mark(p);
     },
+    // Picks itself up off the road.
+    spawn(p, t) {
+      const k = Math.min(1, t / 0.35);
+      p.mesh.rotation[p.fall[0]] = p.fall[1] * (1 - k) * (Math.PI / 2);
+      if (k >= 1) { p.mesh.rotation.set(0, 0, 0); p.mesh.rotation.y = p.facing; return true; }
+      return false;
+    },
   },
 
   // Pressed into the road and drawn out along it. How far is the cause's
@@ -84,6 +91,16 @@ export const POSES = {
       p.mesh.visible = false;
     },
     update() {},
+    // Reassembled, with the clatter running the other way.
+    spawnSfx: ['clatter', 0],
+    spawn(p, t) {
+      const k = Math.min(1, t / 0.45);
+      p.mesh.visible = true;
+      const over = 1 + Math.sin(k * Math.PI) * 0.25;
+      p.mesh.scale.setScalar(Math.max(0.001, k * k * over));
+      p.mesh.rotation.y = p.facing + (1 - k) * 8;
+      return k >= 1;
+    },
   },
 
   // A hole opens underneath, they drop through it, it closes after them.
@@ -177,6 +194,14 @@ export const POSES = {
       for (const m of p.standins) p.scene.remove(m);
       p.standins = null;
     },
+    // Runs the roster again, and this time stops on the right one.
+    spawn(p, t) {
+      if (t === 0) POSES.roulette.enter(p);
+      const k = Math.min(1, t / 0.55);
+      POSES.roulette.update(p, t);
+      if (k >= 1) { POSES.roulette.exit(p); p.mesh.visible = true; return true; }
+      return false;
+    },
   },
 
   // The colour drains out and so does the rest of it.
@@ -194,6 +219,19 @@ export const POSES = {
       });
       if (k >= 1) p.mesh.visible = false;
     },
+    // Colour floods back in.
+    spawn(p, t) {
+      if (t === 0) { p.own(); p.mesh.visible = true; }
+      const k = Math.min(1, t / 0.55);
+      p.mesh.traverse((o) => {
+        if (!o.isMesh || !o.userData.col0) return;
+        const c0 = o.userData.col0, l = 0.299 * c0.r + 0.587 * c0.g + 0.114 * c0.b;
+        o.material.color.copy(new THREE.Color(l, l, l)).lerp(c0, k);
+        o.material.opacity = k;
+      });
+      if (k >= 1) { p.restore(); return true; }
+      return false;
+    },
   },
 
   // Water closes over the top.
@@ -202,6 +240,14 @@ export const POSES = {
       p.mesh.position.y = -Math.min(1.2, t * 2.5);
       p.mesh.rotation.z = t * 3;
     },
+    // Comes back up spluttering.
+    spawn(p, t) {
+      const k = Math.min(1, t / 0.5);
+      p.mesh.position.y = p.y - (1 - k) * 1.2;
+      p.mesh.rotation.z = (1 - k) * 3;
+      if (k >= 1) { p.mesh.rotation.set(0, 0, 0); p.mesh.rotation.y = p.facing; return true; }
+      return false;
+    },
   },
 
   // Carried off by something with wings.
@@ -209,6 +255,14 @@ export const POSES = {
     update(p, t) {
       p.mesh.position.y = t * 12 - t * t * 9;
       p.mesh.rotation.x = t * 8;
+    },
+    // Dropped back in from wherever it was taken.
+    spawn(p, t) {
+      const k = Math.min(1, t / 0.5);
+      p.mesh.position.y = p.y + (1 - k) * (1 - k) * 9;
+      p.mesh.rotation.x = (1 - k) * 8;
+      if (k >= 1) { p.mesh.rotation.set(0, 0, 0); p.mesh.rotation.y = p.facing; return true; }
+      return false;
     },
   },
 };
