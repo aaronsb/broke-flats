@@ -114,11 +114,75 @@ rest of the game does not pay off.
 | **Blind Hop**, **From Memory**, **Last Seen** | All name the memory half of the loop, which is real, but none name the cost — and "Last Seen" is a messaging-app phrase now |
 | **Dead Reckoning** | Exactly the right idea — navigating from your last known fix — and completely unavailable: a 2023 Mission: Impossible film and several games |
 
+## Putting the crossing back in
+
+Adding "crossing" re-imports the exact problem this shortlist was built to
+dodge: it is the genre word, and the genre is the least distinctive thing about
+the game. One framing rescues it — **stop using it as a category and use it as
+a place.** "Crossing" in "Animal Crossing" is a category. "Crossing" in
+*Flat Broke Crossing* is a dot on a map, the way American rail towns are named:
+Harpers Ferry, Council Bluffs, Pilot Knob. A place name is specific by
+construction, which is what a category name can never be.
+
+### Flat Broke Crossing — the combination to take
+
+The lose condition survives intact, the genre arrives for free, and the game
+gains a setting it did not have before. The title card becomes a town sign.
+The attract screen can post a population that drops as you lose chicks. The
+levels stop being levels and start being the outskirts of somewhere.
+
+It also passes the test that matters for a long name: it shortens well. Nobody
+will say all three words twice — in conversation it is "Flat Broke," which is
+the better half. The full title does the explaining on a store page; the short
+one does the work everywhere else.
+
+Cost: five syllables, and any `___ Crossing` borrows a little air from Animal
+Crossing. For a hopper with a chicken in it, that reads as a genre signal
+rather than a debt.
+
+### Level Crossing — the tightest single phrase
+
+Three meanings stacked in two words, all of them true:
+
+1. The railway term for a road crossing a rail line at grade — the game has
+   rail bands, and trains that arrive from beyond the tilted view.
+2. Crossing a level, which is the loop.
+3. **Level** as in flat. The view you are stuck in when the coins run out.
+
+Nothing else on either list does three at once, and no game holds the exact
+title. The cost is that the phrase belongs to the real world: searching it
+returns Wikipedia and railway safety campaigns forever, and you would never
+outrank them. Compare **Grade Crossing**, the American term for the same
+thing — a less crowded search, but "grade" does not carry the flat/level pun,
+which is the whole reason the phrase was interesting.
+
+### Exact Change — the toll booth read
+
+The sign on the road, the coins in the slot, and the knife-edge economy of
+25 coins a life, in two words that sound like an arcade cabinet. Clear of
+games, clear on npm. It is the best *money plus road* name available.
+
+Cost: it drops the flat. It names the currency and the crossing but says
+nothing about the view, which is the half of the hook that is actually novel.
+
+### Ruled out from this batch
+
+| Name | Why not |
+|------|---------|
+| **Double Cross** | Deception plus crossing, and the deception is literal — the tunnel roof matches the hedge exactly from above, so the flat view really does double-cross you. Taken: 13AM Games' 2019 action platformer on Steam, Switch and Xbox |
+| **Toll Bridge**, **Turnpike** | Honest, and inert. A turnpike is a road you drive along, not one you cross |
+| **Coin Crossing** | Says both halves and sounds like an Animal Crossing riff, which is the association to avoid, not lean on |
+| **Flat Out** | "Flat out broke" and "flat out" as full speed, but Bugbear's FlatOut racing series has owned it since 2004 |
+
 ## Recommendation
 
-**Flat Broke**, with **Peek Tax** as the fallback if you want the name to
-explain rather than imply. Both are clear of games; Flat Broke is the one that
-sounds like a game.
+**Flat Broke Crossing** as the title, **Flat Broke** as what everyone actually
+calls it. It keeps the one name that states the lose condition, and buys back
+the genre clarity that the short name gives up.
+
+If you want one tight phrase instead of three words, **Level Crossing** is the
+cleverest thing on either list and the hardest to ever find in a search. That
+trade is the whole decision.
 
 If it goes in, the rename touches: repo name, `package.json` `name` and
 `homepage`, the `<title>` in `index.html`, the title card and attract screen,
@@ -128,10 +192,10 @@ README, and the GitHub Pages URL.
 
 | Check | Result |
 |-------|--------|
-| npm registry | `sidelong`, `peektax`, `tilttoll`, `hatchline`, `nodepth`, `flatbroke`, `tollroad`, `blindhop` unregistered; `clutch`, `squint`, `brood`, `flatland`, `hedgerow`, `overlook`, `oblique`, `askew`, `lastseen` taken (all irrelevant to a browser game, noted for completeness) |
+| npm registry | `sidelong`, `peektax`, `tilttoll`, `hatchline`, `nodepth`, `flatbroke`, `tollroad`, `blindhop`, `flatbrokecrossing`, `brokecrossing`, `levelcrossing`, `exactchange`, `gradecrossing` unregistered; `clutch`, `squint`, `brood`, `flatland`, `hedgerow`, `overlook`, `oblique`, `askew`, `lastseen` taken (all irrelevant to a browser game, noted for completeness) |
 | `github.com/aaronsb/*` | No collision with any shortlisted name across the 134 repos on the account |
-| itch.io / Steam | Collisions found for Clutch, Look Both Ways, Squint. Flat Broke, Peek Tax, Sidelong, Overlook, Coinsight came back clear |
-| `"<name>" game` attention test | Clutch is unwinnable. Flat Broke, Peek Tax and Coinsight have effectively empty fields |
+| itch.io / Steam | Collisions found for Clutch, Look Both Ways, Squint, Double Cross, FlatOut. Flat Broke, Flat Broke Crossing, Level Crossing, Exact Change, Peek Tax, Sidelong, Overlook and Coinsight came back clear |
+| `"<name>" game` attention test | Clutch is unwinnable and Level Crossing is unwinnable against the real-world term. Flat Broke, Flat Broke Crossing, Exact Change, Peek Tax and Coinsight have effectively empty fields |
 
 **Still to do by hand:** the USPTO search in classes 9 and 41. `tmsearch.uspto.gov`
 is blocked by this environment's egress policy, so it could not be run here.
