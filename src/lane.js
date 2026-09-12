@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeGround, makeCoin, makeEgg } from './meshes.js';
+import { makeGround, makeCoin, makeEgg, makeFlagMarker } from './meshes.js';
 import { rand } from './util.js';
 import { sfx } from './sfx.js';
 
@@ -22,6 +22,7 @@ export class Lane {
     this.blocked = new Set();
     this.coins = new Map();
     this.eggs = new Map();
+    this.flags = new Map();      // player-planted markers, any row
     this.movers = [];
     this.dir = 0;
     this.speed = 0;
@@ -56,6 +57,13 @@ export class Lane {
     if (Math.random() > chance) return;
     const c = Math.round(rand(-W + 1, W - 1));
     if (Math.random() < eggShare) this.egg(c); else this.coin(c);
+  }
+
+  toggleFlag(c) {
+    const f = this.flags.get(c);
+    if (f) { this.group.remove(f); this.flags.delete(c); return false; }
+    this.flags.set(c, this.add(makeFlagMarker(), c));
+    return true;
   }
 
   takeEgg(c) {

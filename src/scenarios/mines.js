@@ -1,12 +1,13 @@
 // Minesweeper gauntlet: open ground, no traffic, buried mines that never show
 // from any angle. A guaranteed safe path random-walks up the field and carries
 // coins; eggs sit on safe cells, and the followers they hatch are your mine
-// detectors: a follower stepping on a mine makes it beep underground. Landing
-// on a safe cell shows its adjacent-mine count as red dots. Q/E turn in place
-// and F plants a flag one cell ahead. Stepping on a mine raises it, beeping,
-// and it blows the level with no bonus. Crossing the line blows every mine at
-// once instead, and the flags that were right pay out.
-import { makeMine, makeCountTile, makeFlagMarker, makeScorch } from '../meshes.js';
+// detectors: a follower stepping on a mine makes it beep and lights a red
+// marker on that cell for a moment. Q/E turn in place and F plants a flag one
+// cell ahead. Stepping on a mine raises it, beeping, and it blows the level
+// with no bonus. Crossing the line blows every mine at once instead, and the
+// flags that were right pay out.
+import * as THREE from 'three';
+import { box, makeMine, makeScorch } from '../meshes.js';
 import { W } from '../lane.js';
 import { sfx } from '../sfx.js';
 import { randInt, clamp } from '../util.js';
@@ -24,8 +25,7 @@ export default {
     lane.terrain();
     lane.edges();
     lane.data.mines = new Map();
-    lane.data.flags = new Map();
-    lane.data.revealed = new Set();
+    lane.data.sweeps = [];       // follower-lit markers, fading
     world.pathCol = clamp(world.pathCol + randInt(-1, 1), -W + 1, W - 1);
     const safe = new Set([world.pathCol - 1, world.pathCol, world.pathCol + 1]);
     for (let c = -W; c <= W; c++) {
@@ -62,24 +62,17 @@ export default {
       player.frozen = true;
       return null;
     }
-    if (!lane.data.revealed.has(player.col)) {
-      lane.data.revealed.add(player.col);
-      const n = this.adjacent(lane, player.col);
-      if (n) lane.add(makeCountTile(n), player.col);
-    }
     return null;
   },
 
-  // A follower on a mine: it beeps, buried, and nothing else happens.
+  // A follower on a mine sweeps it: a beep and a red marker that blinks a while.
   onFollowerLand(lane, c) {
-    if (lane.data.mines.has(c)) sfx.beep(0.6);
-  },
-
-  toggleFlag(lane, c) {
-    const f = lane.data.flags.get(c);
-    if (f) { lane.group.remove(f); lane.data.flags.delete(c); }
-    else lane.data.flags.set(c, lane.add(makeFlagMarker(), c));
-    sfx.tick();
+    if (!lane.data.mines.has(c)) return;
+    sfx.beep(0.6);
+    const m = box(0.3, 0.06, 0.3, new THREE.MeshBasicMaterial({ color: 0xff2a1a }), 0, 0.02, 0, false);
+    m.position.x = c;
+    lane.group.add(m);
+    lane.data.sweeps.push({ mesh: m, life: 2.2 });
   },
 
   // The finale: every remaining mine rises and goes off, nearest rows first.
@@ -89,6 +82,8 @@ export default {
   },
 
   update(lane, dt, time) {
+    for (const sw of lane.data.sweeps) { sw.life -= dt; sw.mesh.visible = Math.sin(time * 18) > 0; }
+    lane.data.sweeps = lane.data.sweeps.filter((sw) => { const gone = sw.life <= 0; if (gone) lane.group.remove(sw.mesh); return !gone; });
     const armed = lane.data.armed;
     if (!armed?.length) return;
     const on = Math.sin(time * 40) > 0;
@@ -103,7 +98,7 @@ export default {
         const fx = lane.world.config.fx;
         if (fx) fx.explode(m.mesh, 1.4); else lane.group.remove(m.mesh);
         lane.add(makeScorch(), m.c);
-        if (lane.data.flags.has(m.c)) lane.data.hits = (lane.data.hits ?? 0) + 1;
+        if (lane.flags.has(m.c)) lane.data.hits = (lane.data.hits ?? 0) + 1;
         if (!lane.data.finale) { sfx.boom(1.6); lane.world.onMine?.(); }
       }
     }

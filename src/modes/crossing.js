@@ -60,7 +60,7 @@ export class CrossingMode {
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
     if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
-    if (this.game.run.gauntlet === 'mines') this.hint = 'arrows hop · Q/E turn · F flag the cell ahead · followers beep on mines · SPACE peek';
+    if (this.game.run.gauntlet === 'mines') this.hint = 'arrows hop · Q/E turn · F flag the cell you face · followers sweep: beep and a red blink on a mine';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
   }
 
@@ -167,12 +167,13 @@ export class CrossingMode {
     return false;
   }
 
-  // Toggle a flag on the cell the player faces, on minefield rows only.
+  // Toggle a flag on the cell the player faces, on any row.
   plantFlag(p) {
     const [c, r] = p.ahead();
     const lane = this.world.laneAt(r);
-    if (!lane?.scenario.toggleFlag || Math.abs(c) > W) { sfx.bump(); return; }
-    lane.scenario.toggleFlag(lane, c);
+    if (!lane || Math.abs(c) > W) { sfx.bump(); return; }
+    lane.toggleFlag(c);
+    sfx.tick();
   }
 
   onKeyUp(e) {
@@ -297,7 +298,9 @@ export class CrossingMode {
     if (T.mines) {
       const rows = [...this.world.rows.values()].filter((l) => l.scenario.id === 'mines');
       const hits = rows.reduce((a, l) => a + (l.data.hits ?? 0), 0);
+      const planted = [...this.world.rows.values()].reduce((a, l) => a + l.flags.size, 0);
       lines.push({ label: 'FLAGS RIGHT', count: hits, each: FLAG_BONUS });
+      if (planted > hits) lines.push({ label: 'FLAGS WRONG', count: planted - hits, each: 0 });
     }
     if (T.gauntlet) lines.push({ label: 'PHEW, MADE IT', each: GAUNTLET_BONUS });
     game.run.coins += T.led + T.found;
