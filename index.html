@@ -142,6 +142,11 @@
     #summary .row { display: flex; justify-content: space-between; gap: 16px; }
     #summary .row .value { color: var(--accent); min-width: 5ch; text-align: right; }
     #summary .row.total { margin-top: 8px; border-top: 2px solid var(--edge); padding-top: 6px; }
+    #summary .row.stamps .label { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    #summary .strip { display: inline-flex; gap: 2px; flex-wrap: wrap; }
+    #summary .stamp { width: 28px; height: 28px; image-rendering: pixelated; animation: stamp .18s ease-out; }
+    #summary span.stamp { color: var(--accent); text-align: center; line-height: 28px; }
+    @keyframes stamp { from { transform: scale(2.2) rotate(-14deg); opacity: 0; } to { transform: none; opacity: 1; } }
   </style>
 </head>
 <body>

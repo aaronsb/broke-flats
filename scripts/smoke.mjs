@@ -22,7 +22,9 @@ const state = () => evaluate(`({score: document.getElementById('score').textCont
 
 await send('Runtime.enable');
 await send('Page.enable');
-await send('Page.navigate', { url: 'http://localhost:5173/' });
+// BASE points the run at another server (a private snapshot) when :5173 is shared.
+const BASE = process.env.BASE ?? 'http://localhost:5173/';
+await send('Page.navigate', { url: BASE });
 await sleep(2500);
 const start = async () => { await key('Enter', 'Enter'); await sleep(4500); console.log('start', await state()); };
 // Screenshots land in shots/ unless OUT says otherwise (make shots points it at
@@ -63,7 +65,7 @@ if (script === 'lives') {
   console.log('new session', await evaluate(`[__game.run.coins, __game.run.lives, !document.getElementById('title').classList.contains('hide')]`));
 }
 if (script === 'touch') {
-  await send('Page.navigate', { url: 'http://localhost:5173/?touch=1' }); await sleep(2500);
+  await send('Page.navigate', { url: BASE + '?touch=1' }); await sleep(2500);
   const tap = async (sel) => {
     const box = await evaluate(`(() => { const r = document.querySelector('${sel}').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box[0], y: box[1], button: 'left', clickCount: 1 });
@@ -172,10 +174,74 @@ if (script === 'traffic') {
     console.log('level ' + lv, await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road'); let minGap = 99, stallers = 0, n = 0, speed = 0; for (const l of rows) { const o = [...l.movers].sort((a, b) => a.x * l.dir - b.x * l.dir); n += o.length; speed += l.speed; for (const m of o) if (m.staller) stallers++; for (let i = 0; i + 1 < o.length; i++) { const g = (o[i+1].x - o[i].x) * l.dir - (o[i+1].len + o[i].len) / 2; minGap = Math.min(minGap, g); } } return { rows: rows.length, perLane: +(n / rows.length).toFixed(1), avgSpeed: +(speed / rows.length).toFixed(1), minGap: +minGap.toFixed(2), stallers }; })()`));
   }
 }
+if (script === 'halt') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'road'; __game.restartStage()`); await sleep(500);
+  // Stand before the first road row with five followers, then hop into the
+  // nearest cell with braking room: traffic should brake for the procession,
+  // and anything close behind a braking car may rear-end it.
+  const setup = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road').sort((a, b) => a.r - b.r)[0];
+    const p = __game.mode.players[0]; const tr = __game.mode.trains[0];
+    // The cell with the least clear road upstream that still leaves braking room, so a car arrives soon.
+    let best = 0, room = 99;
+    for (let c = -6; c <= 6; c++) { let d = 99; for (const m of lane.movers) { let g = (c - m.x) * lane.dir - m.len / 2; if (g < -1) g += 70; d = Math.min(d, g); } if (d >= 3 && d < room) { room = d; best = c; } }   // distance around the wrap
+    p.row = lane.r - 1; p.z = -p.row; p.x = best; p.col = best; p.mesh.position.set(best, 0, p.z);
+    tr.trail = []; for (let i = 0; i < 5; i++) tr.hatch(true);
+    return { r: lane.r, dir: lane.dir, speed: +lane.speed.toFixed(1), movers: lane.movers.length, cell: best, room: +room.toFixed(1), followers: tr.count }; })()`);
+  console.log('setup', setup);
+  await key('ArrowUp');
+  let halted = false, blocked = 0, minV = 1, alive = true;
+  const polls = Math.min(150, Math.ceil((setup.room / setup.speed + 3) * 10));   // long enough for the nearest car to arrive
+  for (let i = 0; i < polls && !halted; i++) {
+    await sleep(100);
+    const s = await evaluate(`(() => { const lane = __game.mode.world.laneAt(${setup.r}); const p = __game.mode.players[0];
+      return { b: lane.blockers?.length ?? 0, v: Math.min(1, ...lane.movers.map(m => m.v)), alive: p.alive, row: p.row }; })()`);
+    if (s.b) blocked++;
+    minV = Math.min(minV, s.v);
+    if (s.b && s.v < 0.2) halted = true;
+    alive = s.alive;
+  }
+  { await evaluate(`__game.run.coins = 20; __game.mode.setTilt(true)`); await sleep(900);   // brake lights read from the side
+    const fsH = await import('node:fs'); const r = await send('Page.captureScreenshot', { format: 'png' }); fsH.writeFileSync(`${OUT}/halt.png`, Buffer.from(r.data, 'base64')); }
+  const after = await evaluate(`(() => { const lane = __game.mode.world.laneAt(${setup.r}); return { movers: lane.movers.length, v: lane.movers.map(m => +m.v.toFixed(2)) }; })()`);
+  console.log('halt', { halted, framesBlocked: blocked, minV: +minV.toFixed(2), player: alive ? 'alive' : 'died', crash: after.movers < setup.movers ? `yes (${setup.movers} -> ${after.movers})` : 'no', v: after.v });
+  if (!halted) errors.push('halt: no mover in the blocked lane reached v < 0.2');
+}
+if (script === 'halt-crash') {
+  await start();
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'road'; __game.restartStage()`); await sleep(500);
+  // A hand-built queue of four cars nose to tail, bearing down on the cell a
+  // five-strong procession is about to step into. The lead car brakes hard
+  // for the flock; the one behind notices too late and rear-ends it.
+  const setup = await evaluate(`(() => { const lane = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'road').sort((a, b) => a.r - b.r)[0];
+    for (const o of lane.movers) lane.group.remove(o.mesh); lane.movers = [];
+    lane.speed = 4.5;
+    let front = -lane.dir * 5.5;   // lead bumper 5.5 units upstream of x = 0
+    for (let i = 0; i < 4; i++) { const m = __meshes.makeCar(); m.x = front - lane.dir * m.len / 2; m.v = 1; if (lane.dir < 0) m.mesh.rotation.y = Math.PI; lane.add(m.mesh, m.x); lane.movers.push(m); front = m.x - lane.dir * (m.len / 2 + 1); }
+    const p = __game.mode.players[0]; const tr = __game.mode.trains[0];
+    p.row = lane.r - 1; p.z = -p.row; p.x = 0; p.col = 0; p.mesh.position.set(0, 0, p.z);
+    tr.trail = []; for (let i = 0; i < 5; i++) tr.hatch(true);
+    return { r: lane.r, dir: lane.dir, gapMin: +lane.gapMin.toFixed(1), movers: lane.movers.length, followers: tr.count }; })()`);
+  console.log('setup', setup);
+  await key('ArrowUp');
+  let halted = false, crashed = false, alive = true;
+  for (let i = 0; i < 40 && !(halted && crashed); i++) {
+    await sleep(100);
+    const s = await evaluate(`(() => { const lane = __game.mode.world.laneAt(${setup.r}); const p = __game.mode.players[0];
+      return { b: lane.blockers?.length ?? 0, v: Math.min(1, ...lane.movers.map(m => m.v)), n: lane.movers.length, alive: p.alive }; })()`);
+    if (s.b && s.v < 0.2) halted = true;
+    if (s.n < setup.movers) crashed = true;
+    alive = s.alive;
+  }
+  const after = await evaluate(`(() => { const lane = __game.mode.world.laneAt(${setup.r}); return { movers: lane.movers.length, v: lane.movers.map(m => +m.v.toFixed(2)) }; })()`);
+  console.log('halt-crash', { halted, crash: crashed ? `yes (${setup.movers} -> ${after.movers})` : 'no', player: alive ? 'alive' : 'died', v: after.v });
+  if (!halted) errors.push('halt-crash: the lead car never braked for the procession');
+  if (!crashed) errors.push('halt-crash: nothing rear-ended the braking car');
+}
 if (script === 'playtest') {
-  await send('Page.navigate', { url: 'http://localhost:5173/?start&level=3&force=rail&god&coins=42&lives=7&chars=goose,pig' }); await sleep(3500);
+  await send('Page.navigate', { url: BASE + '?start&level=3&force=rail&god&coins=42&lives=7&chars=goose,pig' }); await sleep(3500);
   console.log('playtest', await evaluate(`[__game.run.level, __game.run.coins, __game.run.lives, __game.roster.map(c => c.id).join('+'), __game.mode.players[0].invincible, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 12).map(l => l.scenario.id))].join(','), document.getElementById('level').textContent]`));
-  await send('Page.navigate', { url: 'http://localhost:5173/?battle&level=2' }); await sleep(3500);
+  await send('Page.navigate', { url: BASE + '?battle&level=2' }); await sleep(3500);
   console.log('battle url', await evaluate(`[__game.mode.constructor.name, __game.run.level]`));
 }
 if (script === 'wing') {
@@ -246,7 +312,7 @@ if (script === 'mines') {
   console.log('stepped by key', rowAfter, await evaluate(`[__game.mode.players[0].row]`));
   await sleep(6000); await key('Enter', 'Enter'); await sleep(800);
   console.log('after blast', await evaluate(`[__game.run.level, __game.mode.constructor.name]`));
-  await send('Page.navigate', { url: 'http://localhost:5173/?start&gauntlet=mines&god' }); await sleep(3500);
+  await send('Page.navigate', { url: BASE + '?start&gauntlet=mines&god' }); await sleep(3500);
   await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world; const first = [...w.rows.values()].filter(l => l.scenario.id === 'mines').map(l => l.r).sort((a, b) => a - b)[0]; p.row = first - 1; p.col = w.pathCol; p.x = p.col; p.z = -p.row; p.mesh.position.set(p.x, 0, p.z); })()`);
   console.log('any-cell flag', await evaluate(`(() => { const p = __game.mode.players[0]; p.facing = Math.PI; __game.mode.plantFlag(p); const [c, r] = p.ahead(); return [r < p.row, __game.mode.world.laneAt(r).flags.has(c)]; })()`));
   // Flag the mine ahead, then the finale: cross the line and let them all go up.
@@ -258,7 +324,7 @@ if (script === 'mines') {
   console.log('after', await evaluate(`[__game.run.level, __game.mode.constructor.name]`));
 }
 if (script === 'swim') {
-  await send('Page.navigate', { url: 'http://localhost:5173/?start&force=river&chars=duck&coins=50' }); await sleep(3500);
+  await send('Page.navigate', { url: BASE + '?start&force=river&chars=duck&coins=50' }); await sleep(3500);
   const r = await evaluate(`(() => { const p = __game.mode.players[0]; const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'river'); for (const m of lane.movers) { m.x = -12; m.mesh.position.x = -12; } p.row = lane.r; p.col = 3; p.x = 3; p.z = -lane.r; p.mesh.position.set(3, 0, p.z); p.land(); return [p.swims, p.alive, !!p.carrier]; })()`);
   await sleep(400);
   console.log('duck swims', r, await evaluate(`[__game.mode.players[0].alive, Math.round(__game.mode.players[0].y * 10) / 10]`));
@@ -267,11 +333,11 @@ if (script === 'swim') {
   // A log drifting onto the duck picks it up; a boat runs it down.
   console.log('log pickup', await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row); const len = 3; const m = { mesh: __meshes.makeLog(len), len, bed: [-len / 2, len / 2], rideY: 0, kind: 'log', x: p.x, v: 1 }; lane.add(m.mesh, m.x); lane.movers.push(m); p.update(0.016); return [!!p.carrier, p.alive]; })()`));
   console.log('boat hit', await evaluate(`(() => { const p = __game.mode.players[0]; p.carrier = null; const lane = __game.mode.world.laneAt(p.row); lane.movers.forEach(o => lane.group.remove(o.mesh)); lane.movers = []; const m = __meshes.makeRiverBoat(); m.kind = 'boat'; m.x = p.x; m.v = 1; lane.add(m.mesh, m.x); lane.movers.push(m); p.update(0.016); return [p.alive, p.deadBy]; })()`));
-  await send('Page.navigate', { url: 'http://localhost:5173/?start&level=4&gauntlet=mines' }); await sleep(3500);
+  await send('Page.navigate', { url: BASE + '?start&level=4&gauntlet=mines' }); await sleep(3500);
   console.log('mines url', await evaluate(`[__game.run.gauntlet, [...new Set([...__game.mode.world.rows.values()].filter(l => l.r > 3 && l.r < 12).map(l => l.scenario.id))].join(',')]`));
 }
 if (script === 'logedge') {
-  await send('Page.navigate', { url: 'http://localhost:5173/?start&force=river&coins=50' }); await sleep(3500);
+  await send('Page.navigate', { url: BASE + '?start&force=river&coins=50' }); await sleep(3500);
   console.log('log ends', await evaluate(`(() => { const p = __game.mode.players[0]; const lane = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'river'); lane.movers.forEach(o => lane.group.remove(o.mesh)); lane.movers = []; const len = 3; const m = { mesh: __meshes.makeLog(len), len, bed: [-len / 2, len / 2], rideY: 0, kind: 'log', x: 0, v: 1 }; lane.add(m.mesh, 0); lane.movers.push(m);
     const out = []; for (const x of [-1.7, -1.45, 0, 1.45, 1.7, 2.0]) { p.reset(); p.row = lane.r; p.z = -lane.r; p.x = x; p.col = Math.round(x); p.mesh.position.set(x, 0, p.z); p.land(); out.push([x, p.alive && !!p.carrier ? 'ride' : p.alive ? 'swim?' : p.deadBy]); } return out; })()`));
 }
@@ -334,7 +400,7 @@ if (script === 'phone' || script === 'tablet') {
   const size = script === 'tablet' ? { width: 820, height: 1180 } : { width: 400, height: 720 };
   await send('Emulation.setDeviceMetricsOverride', { ...size, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  await send('Page.navigate', { url: 'http://localhost:5173/' });
+  await send('Page.navigate', { url: BASE });
   const shown = `document.getElementById('intro')?.classList.contains('show')`;
   while (!(await evaluate(shown))) await sleep(50);
   await sleep(2400); await shot(`${script}-intro`);
@@ -357,7 +423,7 @@ if (script === 'phone' || script === 'tablet') {
   await evaluate(`__game.run.coins = 50`);
   await key('Space', ' '); await sleep(1800); await shot(`${script}-iso`);
   await key('Space', ' '); await sleep(400);
-  await evaluate(`__game.mode.finished = true`); await sleep(9000);
+  await evaluate(`for (let i = 0; i < 3; i++) __game.mode.trains[0].hatch(true); __game.mode.finished = true`); await sleep(9000);
   await key('Enter', 'Enter'); await sleep(6000); await shot(`${script}-battle`);
   await key('ShiftLeft', 'Shift'); await sleep(1600);
   await shot(`${script}-battle-sea`);   // the placard is the only visible aim control on touch
@@ -475,7 +541,7 @@ if (script === 'logo') {
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${n}.png`, Buffer.from(r.data, 'base64')); };
   // Reload so the attract intro runs from the top. Module load time varies, so
   // anchor to the frame actually appearing, then shoot at offsets from there.
-  await send('Page.navigate', { url: 'http://localhost:5173/' });
+  await send('Page.navigate', { url: BASE });
   const shown = `document.getElementById('intro')?.classList.contains('show')`;
   while (!(await evaluate(shown))) await sleep(50);
   const t0 = Date.now();
@@ -488,7 +554,7 @@ if (script === 'logo') {
   await key('Escape', 'Escape'); await sleep(500);
   // Browsing the roster must not be interrupted: a pick keypress drops the
   // sign at once and starts the idle count again.
-  await send('Page.navigate', { url: 'http://localhost:5173/' });
+  await send('Page.navigate', { url: BASE });
   while (!(await evaluate(shown))) await sleep(50);
   await sleep(1200);
   const up = await evaluate(shown);
@@ -525,7 +591,7 @@ if (script === 'shots') {
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(500); await shot('night-top');
   await key('Space', ' '); await sleep(1500); await shot('night-iso');
-  await evaluate(`__game.mode.finished = true`); await sleep(5000); await shot('tally');
+  await evaluate(`for (let i = 0; i < 3; i++) __game.mode.trains[0].hatch(true); __game.mode.finished = true`); await sleep(7500); await shot('tally');
   await sleep(4000); await key('Enter', 'Enter'); await sleep(1500); await shot('battle-land');
   await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-sea');
   await key('ShiftLeft', 'Shift'); await sleep(1500); await shot('battle-air');

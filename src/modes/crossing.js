@@ -11,12 +11,14 @@ import { W } from '../lane.js';
 import { FLAG_BONUS } from '../scenarios/mines.js';
 import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
+import { stampOf } from '../stamp.js';
 import { GAUNTLET_BONUS } from '../game.js';
 
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
 const LED_BONUS = 50;    // per follower led across the line
 const FOUND_BONUS = 20;  // per follower that made its own way to the finish
+const FOLLOWER_MUL = 0.5; // added to the score multiplier per follower carried over
 const TALLY_TIME = 6;    // seconds to run around while the score counts up
 const LEASH = 8;       // rows a player may lead the other by
 
@@ -228,11 +230,32 @@ export class CrossingMode {
     return out;
   }
 
+  // A player with followers is a procession, and road traffic brakes for it:
+  // the cells the leader and its followers hold go on their lanes as blockers,
+  // each as strong as the train is long.
+  setBlockers() {
+    for (const lane of this.held ?? []) lane.blockers = null;
+    this.held = [];
+    const mark = (x, row, n) => {
+      const lane = this.world.laneAt(row);
+      if (!lane?.halts) return;
+      if (!lane.blockers) { lane.blockers = []; this.held.push(lane); }
+      lane.blockers.push({ x, n });
+    };
+    for (const t of this.trains) {
+      const p = t.player, n = t.count;
+      if (!n || !p.alive) continue;
+      if (!p.carrier) mark(p.x, p.moving && p.t > 0.5 ? p.trow : p.row, n);
+      for (const k of t.chicks) if (!k.rec.carrier && (!k.moving || k.t > 0.5)) mark(k.mesh.position.x, k.rec.row, n);
+    }
+  }
+
   update(dt, time) {
     const { game, world } = this;
     for (const p of this.players) p.update(dt);
     for (const t of this.trains) t.update(dt, time);
     this.fx.update(dt);
+    this.setBlockers();
     world.update(dt, time);
 
     const alive = this.alive();
@@ -297,7 +320,8 @@ export class CrossingMode {
     const led = this.trains.reduce((a, t) => a + t.count, 0);
     const found = this.trains.reduce((a, t) => a + t.waiting, 0);
     const missed = Math.max(0, (this.world.data.eggsPlaced ?? 0) - this.trains.reduce((a, t) => a + t.hatched, 0));
-    this.tally = { t: 0, led, found, missed, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines' };
+    const per = this.trains.map((t) => t.count + t.waiting);   // whose stamps, in roster order
+    this.tally = { t: 0, led, found, missed, per, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines' };
     for (const p of this.players) p.invincible = true;
     // Minefield finale: everything left in the ground goes up, nearest rows first.
     if (this.tally.mines) for (const l of this.world.rows.values()) if (l.scenario.id === 'mines') l.scenario.detonateAll(l, this.players[0].row);
@@ -324,8 +348,12 @@ export class CrossingMode {
     game.run.score -= T.rows;        // rows were credited at the line; the panel counts them again
     music.reset({ tally: true });
     if (T.gauntlet) sfx.phew();
+    const owners = T.per.flatMap((n, k) => Array(n).fill(k));
+    const stamp = (k) => { const c = game.roster[k], v = game.run.variants[k]; return stampOf(`${c.id}:${v}`, () => c.young(v)); };
+    if (T.led + T.found) stamp(owners[0] ?? 0);   // first render compiles shaders; do it before the cadence starts
     T.summaryMs = game.summary.show(`LEVEL ${game.level.number} CLEAR`, lines, {
       mul: game.scoreMul(),
+      stamps: { count: T.led + T.found, image: (i) => stamp(owners[i] ?? 0), each: FOLLOWER_MUL },
       onTotal: (v) => { game.run.score += v; },
       done: () => { T.summaryDone = true; },
     });

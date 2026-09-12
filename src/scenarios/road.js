@@ -30,6 +30,7 @@ export default {
       for (let x = -DETAIL_W / 2; x < DETAIL_W / 2; x += 1.5) lane.add(box(0.7, 0.02, 0.1, 0xdedede, x, 0, 0.5, false));
     }
     lane.dir = pick(-1, 1);
+    lane.halts = true;
     const tr = traffic(difficulty + lane.r / 120);
     lane.speed = rand(2, 4) * tr.speed;
     const kinds = pickComposition(level);

@@ -34,8 +34,13 @@ const THEMES = {
   parking:     { props: [makeParkedCar, makeFence, makeFence, makePlanter, makePlanter, makeShrub, makeTree, makeHedge], building: 'tower', buildProb: 0.15 },
 };
 const HEIGHT = { land: 0.6, sea: 0.6, air: 3.2 };
+const NEXT = { land: 'sea', sea: 'air' };            // where a missed egg bounces on to
+const FAR = ROWS.air + 2;                             // eggs past here burst in the air
 const PROP_POINTS = 5;
 const SLIDE = 7, EGG_SPEED = 14, COOLDOWN = 0.3;
+const ARC = 2.2, BOUNCE_ARC = 0.55;                   // first-arc height and the bounce's share of it
+const VOLLEY_MS = 60;                                 // stagger between follower eggs
+const YOUNG_DMG = 0.5, YOUNG_SCALE = 0.6;
 // Per-pilot keys: player 1 moves on the arrows and fires with Space, player 2
 // moves on WASD and fires with Q. Shift cycles the aim for everyone.
 const PILOT_KEYS = [
@@ -128,7 +133,8 @@ export class BattleMode {
         if (taken.has(c)) continue;
         const inStrip = Math.abs(c) <= W + 1;
         if (inStrip && r <= 3) continue;                  // clear sight lines in front of the chicken
-        const density = inStrip ? (r >= 13 ? 0.45 : 0.02) : 0.3;
+        const mid = (r >= 5 && r <= 7) || (r >= 9 && r <= 11);   // between the target rows
+        const density = inStrip ? (r >= 13 ? 0.45 : mid ? 0.18 : 0.02) : 0.3;
         if (Math.random() < density) {
           const m = pick(...theme.props)();
           m.position.x = c;
@@ -160,7 +166,7 @@ export class BattleMode {
   hitProps(e, y) {
     for (const p of this.props) {
       if (p.tipping || Math.abs(e.x - p.x) > 0.6 || Math.abs(e.z - p.z) > 0.5 || y > p.h) continue;
-      p.hp -= 1;
+      p.hp -= e.dmg;
       if (p.hp > 0) {
         p.lean += 0.07;
         p.mesh.rotation.z = p.lean * (e.x < p.x ? -1 : 1);
@@ -254,16 +260,62 @@ export class BattleMode {
     sfx.tilt();
   }
 
+  // The pilot's egg leads and the flock's follow, one every few frames, all
+  // at the row that was aimed when the trigger went.
   fire(pilot) {
     if (pilot.cooldown > 0 || this.ending) return;
     pilot.cooldown = COOLDOWN;
-    const egg = makeEgg();
-    egg.position.set(pilot.cx, 0.6, -pilot.cz);
-    this.group.add(egg);
-    this.eggs.push({ mesh: egg, x: pilot.cx, z: pilot.cz, z0: pilot.cz, aim: this.aim });
+    const aim = this.aim;
+    this.launch(pilot.cx, pilot.cz, aim, 1, 1);
     setFrame(pilot.mesh, 1);
     setTimeout(() => setFrame(pilot.mesh, 0), 180);
+    pilot.young.forEach((m, k) => setTimeout(() => {
+      if (this.ending || this.game.mode !== this) return;
+      this.launch(m.position.x, -m.position.z, aim, YOUNG_DMG, YOUNG_SCALE);
+      setFrame(m, 1);
+      setTimeout(() => setFrame(m, 0), 180);
+    }, VOLLEY_MS * (k + 1)));
+  }
+
+  launch(x, z, aim, dmg, scale) {
+    const egg = makeEgg();
+    egg.scale.setScalar(scale);
+    egg.position.set(x, 0.6, -z);
+    this.group.add(egg);
+    this.eggs.push({ mesh: egg, x, z, from: z, to: ROWS[aim], kind: aim, h0: 0, h1: HEIGHT[aim], amp: ARC, dmg, bounced: false });
     sfx.plink();
+  }
+
+  // A half-damaged target rocks and puffs; the finishing hit gets the boom and
+  // the coin, whoever threw it.
+  hitTargets(e) {
+    for (const t of this.targets) {
+      if (t.kind !== e.kind || Math.abs(e.z - t.z) > 0.6 || Math.abs(e.x - t.x) > t.len / 2 + 0.3) continue;
+      t.hp = (t.hp ?? 1) - e.dmg;
+      if (t.hp > 0) {
+        t.mesh.rotation.z = (e.x < t.x ? -1 : 1) * 0.12;
+        this.debris.puff(e.mesh.position, 0x8a8a8a, 0.25, 0.6, new THREE.Vector3(0, 1.5, 0), 2);
+        sfx.crack();
+        return true;
+      }
+      this.debris.explode(t.mesh, 1.2);
+      this.targets = this.targets.filter((q) => q !== t);
+      this.points += t.points;
+      this.tally[t.points === 60 ? 'train' : t.kind]++;
+      this.game.run.coins += 1;
+      sfx.boom(t.kind === 'air' ? 1.3 : t.kind === 'sea' ? 0.8 : 1);
+      if (t.kind === 'sea') sfx.splash();
+      return true;
+    }
+    return false;
+  }
+
+  // Off the back of the map: a flash, a boom, nothing on the board.
+  airburst(at) {
+    this.debris.burst(at, 0.9);
+    this.debris.puff(at, 0xffffff, 1.1, 0.16, new THREE.Vector3(), 1.6);
+    this.debris.puff(at, 0xffe36b, 0.8, 0.22, new THREE.Vector3(), 2.2);
+    sfx.boom(0.5);
   }
 
   // Followers sit at fixed distances back along the pilot's recorded path.
@@ -315,6 +367,7 @@ export class BattleMode {
     const entry = -dir * (OFFSCREEN + 2 + t.len / 2);
     if (this.targets.some((o) => o.kind === kind && Math.abs(o.x - entry) < (o.len + t.len) / 2 + 1.5)) return false;
     t.kind = kind;
+    t.hp = 1;
     t.points = train ? 60 : POINTS[kind];
     t.dir = dir;
     const base = train ? rand(5, 7) : kind === 'sea' ? rand(1.5, 2.5) : kind === 'air' ? rand(5, 7.5) : rand(3, 4.5);
@@ -389,28 +442,28 @@ export class BattleMode {
       return false;
     });
 
-    // Eggs fly to the row they were aimed at and only hit targets there.
+    // Eggs arc to the row they were aimed at and only hit targets there. A
+    // miss skips once, lower and on to the next row; a miss after that drops
+    // in the sea or flies off the back and bursts.
     for (const e of this.eggs) {
       e.z += EGG_SPEED * dt;
-      const reach = ROWS[e.aim], k = Math.min(1, (e.z - e.z0) / (reach - e.z0));
-      const y = 0.6 + Math.sin(k * Math.PI) * 2.2 + HEIGHT[e.aim] * k;
+      const k = Math.min(1, (e.z - e.from) / (e.to - e.from));
+      const y = 0.6 + Math.sin(k * Math.PI) * e.amp + e.h0 + (e.h1 - e.h0) * k;
       e.mesh.position.set(e.x, y, -e.z);
       e.mesh.rotation.x += dt * 10;
-      if (this.hitProps(e, y)) { e.z = 99; continue; }
-      for (const t of this.targets) {
-        if (t.kind !== e.aim || Math.abs(e.z - t.z) > 0.6 || Math.abs(e.x - t.x) > t.len / 2 + 0.3) continue;
-        this.debris.explode(t.mesh, 1.2);
-        this.targets = this.targets.filter((q) => q !== t);
-        e.z = 99;
-        this.points += t.points;
-        this.tally[t.points === 60 ? 'train' : t.kind]++;
-        game.run.coins += 1;
-        sfx.boom(t.kind === 'air' ? 1.3 : t.kind === 'sea' ? 0.8 : 1);
-        if (t.kind === 'sea') sfx.splash();
-        break;
+      if (this.hitProps(e, y) || this.hitTargets(e)) { e.gone = true; continue; }
+      if (e.z > FAR) { this.airburst(e.mesh.position); e.gone = true; continue; }
+      if (e.z <= e.to + 0.6 || e.kind === 'air') continue;
+      if (e.bounced) {
+        this.debris.splash(e.mesh.position, 0.6);
+        e.gone = true;
+        continue;
       }
+      const next = NEXT[e.kind];
+      this.debris.puff(e.mesh.position, 0xcfcfcf, 0.18, 0.4, new THREE.Vector3(0, 1, 0), 2);
+      Object.assign(e, { from: e.z, to: ROWS[next], h0: HEIGHT[e.kind], h1: HEIGHT[next], kind: next, amp: ARC * BOUNCE_ARC, bounced: true });
     }
-    this.eggs = this.eggs.filter((e) => { const gone = e.z > ROWS[e.aim] + 1; if (gone) this.group.remove(e.mesh); return !gone; });
+    this.eggs = this.eggs.filter((e) => { if (e.gone) this.group.remove(e.mesh); return !e.gone; });
 
     const tz = -VIEW[this.aim][1];
     game.camera.update(dt, cx * 0.3, tz);

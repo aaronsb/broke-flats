@@ -135,7 +135,7 @@ export const sfx = {
   horn: () => { for (const d of [0, 420]) setTimeout(() => { voice({ wave: 'sawtooth', freq: N(57), attack: 0.03, decay: 0.05, sustain: 0.8, hold: 0.25, release: 0.12, vol: 0.07 });
                                                               voice({ wave: 'sawtooth', freq: N(61), attack: 0.03, decay: 0.05, sustain: 0.8, hold: 0.25, release: 0.12, vol: 0.05 }); }, d); },
   // Wheels on rails: a long lowpassed noise rumble.
-  rumble: () => voice({ wave: 'noise', freq: 260, slideTo: 180, filter: 'lowpass', attack: 0.2, decay: 0.3, sustain: 0.8, hold: 1.6, release: 0.8, vol: 0.1 }),
+  rumble: () => voice({ wave: 'noise', freq: 260, slideTo: 180, filter: 'lowpass', attack: 0.2, decay: 0.3, sustain: 0.8, hold: 1.6, release: 0.8, vol: 0.17 }),
   // Jet whoosh: a bandpassed noise sweep, rising for take-off, falling for landing.
   jet: (up = true) => voice({ wave: 'noise', freq: up ? 300 : 2200, slideTo: up ? 2600 : 350, filter: 'bandpass', attack: 0.12, decay: 0.2, sustain: 0.7, hold: 0.35, release: 0.5, vol: 0.09 }),
   // Structural crack: a sharp noise snap over a low thud.

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeGround, makeCoin, makeEgg, makeFlagMarker } from './meshes.js';
+import { makeGround, makeCoin, makeEgg, makeFlagMarker, setBrake } from './meshes.js';
 import { rand } from './util.js';
 import { sfx } from './sfx.js';
 
@@ -15,6 +15,24 @@ export const OFF_EDGE = 11.6; // carried this far is off screen and lost
 export const GW = 120;       // ground width: far past any camera edge, even tilted
 export const VERGE_W = 1.1;  // width of the darker strip marking the edge of play
 export const DETAIL_W = 60;  // repeated details (dashes, stripes, sleepers) only span this
+const EASE = 2.5;            // v per second: how a staller slows and how anything pulls away
+// Halting lanes (roads) brake for a procession. A vehicle sights a blocker
+// HALT_PAD + speed·HALT_LOOK ahead of its bumper and eases to 0 at
+// EASE·(1 + HALT_GAIN·(followers − 1)): one follower brakes like a staller and
+// its stop ends right at HALT_PAD (HALT_LOOK is 1/EASE); more brake harder.
+const HALT_PAD = 1.2;
+const HALT_GAIN = 0.6;
+const HALT_LOOK = 1 / EASE;
+// Following. A driver notices the vehicle ahead slowing (v under BRAKE_SEEN)
+// only after REACT seconds, holding speed until then: a gentle staller gives
+// the queue time, a hard halt does not, and a close queue rear-ends it. Once
+// reacting, the follower eases to the pace ahead at FOLLOW_BRAKE, scaled down
+// by how far inside gapMin it sits so a queue opens back out as it moves.
+const REACT = 0.4;
+const BRAKE_SEEN = 0.9;
+const FOLLOW_BRAKE = 4;
+const TOUCH = 0.05;          // bumpers this close have met
+const CRASH_DV = 0.15;       // meeting while this much faster than the vehicle ahead is a crash
 
 // One board row. Scenarios fill it through these helpers; the board and the
 // player only read the fields (blocked, coins, movers, dir, speed).
@@ -33,6 +51,8 @@ export class Lane {
     this.movers = [];
     this.dir = 0;
     this.speed = 0;
+    this.halts = false;      // traffic brakes for a procession (roads)
+    this.blockers = null;    // [{ x, n }] cells held by a player and followers, refreshed per frame
     this.data = {};          // scenario-private state
   }
 
@@ -179,8 +199,20 @@ export class Lane {
     return null;
   }
 
+  // Strength of the nearest blocker in this mover's look-ahead, 0 for none.
+  blockerAhead(m) {
+    if (!this.blockers?.length) return 0;
+    const front = m.x + this.dir * m.len / 2;
+    const look = HALT_PAD + this.speed * HALT_LOOK;
+    let n = 0;
+    for (const b of this.blockers) {
+      const d = (b.x - front) * this.dir;
+      if (d > -0.3 && d < look) n = Math.max(n, b.n);
+    }
+    return n;
+  }
+
   advance(dt) {
-    const n = this.movers.length;
     // Stallers: go -> slowing -> stopped -> go, each phase eased.
     for (const m of this.movers) {
       if (!m.staller) continue;
@@ -190,24 +222,46 @@ export class Lane {
         st.phase = st.phase === 'go' ? 'stop' : 'go';
         st.wait = st.phase === 'stop' ? rand(1, 3) : rand(4, 12);
       }
-      const target = st.phase === 'stop' ? 0 : 1;
-      m.v += (target - m.v) * Math.min(1, dt * 2.5);
+      if (!this.halts) m.v += ((st.phase === 'stop' ? 0 : 1) - m.v) * Math.min(1, dt * EASE);
     }
-    // Car following: nobody closes on the vehicle ahead past the minimum gap.
+    // Car following, nearest ahead first so a wreck this frame is skipped by
+    // whoever was behind it: they follow the survivor instead.
     const ordered = [...this.movers].sort((a, b) => a.x * this.dir - b.x * this.dir);
+    const n = ordered.length;
     const gapMin = this.gapMin ?? 0;
     for (let i = 0; i < n; i++) {
-      const m = ordered[i], ahead = ordered[(i + 1) % n];
+      const m = ordered[i];
+      if (m.wrecked) continue;
+      let ahead = null, wrap = false;
+      for (let k = 1; k < n && !ahead; k++) { const o = ordered[(i + k) % n]; if (!o.wrecked) { ahead = o; wrap = i + k >= n; } }
+      let gap = ahead ? (ahead.x - m.x) * this.dir - (ahead.len + m.len) / 2 + (wrap ? 2 * SPAN : 0) : Infinity;
+      if (this.halts && !m.reckless) {
+        // Own braking: a blocker ahead, or a staller's stop; otherwise pull toward full speed.
+        let target = 1, rate = EASE;
+        if (m.staller?.phase === 'stop') target = 0;
+        const hold = this.blockerAhead(m);
+        if (hold) { target = 0; rate = EASE * (1 + HALT_GAIN * (hold - 1)); }
+        // Inside gapMin the vehicle ahead sets the pace, once its slowing has been seen.
+        if (ahead && gapMin > 0 && gap < gapMin && (ahead.braking ?? 0) >= REACT) {
+          const pace = (ahead.v ?? 1) * Math.min(1, Math.max(0, gap) / gapMin);
+          if (pace < target) { target = pace; rate = FOLLOW_BRAKE; }
+        }
+        m.v += (target - m.v) * Math.min(1, dt * rate);
+        m.braking = m.v < BRAKE_SEEN ? (m.braking ?? 0) + dt : 0;
+        const lit = target < m.v - 0.02;
+        if (lit !== !!m.lit) { m.lit = lit; setBrake(m.mesh, lit); }
+      }
       let v = m.v ?? 1;
       let step = this.speed * v * dt;
-      if (n > 1 && gapMin > 0) {
-        let gap = (ahead.x - m.x) * this.dir - (ahead.len + m.len) / 2;
-        if (i === n - 1) gap += 2 * SPAN;
+      if (ahead && gapMin > 0) {
         if (m.reckless) {
           // Never brakes: closes to the bumper, then crashes into anything slower or rides it.
-          if (gap <= 0.05 && v > (ahead.v ?? 1) + 0.02) { this.crash(m, ahead); break; }
-          if (gap <= 0.05) v = Math.min(v, ahead.v ?? 1);
+          if (gap <= TOUCH && v > (ahead.v ?? 1) + 0.02) { this.crash(m, ahead); continue; }
+          if (gap <= TOUCH) v = Math.min(v, ahead.v ?? 1);
           step = Math.min(this.speed * v * dt, Math.max(0, gap));
+        } else if (this.halts) {
+          if (gap <= TOUCH && v > (ahead.v ?? 1) + CRASH_DV) { this.crash(m, ahead); continue; }
+          step = Math.min(step, Math.max(0, gap));   // never through the bumper
         } else {
           if (gap < gapMin) v = Math.min(v, ahead.v ?? 1);
           step = Math.min(this.speed * v * dt, Math.max(0, gap - gapMin + 0.02));   // never past the minimum gap
@@ -220,13 +274,13 @@ export class Lane {
     }
   }
 
-  // Two vehicles meet: both break apart and the lane runs one short for a while.
+  // Two vehicles meet: the faster one breaks apart and the slower one drives on.
   crash(a, b) {
+    const m = (a.v ?? 1) >= (b.v ?? 1) ? a : b;
     const fx = this.world?.config?.fx;
-    for (const m of [a, b]) {
-      if (fx) fx.explode(m.mesh, 1.1); else this.group.remove(m.mesh);
-      this.movers = this.movers.filter((o) => o !== m);
-    }
+    if (fx) fx.explode(m.mesh, 1.1); else this.group.remove(m.mesh);
+    m.wrecked = true;
+    this.movers = this.movers.filter((o) => o !== m);
     sfx.boom(1.2);
   }
 

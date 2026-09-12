@@ -5,6 +5,7 @@ import { sfx } from './sfx.js';
 
 const STEP_MS = 55;      // per count tick
 const LINE_GAP = 350;    // pause after a line lands
+const STAMP_MS = 190;    // per follower stamp
 
 export class Summary {
   constructor(ui) {
@@ -13,8 +14,10 @@ export class Summary {
   }
 
   // lines: [{ label, count, each }] — value = count × each. The total is scaled by
-  // `mul` (shown as its own line when it is not 1) and handed to onTotal once.
-  show(title, lines, { mul = 1, onTotal = () => {}, done = () => {} } = {}) {
+  // `mul` (shown as its own line when it is not 1) and by the follower stamps,
+  // then handed to onTotal once. stamps: { count, image(i) → data URL or null,
+  // each } — every stamp adds `each` to a multiplier that starts at 1.
+  show(title, lines, { mul = 1, stamps = null, onTotal = () => {}, done = () => {} } = {}) {
     this.clear();
     this.ui.summary.classList.add('show');
     this.ui.summaryTitle.textContent = title;
@@ -40,6 +43,31 @@ export class Summary {
       at += steps * STEP_MS + LINE_GAP;
     });
 
+    let fmul = 1;
+    if (stamps?.count) {
+      const { count, image = () => null, each = 0.5 } = stamps;
+      const row = document.createElement('div');
+      row.className = 'row stamps';
+      row.innerHTML = '<span class="label">FLOCK <span class="strip"></span></span><span class="value">×1.0</span>';
+      const strip = row.querySelector('.strip');
+      const value = row.querySelector('.value');
+      later(at, () => { body.appendChild(row); });
+      for (let i = 0; i < count; i++) {
+        later(at + LINE_GAP + i * STAMP_MS, () => {
+          const url = image(i);
+          const el = document.createElement(url ? 'img' : 'span');
+          el.className = 'stamp';
+          if (url) el.src = url; else el.textContent = '●';
+          strip.appendChild(el);
+          fmul = 1 + (i + 1) * each;
+          value.textContent = `×${fmul.toFixed(1)}`;
+          sfx.tick(); sfx.doot(Math.min(i, 14));
+        });
+      }
+      later(at + LINE_GAP + count * STAMP_MS + 40, () => { sfx.register(); });
+      at += LINE_GAP + count * STAMP_MS + LINE_GAP;
+    }
+
     if (mul !== 1) {
       const row = document.createElement('div');
       row.className = 'row';
@@ -56,7 +84,7 @@ export class Summary {
     this.ready = false;
     this.done = done;
     later(at + 200, () => {
-      const scaled = Math.round(total * mul);
+      const scaled = Math.round(total * mul * fmul);
       totalRow.innerHTML = `<span class="label">TOTAL</span><span class="value">${scaled}</span>`;
       body.appendChild(totalRow);
       sfx.register();

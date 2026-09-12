@@ -30,7 +30,20 @@ const CAR_COLORS = [0xe0473a, 0x3a7be0, 0xf2c53d, 0xffffff, 0x8f3ae0, 0x3ac9a8, 
 const GLASS = 0x8fd0ff, TIRE = 0x222222;
 // Lamps are unlit so they read as glowing at night without any effect.
 const HEADLAMP = new THREE.MeshBasicMaterial({ color: 0xfff6c8 });
-const TAILLAMP = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
+const TAILLAMP = new THREE.MeshBasicMaterial({ color: 0xb0201a });
+const BRAKELAMP = new THREE.MeshBasicMaterial({ color: 0xff5a4a });
+// Tail lamps are tagged so setBrake can find them.
+const tail = (...a) => { const b = box(...a); b.userData.tail = true; return b; };
+
+// Brake lights: the tail lamps flare and swell while a vehicle is slowing.
+export function setBrake(mesh, on) {
+  mesh.traverse((o) => {
+    if (!o.userData.tail) return;
+    o.material = on ? BRAKELAMP : TAILLAMP;
+    o.userData.s0 ??= o.scale.clone();          // boxes are sized by scale
+    o.scale.copy(o.userData.s0).multiplyScalar(on ? 1.6 : 1);
+  });
+}
 
 // Vehicles are modeled driving toward +x.
 export function makeCar() {
@@ -42,8 +55,8 @@ export function makeCar() {
   for (const sx of [-0.55, 0.55]) for (const sz of [-0.42, 0.42]) g.add(box(0.35, 0.3, 0.15, TIRE, sx, 0.05, sz));
   g.add(box(0.06, 0.15, 0.2, HEADLAMP, 0.86, 0.4, 0.28));  // headlights
   g.add(box(0.06, 0.15, 0.2, HEADLAMP, 0.86, 0.4, -0.28));
-  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -0.86, 0.4, 0.28)); // tail lights
-  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -0.86, 0.4, -0.28));
+  g.add(tail(0.06, 0.12, 0.2, TAILLAMP, -0.86, 0.4, 0.28)); // tail lights
+  g.add(tail(0.06, 0.12, 0.2, TAILLAMP, -0.86, 0.4, -0.28));
   return { mesh: g, len: 1.7 };
 }
 
@@ -55,8 +68,8 @@ export function makeTruck() {
   g.add(box(1.9, 1.05, 0.95, 0xe6e6e6, -0.5, 0.25, 0));       // trailer
   g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.42, 0.35, 0.3));
   g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.42, 0.35, -0.3));
-  g.add(box(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, 0.35));
-  g.add(box(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, -0.35));
+  g.add(tail(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, 0.35));
+  g.add(tail(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, -0.35));
   for (const sx of [-1.15, -0.45, 1.0]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
   return { mesh: g, len: 2.9 };
 }
@@ -255,8 +268,8 @@ export function makeFlatbed() {
   g.add(box(0.08, 0.5, 0.95, 0x3a2c20, 0.52, 0.45, 0));       // headboard
   g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.52, 0.35, 0.3));
   g.add(box(0.06, 0.15, 0.2, HEADLAMP, 1.52, 0.35, -0.3));
-  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, 0.35));
-  g.add(box(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, -0.35));
+  g.add(tail(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, 0.35));
+  g.add(tail(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, -0.35));
   for (const sx of [-1.2, -0.4, 1.05]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
   return { mesh: g, len: 3.1, bed: [-1.55, 0.55], rideY: 0.45, offCause: 'hauled' };
 }
@@ -469,7 +482,7 @@ function car(g, kind, x, last) {
     g.add(box(CAR_LEN + 0.1, 0.08, 0.94, 0x333333, x, 1.1));
   }
   wheels(g, x, CAR_LEN, 2);
-  if (last) g.add(box(0.08, 0.16, 0.2, TAILLAMP, x - CAR_LEN / 2 - 0.02, 0.6));
+  if (last) g.add(tail(0.08, 0.16, 0.2, TAILLAMP, x - CAR_LEN / 2 - 0.02, 0.6));
   return beds;
 }
 
