@@ -14,11 +14,28 @@ const BUTTONS = [
 ];
 
 export function wantsTouch() {
-  return new URLSearchParams(location.search).has('touch') || matchMedia('(pointer: coarse)').matches;
+  return new URLSearchParams(location.search).has('touch')
+    || matchMedia('(pointer: coarse)').matches
+    || matchMedia('(any-pointer: coarse)').matches
+    || navigator.maxTouchPoints > 0
+    || 'ontouchstart' in window;
 }
 
+let installed = false;
+
+// Build the bar now if the device looks touch-driven; otherwise wait for the
+// first real touch and build it then (device emulation and hybrids).
 export function installTouch(root) {
-  if (!wantsTouch()) return false;
+  if (wantsTouch()) return build(root);
+  const onTouch = (e) => { if (e.pointerType && e.pointerType !== 'touch') return; build(root); };
+  addEventListener('touchstart', onTouch, { once: true, passive: true });
+  addEventListener('pointerdown', onTouch, { once: true });
+  return false;
+}
+
+function build(root) {
+  if (installed) return true;
+  installed = true;
   document.body.classList.add('touch');
   const bar = document.createElement('div');
   bar.id = 'touchbar';
