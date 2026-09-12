@@ -82,7 +82,7 @@ export default {
     const ordered = [...lane.movers].sort((a, b) => a.x * lane.dir - b.x * lane.dir);
     for (let i = 0; i < ordered.length; i++) {
       const m = ordered[i], ahead = ordered[(i + 1) % ordered.length];
-      if (ordered.length > 1 && m.y < 1 && ahead.y < 1) {
+      if (ordered.length > 1 && m.y < 1.5 && ahead.y < 1.5) {     // descending planes queue up before touchdown
         let gap = (ahead.x - m.x) * lane.dir - (ahead.len + m.len) / 2;
         if (i === ordered.length - 1) gap += 2 * SPAN;
         if (gap < 1.2) m.v = Math.min(m.v, ahead.v);

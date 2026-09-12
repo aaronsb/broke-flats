@@ -166,7 +166,8 @@ export class Lane {
         let gap = (ahead.x - m.x) * this.dir - (ahead.len + m.len) / 2;
         if (i === n - 1) gap += 2 * SPAN;
         if (gap < gapMin && !m.reckless) v = Math.min(v, ahead.v ?? 1);
-        else if (gap < 0.05 && m.reckless && v > (ahead.v ?? 1) + 0.2) { this.crash(m, ahead); break; }
+        else if (m.reckless && gap < 0.05 && v > (ahead.v ?? 1) + 0.02) { this.crash(m, ahead); break; }
+        else if (m.reckless && gap < 0.05) v = Math.min(v, ahead.v ?? 1);   // same speed: ride the bumper, never overlap
       }
       m.x += this.dir * this.speed * v * dt;
       if (m.x > SPAN) m.x -= 2 * SPAN;
