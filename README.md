@@ -43,7 +43,9 @@ make dev        # Vite dev server on :5173
 make            # list all targets
 ```
 
-`make smoke S=<scenario>` drives the game in headless Chrome over the DevTools Protocol and reports runtime errors. `make shots` captures one screenshot per view into `docs/screenshots/`. Both need `google-chrome-stable`.
+`make smoke S=<scenario>` drives the game in headless Chrome over the DevTools Protocol and reports runtime errors; `make` lists the scenarios. `make smoke S=phone` and `S=tablet` replay a whole run at a device shape — intro, title, character pick, board, peek, battle — which is where the window-shape bugs live. `make shots` captures one screenshot per view into `docs/screenshots/`; everything else writes to the gitignored `shots/`.
+
+Both need a Chrome binary: `google-chrome-stable`, or a path in `CHROME_BIN`. See [the verify-game skill](.claude/skills/verify-game/SKILL.md) for the loop and [its reference](.claude/skills/verify-game/reference.md) for the handles a scenario can reach inside the running game.
 
 Pushes to `main` build and deploy to GitHub Pages.
 

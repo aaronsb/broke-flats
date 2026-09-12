@@ -18,11 +18,32 @@ The Claude-in-Chrome tab cannot reach this machine's dev server. Everything is v
 
 `make smoke` and `make shots` start a Vite server on :5173 if one is not already running.
 
+The harness runs `google-chrome-stable`. Where that binary does not exist — a
+container, a machine with only Chromium — put a path in `CHROME_BIN`:
+`CHROME_BIN=/opt/pw-browsers/chromium-1194/chrome-linux/chrome make smoke S=hops`.
+
 ## Scenario names
 
-`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `gauntlet` (scenario mechanics) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `shots`.
+`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, battle pilots) · `battle` (kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `gauntlet` (scenario mechanics) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
 
 The list lives in `scripts/smoke.mjs`; `make` prints it.
+
+## Device shapes
+
+`touch.png` only ever framed the crossing board, so nothing was watching the
+title, the character row or the battle at a phone's proportions — and that is
+where they broke. `phone` (400x720) and `tablet` (820x1180) share one branch and
+play a whole run: intro, title, a pick two along, the board, a peek, the battle,
+an aim cycle. They write `<shape>-intro`, `-title`, `-select`, `-play`, `-iso`,
+`-battle` and `-battle-sea`.
+
+Run them after touching anything that reads the window: CSS with a width in it,
+the camera presets, `select.js`, or the touch bar. Two rules of thumb the shapes
+keep proving:
+
+- A camera preset with a fixed distance frames badly off 16:9. Derive it.
+- A tall window is not a wide one with more rows. Text sized to `max-content`
+  and hit targets pinned to the bottom both stop fitting.
 
 ## Timing caveat
 
@@ -33,6 +54,16 @@ Software-rendered Chrome runs the game clock slower than wall time. Waits in the
 Add a branch `if (script === 'name') { await start(); ... }` in `scripts/smoke.mjs`. Tools available inside: `key(code, key)`, `evaluate(js)`, `state()`, `send(cdpMethod, params)`, and screenshots via `Page.captureScreenshot`. The page exposes `window.__game` (the Game) and `window.__meshes` (mesh factories) in dev builds; force states through them (`__game.debug.force = 'rail'; __game.restartStage()`, `__game.mode.finished = true`, `__game.mode.players[0].die('car')`). See `reference.md` for snippets.
 
 Add the new name to the `smoke:` help line in the `Makefile` and to the list above.
+
+Two traps when a scenario takes screenshots:
+
+- **Anchor to state, not to elapsed time.** Module load and capture latency both
+  drift under swiftshader, so a chain of `sleep`s walks off the thing you meant
+  to catch. Poll for the state first (`while (!(await evaluate(shown))) await
+  sleep(50)`), take `Date.now()` there, and shoot at offsets from it.
+- **`Page.captureScreenshot` is slow enough to matter** — hundreds of ms each.
+  Deltas between shots accumulate that cost; absolute offsets from the anchor do
+  not.
 
 ## Playtest by hand
 

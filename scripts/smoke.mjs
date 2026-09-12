@@ -25,6 +25,11 @@ await send('Page.enable');
 await send('Page.navigate', { url: 'http://localhost:5173/' });
 await sleep(2500);
 const start = async () => { await key('Enter', 'Enter'); await sleep(4500); console.log('start', await state()); };
+// Screenshots land in shots/ unless OUT says otherwise (make shots points it at
+// docs/screenshots). shots/ is gitignored, so running a scenario by hand never
+// drops PNGs in the repo root.
+const OUT = process.env.OUT ?? 'shots';
+(await import('node:fs')).mkdirSync(OUT, { recursive: true });
 const script = process.argv[2] ?? 'hops';
 if (script === 'hops') {
   await start();
@@ -72,7 +77,7 @@ if (script === 'touch') {
   console.log('hopped', await evaluate(`__game.mode.players[0].row`));
   const fsT = await import('node:fs');
   const r = await send('Page.captureScreenshot', { format: 'png' });
-  fsT.writeFileSync(`${process.env.OUT ?? '.'}/touch.png`, Buffer.from(r.data, 'base64'));
+  fsT.writeFileSync(`${OUT}/touch.png`, Buffer.from(r.data, 'base64'));
 }
 if (script === 'respawn') {
   await start();
@@ -121,7 +126,7 @@ if (script === 'rail') {
   console.log('rail', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'rail'); const types = {}; for (const l of rows) types[l.data.train.type] = (types[l.data.train.type] ?? 0) + 1; return [rows.length, types, rows.filter(l => l.data.train.beds.length).length, rows.filter(l => l.blocked.size).length, rows.reduce((a, l) => a + l.data.puffs.length, 0)] })()`));
   const fsR = await import('node:fs');
   const r = await send('Page.captureScreenshot', { format: 'png' });
-  fsR.writeFileSync(`${process.env.OUT ?? '.'}/rail-top.png`, Buffer.from(r.data, 'base64'));
+  fsR.writeFileSync(`${OUT}/rail-top.png`, Buffer.from(r.data, 'base64'));
 }
 if (script === 'gauntlet') {
   await start();
@@ -308,7 +313,7 @@ if (script === 'debug') {
 }
 if (script === 'phone' || script === 'tablet') {
   const fs = await import('node:fs');
-  const out = process.env.OUT ?? '.';
+  const out = OUT;
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${n}.png`, Buffer.from(r.data, 'base64')); };
   // A real device shape: the badge, the picks, the framed intro and the board
   // all have to share it. Tablet portrait is the other side of the camera cap.
@@ -338,7 +343,7 @@ if (script === 'phone' || script === 'tablet') {
 }
 if (script === 'logo') {
   const fs = await import('node:fs');
-  const out = process.env.OUT ?? '.';
+  const out = OUT;
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${n}.png`, Buffer.from(r.data, 'base64')); };
   // Reload so the attract intro runs from the top. Module load time varies, so
   // anchor to the frame actually appearing, then shoot at offsets from there.
@@ -361,16 +366,16 @@ if (script === 'shots') {
   // so select.png shows the character select rather than the framed sign.
   for (let i = 0; i < 200 && !(await evaluate(`document.getElementById('intro')?.hidden !== false`)); i++) await sleep(100);
   await sleep(600);
-  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select.png`, Buffer.from(r.data, 'base64')); }
+  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${OUT}/select.png`, Buffer.from(r.data, 'base64')); }
   await key('KeyI', 'i'); await sleep(6000);
-  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/about.png`, Buffer.from(r.data, 'base64')); }
+  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${OUT}/about.png`, Buffer.from(r.data, 'base64')); }
   await key('Escape', 'Escape'); await sleep(300);
   await key('ArrowRight'); await sleep(400);
-  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${process.env.OUT ?? '.'}/select-spin.png`, Buffer.from(r.data, 'base64')); }
+  { const r = await send('Page.captureScreenshot', { format: 'png' }); fs0.writeFileSync(`${OUT}/select-spin.png`, Buffer.from(r.data, 'base64')); }
   await start();
   // Screenshots of each view for eyeballing. Written to OUT (default: cwd).
   const fs = await import('node:fs');
-  const out = process.env.OUT ?? '.';
+  const out = OUT;
   const shot = async (name) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')); };
   await evaluate(`__game.debug.god = true; __game.mode.player.invincible = true`);
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
