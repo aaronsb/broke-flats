@@ -345,6 +345,8 @@ if (script === 'battle') {
     if (i === 4) await key('ShiftLeft', 'Shift');
   }
   console.log('battle mid', await state(), await evaluate(`[__game.mode.targets.length, __game.mode.eggs.length, __game.mode.points]`));
+  // Force a head-on: two land targets placed nose to nose, then one frame.
+  console.log('collision', await evaluate(`(() => { const m = __game.mode; m.spawn('land'); m.spawn('land'); const [a, b] = m.targets.filter(t => t.kind === 'land').slice(-2); a.x = 0; b.x = 0.5; a.dir = 1; b.dir = -1; const before = m.targets.length; m.update(0.016); return [before, m.targets.length, m.debris.pieces.length > 0]; })()`));
   await evaluate(`__game.mode.timeLeft = 0.1`);
   await sleep(3500);
   console.log('next level', await state());

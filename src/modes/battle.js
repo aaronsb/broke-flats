@@ -216,14 +216,33 @@ export class BattleMode {
     sfx.plink();
   }
 
-  spawn(kind) {
+  // Two targets meeting on the same row wreck each other; replacements come in
+  // from opposite ends so they cannot meet again at the edge.
+  collide() {
+    const hit = [];
+    const list = this.targets;
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.kind === b.kind && Math.abs(a.x - b.x) < (a.len + b.len) / 2 - 0.2) { hit.push(a, b); }
+      }
+    }
+    if (!hit.length) return;
+    const dead = new Set(hit);
+    for (const t of dead) this.debris.explode(t.mesh, 1.2);
+    this.targets = list.filter((t) => !dead.has(t));
+    sfx.boom(1.3);
+    if (!this.ending) for (const t of dead) this.spawn(t.kind, t.dir);
+  }
+
+  spawn(kind, dir = pick(-1, 1)) {
     const train = kind === 'land' && Math.random() < 0.15;
     const t = train ? makeTrain(pick('steam', 'diesel', 'bullet'), Array.from({ length: randInt(2, 4) }, () => 'closed'))
       : kind === 'land' ? (Math.random() < 0.3 ? makeTruck() : makeCar())
       : kind === 'sea' ? makeBoat() : makePlane();
     t.kind = kind;
     t.points = train ? 60 : POINTS[kind];
-    t.dir = pick(-1, 1);
+    t.dir = dir;
     const base = train ? rand(5, 7) : kind === 'sea' ? rand(1.5, 2.5) : kind === 'air' ? rand(5, 7.5) : rand(3, 4.5);
     t.speed = base + this.game.level.difficulty * 0.5;
     t.z = ROWS[kind];
@@ -279,6 +298,7 @@ export class BattleMode {
       if (gone) this.group.remove(t.mesh);
       return !gone;
     });
+    this.collide();
     this.updateTipping(dt);
     this.debris.update(dt);
 
