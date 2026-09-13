@@ -1,5 +1,5 @@
 // Headless smoke test over CDP: load the game, play some hops, report errors.
-const PORT = 9333;
+const PORT = Number(process.env.CDP_PORT ?? 9333);   // a private Chrome when :9333 is taken
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pages = await (await fetch(`http://localhost:${PORT}/json`)).json();
 const ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
@@ -33,6 +33,17 @@ const start = async () => { await key('Enter', 'Enter'); await sleep(4500); cons
 const OUT = process.env.OUT ?? 'shots';
 (await import('node:fs')).mkdirSync(OUT, { recursive: true });
 const script = process.argv[2] ?? 'hops';
+// Barrier variants, each shot straight down and tilted with the player at the
+// weak column two rows short of the row, in a scenery that suits it.
+const BARRIERS = { hedge: 'forest', trees: 'forest', busStop: 'city', picket: 'residential', chainlink: 'parking', wall: 'city' };
+const barrierShots = async (v, shot) => {
+  await evaluate(`__game.debug.force = '${v}'; __game.debug.sky = 'day'; __game.debug.scenery = '${BARRIERS[v]}'; __game.run.level = 1; __game.restartStage(); __game.run.coins = 50`); await sleep(500);
+  for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
+  await evaluate(`(() => { const p = __game.mode.player; const l = __game.mode.world.laneAt(p.row + 1); const c = l.data.weak ?? 0; p.x = c; p.col = c; p.mesh.position.x = c; })()`);
+  await sleep(700); await shot(`barrier-${v}-top`);
+  await key('Space', ' '); await sleep(1500); await shot(`barrier-${v}-iso`);
+  await key('Space', ' '); await sleep(300);
+};
 if (script === 'hops') {
   await start();
   for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(220); }
@@ -571,6 +582,62 @@ if (script === 'logo') {
   console.log('still held off 3s later:', (await evaluate(shown)) === false);
   console.log('logo shots written to', out);
 }
+if (script === 'barrier') {
+  // Every barrier variant: one weak cell, passable for all and hinted, the rest
+  // blocked; a hop through it lands and a hop into a neighbour is refused.
+  const fsB = await import('node:fs');
+  const load = async (q) => { await send('Page.navigate', { url: BASE + q }); await sleep(3500); };
+  const check = (ok, msg) => { if (!ok) errors.push(`barrier: ${msg}`); };
+  const shot = async (name) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fsB.writeFileSync(`${OUT}/${name}.png`, Buffer.from(r.data, 'base64')); };
+  for (const id of Object.keys(BARRIERS)) {
+    await load(`?start&force=${id}&god&coins=50&chars=robot`);   // the robot passes nothing: a fence refuses it too
+    const res = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world;
+      const lane = [...w.rows.values()].filter(l => l.scenario.id === '${id}' && l.r > p.row && l.data.weak !== undefined).sort((a, b) => a.r - b.r)[0];
+      if (!lane) return { none: true };
+      const weak = lane.data.weak; let blockedAll = 0;
+      for (let c = -8; c <= 8; c++) if (w.isBlocked(c, lane.r, lane.r - 1)) blockedAll++;
+      const park = (c) => { p.row = lane.r - 1; p.z = -p.row; p.x = c; p.col = c; p.mesh.position.set(c, 0, p.z); };
+      const run = () => { for (let i = 0; i < 40 && p.moving; i++) p.update(0.02); };
+      park(weak); p.hop(0, 1); run(); const through = p.row - lane.r;
+      const other = weak > 0 ? weak - 1 : weak + 1;
+      park(other); p.hop(0, 1); run(); const into = p.row - lane.r;
+      return { r: lane.r, weak, hidden: !!lane.data.hidden, blockedAll, weakBlocked: w.isBlocked(weak, lane.r, lane.r - 1), through, into, kinds: [...new Set(lane.kinds.values())] }; })()`);
+    console.log(id, res);
+    check(!res.none, `${id}: no row was built`);
+    if (res.none) continue;
+    check(res.hidden, `${id}: the row does not hint`);
+    check(Math.abs(res.weak) < 8 && !res.weakBlocked, `${id}: the weak cell ${res.weak} is blocked`);
+    check(res.blockedAll === 16, `${id}: ${res.blockedAll} cells blocked, expected 16`);
+    check(res.through === 0, `${id}: the hop through the weakness did not land (row ${res.through})`);
+    check(res.into === -1, `${id}: a hop into a blocked cell was not refused (row ${res.into})`);
+    await barrierShots(id, shot);
+  }
+  // Level 3: a band of three lays two rows around an open corridor, weaknesses apart.
+  await load('?start&level=3&force=wall&god');
+  const dbl = await evaluate(`(() => { const w = __game.mode.world; const s = [...w.rows.values()].find(l => l.scenario.id === 'wall').scenario;
+    w.queue = [0, 1, 2].map(i => ({ scenario: s, index: i, count: 3 })); const r0 = w.nextRow; w.ensure(r0 + 2);
+    const a = w.rows.get(r0), mid = w.rows.get(r0 + 1), b = w.rows.get(r0 + 2);
+    const bands = [...w.rows.values()].filter(l => l.scenario.id === 'wall' && l.data.weak === undefined).length;
+    return { a: a.data.weak, b: b.data.weak, corridor: mid.blocked.size, coins: mid.coins.size, pathCol: w.pathCol, naturalDoubles: bands }; })()`);
+  console.log('double band', dbl);
+  check(Math.abs(dbl.a - dbl.b) >= 4, `double band weaknesses ${dbl.a} and ${dbl.b} are too close`);
+  check(dbl.corridor === 0 && dbl.coins === 1, 'the corridor row is not open with a coin');
+  check(dbl.pathCol === dbl.b, 'pathCol does not follow the second row');
+  // Sequencer: a barrier follows a road band well over its share of the weights.
+  const seq = await evaluate(`(() => { const w = __game.mode.world; Object.assign(w, { queue: [], lastUsed: {}, done: false, dangerBands: 0 });
+    // The wall's own weight is nil and its gap is off, so every wall after a road is the follow roll.
+    w.config.weights = { road: 5, wall: 0.0001 }; w.config.ignoreGaps = true; w.config.bands = 1e9; w.config.level = 1;
+    const specs = []; for (let r = 100; r < 900; r++) { const q = w.nextSpec(r); specs.push({ id: q.scenario.id, index: q.index }); }
+    let roads = 0, followed = 0;   // a band starts at index 0; one road band may run straight into the next
+    for (let i = 0; i < specs.length; i++) {
+      if (specs[i].id !== 'road' || specs[i].index !== 0) continue;
+      roads++; let j = i + 1; while (j < specs.length && specs[j].id === 'road' && specs[j].index !== 0) j++;
+      if (specs[j]?.id === 'meadow' && specs[j + 1]?.id === 'wall') followed++;
+    }
+    return { roads, followed, share: +(followed / roads).toFixed(2) }; })()`);
+  console.log('follows', seq);
+  check(seq.share > 0.25 && seq.share < 0.55, `${seq.share} of road bands were followed by a barrier, expected about 0.4`);
+}
 if (script === 'shots') {
   const fs0 = await import('node:fs');
   // The attract intro takes the screen for a stretch of every loop; wait it out
@@ -623,11 +690,14 @@ if (script === 'shots') {
   await sleep(1500); await shot('runway-top');
   await key('Space', ' '); await sleep(1500); await shot('runway-iso');
   await key('Space', ' '); await sleep(300);
-  await evaluate(`__game.debug.force = 'hedge'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
-  for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(200); }
-  await sleep(400); await shot('hedge-top');
-  await key('Space', ' '); await sleep(1500); await shot('hedge-iso');
+  for (const v of Object.keys(BARRIERS)) await barrierShots(v, shot);
+  await evaluate(`__game.debug.force = 'freight'; __game.debug.sky = 'day'; __game.debug.scenery = null; __game.run.level = 1; __game.restartStage()`); await sleep(600);
+  for (let i = 0; i < 3; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(600); await shot('freight-top');
+  await evaluate(`__game.run.coins = 50`);
+  await key('Space', ' '); await sleep(1500); await shot('freight-iso');
   await key('Space', ' '); await sleep(300);
+  await evaluate(`__game.debug.scenery = null`);
   await evaluate(`__game.mode.player.invincible = false; __game.mode.player.die('car')`); await sleep(1500); await shot('game-over');
 }
 if (script === 'coop') {
@@ -807,6 +877,284 @@ if (script === 'perks2') {
   if (held.scattered !== 0 || held.v > 0.2) errors.push('perks2: a honk moved a car that was halted for a blocker');
   const chickenHonk = await evaluate(`(() => { const p = __game.mode.players[0]; p.honk = false; return __game.mode.honk(p); })()`);
   if (chickenHonk !== 0) errors.push('perks2: a non-goose honked');
+}
+if (script === 'powerups') {
+  // Crates and the powerup registry (src/powerups.js). A crate placed in front
+  // of the player is a plain box top-down and shows its item tilted; hopping
+  // onto it grants the power, for 1.5x the time when the grab was a peek.
+  // Then each of the first five powers is granted directly and its effect read.
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  const check = (ok, msg) => { if (!ok) errors.push(`powerups: ${msg}`); };
+  const crateAhead = (id) => evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row + 1); lane.crate(p.col, ${JSON.stringify(id)}); return lane.crates.get(p.col).id; })()`);
+  const crateState = () => evaluate(`(() => { const p = __game.mode.players[0]; const c = __game.mode.world.laneAt(p.row + 1).crates.get(p.col); return c ? { item: c.item.visible, tilted: __game.mode.tilted } : null; })()`);
+  const power = (id) => evaluate(`(() => { const p = __game.mode.players[0]; const e = p.powers.get(${JSON.stringify(id)}); const el = document.getElementById('power');
+    return { active: !!e, left: e ? +e.left.toFixed(2) : null, chip: el.textContent, hidden: el.hidden }; })()`);
+
+  await send('Page.navigate', { url: BASE + '?start&force=grass&sky=day&coins=60' }); await sleep(3500);
+  await crateAhead('star'); await sleep(400);
+  const top = await crateState();
+  await shot('crate-top');
+  console.log('crate top-down', top);
+  check(top && !top.item && !top.tilted, `the crate item showed top-down (${JSON.stringify(top)})`);
+  await key('ArrowUp'); await sleep(800);
+  const star = await power('star');
+  console.log('hopped onto the star crate', star);
+  check(star.active && star.left > 6.5 && star.left <= 8, `star not granted at its base 8 s (${JSON.stringify(star)})`);
+  check(!star.hidden && star.chip.startsWith('STAR'), `HUD chip did not read STAR (${JSON.stringify(star.chip)})`);
+  check(await evaluate(`__game.mode.world.laneAt(__game.mode.players[0].row).crates.size`) === 0, 'the crate stayed on the board after the grab');
+
+  await evaluate(`__game.mode.players[0].clearPowers(); __game.mode.setTilt(true)`);
+  await crateAhead('hourglass'); await sleep(1800);
+  const iso = await crateState();
+  await shot('crate-iso');
+  console.log('crate tilted', iso);
+  check(iso && iso.item && iso.tilted, `the crate item stayed hidden while tilted (${JSON.stringify(iso)})`);
+  await key('ArrowUp'); await sleep(800);
+  const tilted = await power('hourglass');
+  console.log('hopped onto the hourglass crate, tilted', tilted);
+  check(tilted.active && tilted.left > 7.5 && tilted.left <= 9, `a tilted grab was not 1.5x (6 s -> 9 s) (${JSON.stringify(tilted)})`);
+  await evaluate(`__game.mode.players[0].clearPowers(); __game.mode.setTilt(false)`); await sleep(300);
+  check(await evaluate(`document.getElementById('power').hidden`), 'the HUD chip stayed up with nothing active');
+
+  // Magnet: a coin two cells to the right slides in and is taken.
+  const mag = await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row); const c = Math.round(p.x) + 2;
+    lane.takeCoin(c); lane.coin(c); const coins0 = __game.run.coins; p.grant('magnet'); window.__mag = { lane, c, coins0 };
+    return { c, coins0, active: p.hasPower('magnet') }; })()`);
+  let taken = false;
+  for (let i = 0; i < 40 && !taken; i++) { await sleep(100); taken = await evaluate(`!__mag.lane.coins.has(__mag.c)`); }
+  const coinsAfter = await evaluate(`__game.run.coins`);
+  console.log('magnet', { ...mag, taken, coinsAfter: +coinsAfter.toFixed(2) });
+  check(mag.active && taken && coinsAfter - mag.coins0 > 0.99, `the magnet did not pull in a coin two cells away (taken ${taken}, coins ${mag.coins0} -> ${coinsAfter})`);
+
+  // Whistle: two waiting followers run back and join the line at once.
+  const wh = await evaluate(`(() => { const p = __game.mode.players[0], t = __game.mode.trains[0]; p.clearPowers(); t.waiting = 2; const before = t.count; p.grant('whistle');
+    return { waiting: t.waiting, gained: t.count - before, instant: !p.hasPower('whistle') }; })()`);
+  console.log('whistle', wh);
+  check(wh.waiting === 0 && wh.gained === 2 && wh.instant, `the whistle did not bring 2 waiting followers back (${JSON.stringify(wh)})`);
+
+  // Golden egg: the tally multiplier per follower goes to 1.0 for the level.
+  const ge = await evaluate(`(() => { const p = __game.mode.players[0]; p.grant('goldenEgg'); return { mul: __game.mode.followerMul, active: p.hasPower('goldenEgg') }; })()`);
+  await sleep(300);
+  const geChip = await evaluate(`document.getElementById('power').textContent`);
+  console.log('golden egg', { ...ge, chip: geChip });
+  check(ge.mul === 1 && ge.active && geChip.includes('GOLDEN EGG'), `the golden egg did not set followerMul to 1 (${JSON.stringify(ge)})`);
+
+  // Star and hourglass need traffic: a road board.
+  await send('Page.navigate', { url: BASE + '?start&force=road&coins=60' }); await sleep(3500);
+  const starHit = await evaluate(`(() => { const p = __game.mode.players[0]; const w = __game.mode.world;
+    const lane = [...w.rows.values()].filter(l => l.scenario.id === 'road' && l.r > p.row).sort((a, b) => a.r - b.r)[0];
+    // The car nearest the centre, dragged onto the board if need be: off the
+    // board a star saves nobody, so the player must be on a playable cell.
+    const m = [...lane.movers].sort((a, b) => Math.abs(a.x) - Math.abs(b.x))[0]; const n0 = lane.movers.length;
+    if (Math.abs(m.x) > 6) { m.x = 0; m.mesh.position.x = 0; }
+    p.grant('star');
+    p.row = lane.r; p.z = -lane.r; p.x = m.x; p.col = Math.round(m.x); p.mesh.position.set(p.x, 0, p.z);
+    const pieces0 = __game.mode.fx.pieces.length;
+    p.update(0.02);                        // the hazard check finds the car under the player
+    const r = { alive: p.alive, movers: [n0, lane.movers.length], pieces: __game.mode.fx.pieces.length - pieces0, star: p.hasPower('star') };
+    p.row = 0; p.z = 0; p.x = 0; p.col = 0; p.mesh.position.set(0, 0, 0);   // back to safety before the star runs out
+    return r; })()`);
+  console.log('star vs car', starHit);
+  check(starHit.alive && starHit.star, 'the player died under a star');
+  check(starHit.movers[1] === starHit.movers[0] - 1 && starHit.pieces > 0, `the car did not explode (movers ${starHit.movers.join(' -> ')}, pieces ${starHit.pieces})`);
+  const flicker = await evaluate(`(() => { const p = __game.mode.players[0]; let owned = 0; p.mesh.traverse(o => { if (o.isMesh && o.userData.mat0) owned++; }); return owned; })()`);
+  check(flicker > 0, 'the star did not take over the player materials for the flicker');
+
+  const hg = await evaluate(`(() => { const p = __game.mode.players[0]; p.clearPowers(); const w = __game.mode.world;
+    const lanes = [...w.rows.values()].filter(l => l.scenario.id === 'road');
+    p.grant('hourglass'); window.__hg = { lanes, xs: lanes.map(l => l.movers.map(m => m.x)) };
+    return { frozen: w.frozen, laneFrozen: lanes[0].frozen, lanes: lanes.length, restored: !p.hasPower('star') }; })()`);
+  await sleep(1000);
+  const movedFrozen = await evaluate(`__hg.lanes.some((l, i) => l.movers.some((m, k) => Math.abs(m.x - __hg.xs[i][k]) > 1e-6))`);
+  console.log('hourglass', { ...hg, movedWhileFrozen: movedFrozen });
+  check(hg.frozen && hg.laneFrozen && hg.lanes > 0, 'the hourglass did not freeze the world');
+  check(!movedFrozen, 'a road mover moved while the hourglass ran');
+  await evaluate(`__game.mode.players[0].powers.get('hourglass').left = 0.01`); await sleep(800);
+  const thawed = await evaluate(`[!__game.mode.world.frozen, __hg.lanes.some((l, i) => l.movers.some((m, k) => Math.abs(m.x - __hg.xs[i][k]) > 1e-3))]`);
+  console.log('after the hourglass', { unfrozen: thawed[0], moving: thawed[1] });
+  check(thawed[0] && thawed[1], 'traffic did not start again when the hourglass ran out');
+  console.log('crate shots written to', OUT);
+}
+if (script === 'powerups2') {
+  // The movement powerups (src/powerups.js): mushroom, acorn, chili, tilt.
+  // Roads are frozen and pushed off the centre columns so one dragged car is
+  // the only traffic near the player; the tilt test thaws them again.
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  const check = (ok, msg) => { if (!ok) errors.push(`powerups2: ${msg}`); };
+  const chip = () => evaluate(`document.getElementById('power').textContent`);
+  await send('Page.navigate', { url: BASE + '?start&force=road&sky=day&coins=60' }); await sleep(3500);
+  await evaluate(`window.__p2 = {
+    p: () => __game.mode.players[0],
+    roads: () => [...__game.mode.world.rows.values()].filter((l) => l.scenario.id === 'road').sort((a, b) => a.r - b.r),
+    put: (c, r) => { const p = __game.mode.players[0]; p.moving = false; p.buffered = null; p.carrier = null; p.airborne = null; p.bouncing = false;
+      p.row = r; p.col = c; p.x = c; p.z = -r; p.y = 0; p.maxRow = Math.max(p.maxRow, r); p.facing = 0; p.mesh.position.set(c, 0, -r); },
+    clear: () => { for (const l of __p2.roads()) { l.frozen = true; for (const m of l.movers) if (Math.abs(m.x) < 4) { m.x = 12 * Math.sign(m.x || 1); m.mesh.position.x = m.x; } } },
+    car: (l, x) => { const m = l.movers[0]; m.x = x; m.mesh.position.x = x; return m; },
+    // A column clear of blocks on every row from a to b.
+    free: (a, b) => [0, 1, -1, 2, -2, 3, -3].find((c) => { for (let r = a; r <= b; r++) if (__game.mode.world.laneAt(r)?.blockKind(c)) return false; return true; }),
+  }`);
+
+  // Mushroom: double size, the camera pulls back, a forward hop strides two rows.
+  const mush = await evaluate(`(() => { const p = __p2.p(); __p2.put(0, 0); p.grant('mushroom'); return { active: p.hasPower('mushroom'), giant: p.giant, zoom: __game.camera.zoomGoal }; })()`);
+  await sleep(800);
+  const size = await evaluate(`[+__p2.p().size.toFixed(2), +__p2.p().mesh.scale.x.toFixed(2)]`);
+  console.log('mushroom', { ...mush, size });
+  check(mush.active && mush.giant && Math.abs(size[0] - 2) < 0.05 && Math.abs(size[1] - 2) < 0.1, `the mushroom did not double the player (${JSON.stringify({ ...mush, size })})`);
+  check(mush.zoom > 1.1, `the camera did not pull back for a giant (zoomGoal ${mush.zoom})`);
+  const c0 = await evaluate(`__p2.free(0, 3) ?? 0`);
+  await evaluate(`__p2.put(${c0}, 0)`); await key('ArrowUp'); await sleep(800);
+  const stride = await evaluate(`[__p2.p().row, __p2.p().moving, __p2.p().stride]`);
+  console.log('giant hop from row 0', stride);
+  check(stride[0] === 2, `a giant's forward hop did not land two rows on (row ${stride[0]})`);
+  const tunnel = await evaluate(`(() => { const w = __game.mode.world, p = __p2.p(); w.rows.set(999, { scenario: { id: 'hedge' }, data: { weak: 3 }, blockKind: () => null });
+    const r = [w.isBlocked(3, 999, null, p), w.isBlocked(4, 999, null, p)]; p.giant = false; r.push(w.isBlocked(3, 999, null, p)); p.giant = true; w.rows.delete(999); return r; })()`);
+  console.log('hedge tunnel while giant [tunnel, hedge cell, tunnel when not giant]', tunnel);
+  check(tunnel[0] === true && tunnel[1] === false && tunnel[2] === false, `the hedge tunnel did not refuse a giant (${JSON.stringify(tunnel)})`);
+  // Crush: a frozen car under the landing cell two rows up is wrecked and the player lives.
+  const crush = await evaluate(`(() => { __p2.clear(); const l = __p2.roads()[0]; const m = __p2.car(l, 0); const n0 = l.movers.length; __p2.put(0, l.r - 2); window.__crushLane = l; return { r: l.r, n0, carX: m.x }; })()`);
+  await key('ArrowUp'); await sleep(1000);
+  const crushed = await evaluate(`(() => { const p = __p2.p(), l = __crushLane; return { row: p.row, alive: p.alive, movers: l.movers.length, giant: p.giant }; })()`);
+  console.log('giant onto a car', { ...crush, ...crushed });
+  check(crushed.alive && crushed.giant, 'the giant died landing on a car');
+  check(crushed.row === crush.r && crushed.movers === crush.n0 - 1, `the car under the giant was not wrecked (row ${crushed.row} of ${crush.r}, movers ${crush.n0} -> ${crushed.movers})`);
+  await evaluate(`__game.mode.setTilt(true)`); await sleep(1600);
+  await shot('giant-iso');
+  await evaluate(`__game.mode.setTilt(false)`); await sleep(300);
+
+  // Acorn: half size, fences pass, a truck bed passes overhead, a bounce keeps the buffered hop.
+  const acorn = await evaluate(`(() => { const p = __p2.p(); p.clearPowers(); __p2.put(0, 0); p.grant('acorn'); return { active: p.hasPower('acorn'), tiny: p.tiny, giant: p.giant, fence: p.passes('fence'), zoom: __game.camera.zoomGoal }; })()`);
+  await sleep(800);
+  const tinySize = await evaluate(`+__p2.p().size.toFixed(2)`);
+  console.log('acorn', { ...acorn, size: tinySize });
+  check(acorn.active && acorn.tiny && !acorn.giant && Math.abs(tinySize - 0.5) < 0.05, `the acorn did not halve the player (${JSON.stringify({ ...acorn, size: tinySize })})`);
+  check(acorn.fence && acorn.zoom === 1, 'a tiny player does not pass fences, or the camera stayed pulled back');
+  const tall = await evaluate(`[!!__meshes.makeTruck().tall, !!__meshes.makeFlatbed().tall, !!__meshes.makeCar().tall]`);
+  check(tall[0] && tall[1] && !tall[2], `truck/flatbed/car tall flags read ${JSON.stringify(tall)}`);
+  const under = await evaluate(`(() => { const p = __p2.p(); __p2.clear(); const l = __p2.roads()[0]; const m = __p2.car(l, 0); m.tall = true; __p2.put(0, l.r); p.update(0.02); p.update(0.02);
+    const r = { alive: p.alive, tiny: p.tiny, lethal: l.scenario.lethalAt(l, 0, p) }; m.tall = false; __p2.put(0, 0); return r; })()`);
+  console.log('tiny under a truck', under);
+  check(under.alive && under.lethal === 'car', `standing under a truck killed a tiny player, or the truck was not lethal to begin with (${JSON.stringify(under)})`);
+  const kept = await evaluate(`(() => { const p = __p2.p(); const l = __p2.roads()[0]; __p2.put(0, l.r); p.buffered = [0, 1]; p.bounce(l); const r = { buffered: p.buffered, bouncing: p.bouncing }; __p2.put(0, 0); return r; })()`);
+  console.log('tiny bounce', kept);
+  check(kept.bouncing && Array.isArray(kept.buffered), `a bounce ate a tiny player's buffered hop (${JSON.stringify(kept)})`);
+
+  // Chili: F fires the way the player faces; the car three rows up is wrecked, 5 shots become 4.
+  const chili = await evaluate(`(() => { const p = __p2.p(); p.clearPowers(); __p2.clear(); const l = __p2.roads()[0]; const c = __p2.free(l.r - 3, l.r - 1) ?? 0;
+    const m = __p2.car(l, c); const n0 = l.movers.length; __p2.put(c, l.r - 3); p.grant('chili'); window.__chiliLane = l; return { c, r: l.r, n0, shots: p.powers.get('chili').ctx.shots }; })()`);
+  await sleep(300);
+  const chip0 = await chip();
+  const cls0 = await evaluate(`document.body.classList.contains('chili')`);
+  console.log('chili granted', { ...chili, chip: chip0, bodyClass: cls0 });
+  check(chili.shots === 5 && chip0.includes('CHILI ×5'), `the chip did not read CHILI ×5 (${JSON.stringify(chip0)})`);
+  check(cls0, 'body.chili was not set while a chili is held');
+  await key('KeyF', 'f'); await sleep(1500);
+  const fired = await evaluate(`(() => { const p = __p2.p(); const e = p.powers.get('chili'); return { shots: e?.ctx.shots, balls: e?.ctx.balls.length, movers: __chiliLane.movers.length, alive: p.alive }; })()`);
+  const chip1 = await chip();
+  console.log('after F', { ...fired, chip: chip1 });
+  check(fired.shots === 4 && chip1.includes('CHILI ×4'), `shots did not go 5 -> 4 (${fired.shots}, chip ${JSON.stringify(chip1)})`);
+  check(fired.movers === chili.n0 - 1 && fired.balls === 0, `the fireball did not wreck the car three rows up (movers ${chili.n0} -> ${fired.movers}, balls left ${fired.balls})`);
+  const spent = await evaluate(`(() => { const p = __p2.p(); const e = p.powers.get('chili'); e.ctx.shots = 1; __p2.put(0, 0); p.facing = Math.PI; __game.mode.fire(p); return e.ctx.shots; })()`);
+  await sleep(1200);
+  const gone = await evaluate(`[__p2.p().hasPower('chili'), document.body.classList.contains('chili'), document.getElementById('power').hidden]`);
+  console.log('last shot', { shotsAfterFire: spent, ...{ active: gone[0], bodyClass: gone[1], chipHidden: gone[2] } });
+  check(spent === 0 && !gone[0] && !gone[1] && gone[2], `the chili did not end after its last shot (${JSON.stringify(gone)})`);
+
+  // Tilt: the camera rides into the rolled iso view, every road within range slides off within 1.5 s, and traffic is back after 5 s.
+  const tilt = await evaluate(`(() => { const p = __p2.p(); p.clearPowers(); for (const l of __p2.roads()) l.frozen = false; const l0 = __p2.roads()[0]; __p2.put(0, l0.r - 2);
+    const lanes = __p2.roads().filter((l) => Math.abs(l.r - p.row) <= 14); window.__tilt = { lanes, n: lanes.map((l) => l.movers.length), row: p.row };
+    p.grant('tilt'); return { lanes: lanes.length, movers: __tilt.n.reduce((a, b) => a + b, 0), goal: __game.camera.goalName, forced: __game.mode.forceTilt, tilted: __game.mode.tilted, coins: __game.run.coins }; })()`);
+  await sleep(600);
+  await shot('tilt');
+  await sleep(900);
+  const mid = await evaluate(`(() => { const xs = __tilt.lanes.flatMap((l) => l.movers.map((m) => m.x)); return { row0: __tilt.row, goal: __game.camera.goalName, tilt: +__game.camera.view.tilt.toFixed(2), roll: +__game.camera.view.roll.toFixed(2),
+    off: xs.every((x) => Math.abs(x) >= 35), minAbs: +Math.min(...xs.map(Math.abs)).toFixed(1), frozen: __tilt.lanes.every((l) => l.frozen), row: __p2.p().row, chip: document.getElementById('power').textContent, coins: __game.run.coins }; })()`);
+  console.log('tilt at 1.5 s', { ...tilt, ...mid });
+  check(tilt.goal === 'slide' && mid.goal === 'slide' && mid.tilt > 0.7, `the camera did not ride into the tilted view (goal ${tilt.goal} -> ${mid.goal}, tilt ${mid.tilt})`);
+  check(tilt.forced && !tilt.tilted && Math.abs(mid.coins - tilt.coins) < 0.01, 'the tilt cost coins or set the peek flag');
+  check(mid.off && mid.frozen, `road movers within range were still on the ring 1.5 s in (nearest |x| ${mid.minAbs}, frozen ${mid.frozen})`);
+  check(mid.row === mid.row0, 'the player moved during the tilt');
+  await sleep(3800);
+  const back = await evaluate(`(() => { const lanes = __tilt.lanes; return { goal: __game.camera.goalName, forced: __game.mode.forceTilt, frozen: lanes.some((l) => l.frozen),
+    counts: lanes.map((l) => l.movers.length), same: lanes.every((l, i) => l.movers.length === __tilt.n[i]),
+    showing: lanes.map((l) => l.movers.filter((m) => !m.held && m.mesh.visible && Math.abs(m.x) <= 35).length), stray: lanes.some((l) => l.movers.some((m) => m.held && m.mesh.visible)) }; })()`);
+  console.log('tilt after 5 s', back);
+  check(back.goal === 'top' && !back.forced && !back.frozen, `the board did not come back after the tilt (${JSON.stringify(back)})`);
+  check(back.same && back.showing.every((n) => n > 0) && !back.stray, `traffic did not drift back in (${JSON.stringify(back)})`);
+  console.log('powerup shots written to', OUT);
+}
+if (script === 'freight') {
+  await start();
+  // Level 2: one-sided box cars unlock there.
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'freight'; __game.jumpLevel(2)`); await sleep(800);
+  const check = (ok, msg) => { if (!ok) errors.push(`freight: ${msg}`); };
+  // Page helpers: the nearest freight row, slide the whole train so a car sits at x, drop the player on a cell.
+  await evaluate(`window.__ft = {
+    lane: () => [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'freight').sort((a, b) => a.r - b.r)[0],
+    slide(lane, m, x) { const d = x - m.x; for (const o of lane.movers) { o.x += d; if (o.x > 35) o.x -= 70; if (o.x < -35) o.x += 70; o.mesh.position.x = o.x; } },
+    put(row, x) { const p = __game.mode.players[0]; p.row = row; p.col = x; p.x = x; p.z = -row; p.y = 0; p.moving = false; p.carrier = null; p.airborne = null; p.buffered = null; p.mesh.position.set(x, 0, -row); return p; },
+    who() { const p = __game.mode.players[0]; return { row: p.row, alive: p.alive, carrier: p.carrier?.tag ?? (p.carrier ? p.carrier.kind : null), x: +p.x.toFixed(2), bounces: p.bounces ?? 0 }; },
+  }`);
+  const setup = await evaluate(`(() => { const l = __ft.lane(); const kinds = {}; for (const m of l.movers) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
+    return { r: l.r, dir: l.dir, speed: +l.speed.toFixed(2), gateSide: l.data.gateSide, gates: l.data.gates.length, cars: l.movers.length, kinds, hidden: !!l.data.hidden, gapMax: +Math.max(...l.movers.map((m, i, a) => { const o = a.find(o => o !== m && (o.x - m.x) * l.dir > 0 && Math.abs(o.x - m.x) < 6) ?? m; return Math.abs(o.x - m.x) - (o.len + m.len) / 2; })).toFixed(2) }; })()`);
+  console.log('freight', setup);
+  const r = setup.r;
+  check(setup.gates === 1, `${setup.gates} gates, expected one`);
+  check(setup.dir === setup.gateSide, `on level 2 the train runs toward the gate (dir ${setup.dir}, gate ${setup.gateSide})`);
+  check(setup.speed > 0.9 && setup.speed < 1.6, `speed ${setup.speed}, expected a crawl`);
+  for (const k of ['closed', 'box1', 'box2', 'flat']) check(setup.kinds[k] > 0, `no ${k} car in the ring`);
+  check(setup.hidden, 'the row is not marked hidden: no TILT hint');
+  // Through a two-sided car: board from below, ride, hop out above.
+  await evaluate(`(() => { const l = __ft.lane(); const m = l.movers.find(m => m.kind === 'box2'); m.tag = 'A'; __ft.slide(l, m, -l.dir * 0.3); __ft.put(l.r - 1, 0); })()`); await sleep(120);
+  await key('ArrowUp'); await sleep(700);
+  const boarded = await evaluate(`__ft.who()`);
+  console.log('boarded box2', boarded);
+  check(boarded.carrier === 'A' && boarded.row === r && boarded.alive, 'did not board the two-sided car from below');
+  await key('ArrowUp'); await sleep(700);
+  const through = await evaluate(`__ft.who()`);
+  console.log('out the far side', through);
+  check(through.row === r + 1 && through.alive && !through.carrier, 'did not come out the far side alive');
+  // A one-sided car: refused from its closed side, boarded from its open side,
+  // the far wall holds, and the way back out is the way in.
+  const b = await evaluate(`(() => { const l = __ft.lane(); const m = l.movers.find(m => m.kind === 'box1'); m.tag = 'B'; __ft.slide(l, m, 0); const p = __ft.put(m.side > 0 ? l.r + 1 : l.r - 1, 0); return { side: m.side, row: p.row }; })()`); await sleep(120);
+  const inward = b.side > 0 ? 'ArrowDown' : 'ArrowUp', outward = b.side > 0 ? 'ArrowUp' : 'ArrowDown';
+  await key(inward); await sleep(500);
+  const refused = await evaluate(`__ft.who()`);
+  console.log('box1 closed side', b, refused);
+  check(refused.row === b.row && refused.alive && !refused.carrier, 'the closed side of a one-sided car let the player in');
+  await evaluate(`(() => { const l = __ft.lane(); const m = l.movers.find(m => m.tag === 'B'); __ft.slide(l, m, -l.dir * 0.3); __ft.put(m.side > 0 ? l.r - 1 : l.r + 1, 0); })()`); await sleep(120);
+  await key(outward); await sleep(700);
+  const mounted = await evaluate(`__ft.who()`);
+  console.log('box1 open side', mounted);
+  check(mounted.carrier === 'B' && mounted.row === r && mounted.alive, 'did not board the one-sided car from its open side');
+  await key(outward); await sleep(500);
+  const held = await evaluate(`__ft.who()`);
+  check(held.carrier === 'B' && held.row === r && held.alive, `the far wall of a one-sided car let the rider through (${JSON.stringify(held)})`);
+  await key(inward); await sleep(700);
+  const back = await evaluate(`__ft.who()`);
+  console.log('back out', back);
+  check(back.row === (b.side > 0 ? r - 1 : r + 1) && back.alive && !back.carrier, 'could not hop back out the open side');
+  // A closed car is a wall from either side.
+  await evaluate(`(() => { const l = __ft.lane(); const m = l.movers.find(m => m.kind === 'closed'); __ft.slide(l, m, -l.dir * 0.3); __ft.put(l.r - 1, 0); })()`); await sleep(120);
+  await key('ArrowUp'); await sleep(500);
+  const wall = await evaluate(`__ft.who()`);
+  check(wall.row === r - 1 && wall.alive && !wall.carrier, `a closed car let the player in (${JSON.stringify(wall)})`);
+  // The gate: its side's edge columns refuse entry and exit on both flank rows.
+  const gate = await evaluate(`(() => { const l = __ft.lane(); const w = __game.mode.world; const s = l.data.gateSide; const r = l.r; const m = l.movers.find(m => m.tag === 'A'); __ft.slide(l, m, s * 5);
+    return { side: s, gated: [8, 7, 6, 5, 0, -6, -8].map(c => l.scenario.gated(l, s * c)), exitUp: w.isBlocked(s * 6, r + 1, r), exitDown: w.isBlocked(s * 8, r - 1, r), exitInside: w.isBlocked(s * 5, r + 1, r), enterUp: w.isBlocked(s * 6, r, r - 1), enterDown: w.isBlocked(s * 7, r, r + 1), arm: l.data.gates[0].pivot.rotation.z, post: Math.sign(l.data.gates[0].position.x) }; })()`);
+  console.log('gate', gate);
+  check(gate.gated.join() === 'true,true,true,false,false,false,false', `gated columns read ${gate.gated.join()}`);
+  check(gate.exitUp && gate.exitDown && !gate.exitInside && gate.enterUp && gate.enterDown, 'the arm does not block the right cells');
+  check(gate.arm === 0 && gate.post === gate.side, 'the arm is not down on the gated side');
+  // Pictures: the train from above (every box car alike) and tilted (the doors show).
+  await evaluate(`(() => { const l = __ft.lane(); const m = l.movers.find(m => m.tag === 'A'); __ft.slide(l, m, -l.dir * 0.3); __ft.put(l.r - 1, 0); })()`); await sleep(1200);
+  const fsF = await import('node:fs');
+  const shotF = async (name) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fsF.writeFileSync(`${OUT}/${name}.png`, Buffer.from(r.data, 'base64')); };
+  await shotF('freight-top');
+  await evaluate(`__game.run.coins = 50`);   // the peek burns coins
+  await key('Space', ' '); await sleep(1500); await shotF('freight-iso');
+  await key('Space', ' '); await sleep(300);
 }
 console.log('errors:', errors.length ? errors : 'none');
 ws.close();

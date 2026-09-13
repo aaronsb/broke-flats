@@ -72,6 +72,7 @@ export default {
   },
 
   update(lane, dt, time) {
+    if (lane.frozen) return;
     const d = lane.data, t = d.train;
     const near = Math.abs(lane.r - (lane.world?.focusRow ?? lane.r)) <= 7;
     if (d.state === 'idle') {

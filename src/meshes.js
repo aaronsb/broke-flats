@@ -71,7 +71,7 @@ export function makeTruck() {
   g.add(tail(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, 0.35));
   g.add(tail(0.06, 0.14, 0.2, TAILLAMP, -1.46, 0.4, -0.35));
   for (const sx of [-1.15, -0.45, 1.0]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
-  return { mesh: g, len: 2.9 };
+  return { mesh: g, len: 2.9, tall: true };   // tall: an acorn-sized player passes underneath
 }
 
 export function makeTree(tall = false) {
@@ -286,7 +286,7 @@ export function makeFlatbed() {
   g.add(tail(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, 0.35));
   g.add(tail(0.06, 0.12, 0.2, TAILLAMP, -1.56, 0.3, -0.35));
   for (const sx of [-1.2, -0.4, 1.05]) for (const sz of [-0.45, 0.45]) g.add(box(0.4, 0.35, 0.15, TIRE, sx, 0.05, sz));
-  return { mesh: g, len: 3.1, bed: [-1.55, 0.55], rideY: 0.45, offCause: 'hauled' };
+  return { mesh: g, len: 3.1, bed: [-1.55, 0.55], rideY: 0.45, offCause: 'hauled', tall: true };
 }
 
 // Baby chick follower. Modeled facing -z like the chicken.
@@ -588,4 +588,266 @@ export function makeFlagMarker() {
 }
 export function makeScorch() {
   return box(0.95, 0.03, 0.95, 0x1e1a18, 0, 0, 0, false);
+}
+
+// ---- powerup crates and the items that float above them (src/powerups.js) ----
+// A plain wooden box. Top-down that is all a crate is; tilted, the item shows.
+export function makeCrate() {
+  const g = new THREE.Group();
+  g.add(box(0.8, 0.8, 0.8, 0x9a6a3a));
+  g.add(box(0.84, 0.08, 0.84, 0x6b4423, 0, 0.72, 0, false));
+  g.add(box(0.84, 0.08, 0.84, 0x6b4423, 0, 0, 0, false));
+  g.add(box(0.1, 0.8, 0.84, 0x6b4423, 0, 0, 0, false));
+  g.add(box(0.84, 0.8, 0.1, 0x6b4423, 0, 0, 0, false));
+  return g;
+}
+
+const starMat = new THREE.MeshLambertMaterial({ color: 0xffe36b, emissive: 0x7a5a00 });
+// Five arms standing upright, so the side view reads as a star.
+export function makeStar() {
+  const g = new THREE.Group();
+  g.add(box(0.2, 0.2, 0.1, starMat, 0, 0.15));
+  for (let i = 0; i < 5; i++) {
+    const a = Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    const arm = box(0.11, 0.3, 0.1, starMat);
+    arm.position.set(Math.cos(a) * 0.19, 0.25 + Math.sin(a) * 0.19, 0);
+    arm.rotation.z = a - Math.PI / 2;
+    g.add(arm);
+  }
+  return g;
+}
+
+const sandMat = new THREE.MeshLambertMaterial({ color: 0xf2c53d, emissive: 0x4a3a00 });
+const glassMat = new THREE.MeshLambertMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.55 });
+export function makeHourglass() {
+  const g = new THREE.Group();
+  g.add(box(0.32, 0.06, 0.32, 0x8b5a2b, 0, 0));
+  g.add(box(0.32, 0.06, 0.32, 0x8b5a2b, 0, 0.46));
+  g.add(box(0.16, 0.08, 0.16, sandMat, 0, 0.07));
+  g.add(box(0.1, 0.1, 0.1, sandMat, 0, 0.35));
+  g.add(box(0.24, 0.16, 0.24, glassMat, 0, 0.06));
+  g.add(box(0.1, 0.1, 0.1, glassMat, 0, 0.21));
+  g.add(box(0.24, 0.16, 0.24, glassMat, 0, 0.3));
+  return g;
+}
+
+export function makeMagnet() {
+  const g = new THREE.Group();
+  for (const s of [-1, 1]) {
+    g.add(box(0.12, 0.1, 0.12, 0xdddddd, s * 0.14, 0));
+    g.add(box(0.12, 0.3, 0.12, 0xe0473a, s * 0.14, 0.1));
+  }
+  g.add(box(0.4, 0.12, 0.12, 0xe0473a, 0, 0.38));
+  return g;
+}
+
+export function makeWhistle() {
+  const g = new THREE.Group();
+  g.add(box(0.26, 0.26, 0.22, 0xb8b8c8, 0.08, 0));
+  g.add(box(0.44, 0.16, 0.18, 0xcfcfd8, 0.02, 0.2));
+  g.add(box(0.18, 0.1, 0.14, 0xcfcfd8, -0.28, 0.22));
+  g.add(box(0.1, 0.04, 0.1, 0x333333, 0.1, 0.36, 0, false));
+  return g;
+}
+
+const goldEggMat = new THREE.MeshLambertMaterial({ color: 0xffd23f, emissive: 0x6b4a00 });
+export function makeGoldenEgg() {
+  const g = new THREE.Group();
+  g.add(box(0.32, 0.4, 0.32, goldEggMat, 0, 0));
+  g.add(box(0.2, 0.12, 0.2, goldEggMat, 0, 0.38));
+  return g;
+}
+
+// ---- barrier rows ----
+// Every cell of a barrier row shares its neighbours' top (canopy, roof, rail,
+// coping); the weak cell differs only below it, so straight down it hides and
+// the tilted view shows the way through.
+
+const CANOPY_Y = 1.25;
+// A tree whose canopy fills its cell so a row of them reads as one strip.
+// `gap`: the trunk is missing and the canopy hangs over trodden earth.
+export function makeTreeWall(gap = false) {
+  const g = new THREE.Group();
+  const c1 = pick(...GREENS), c2 = pick(...GREENS);
+  if (gap) g.add(box(0.7, 0.04, 0.9, 0x6b5a3a, 0, 0, 0, false));
+  else g.add(box(0.3, CANOPY_Y, 0.3, 0x7a4a1f));
+  g.add(box(1, 0.8, 1, c1, 0, CANOPY_Y));
+  g.add(box(0.7, 0.45, 0.7, c2, 0, CANOPY_Y + 0.8));
+  return g;
+}
+
+const SHELTER_GLASS = new THREE.MeshLambertMaterial({ color: 0x9fd4f0, transparent: true, opacity: 0.7 });
+// Bus shelter open toward the player. `open`: the back wall is missing too.
+export function makeBusShelter(open = false) {
+  const g = new THREE.Group();
+  const frame = 0x4a4f58;
+  for (const x of [-0.45, 0.45]) for (const z of [-0.42, 0.42]) g.add(box(0.08, 1.2, 0.08, frame, x, 0, z));
+  g.add(box(1, 0.1, 1, 0x3c4048, 0, 1.2));
+  g.add(box(0.9, 0.06, 0.9, 0x5a606a, 0, 1.3));
+  for (const x of [-0.45, 0.45]) g.add(box(0.06, 1.0, 0.7, SHELTER_GLASS, x, 0.1, 0, false));
+  if (!open) {   // under the roof, so none of it casts a shadow of its own
+    g.add(box(0.98, 1.0, 0.06, SHELTER_GLASS, 0, 0.1, -0.42, false));
+    g.add(box(0.8, 0.06, 0.3, 0x8a5a2b, 0, 0.4, -0.2, false));
+    for (const x of [-0.3, 0.3]) g.add(box(0.06, 0.4, 0.26, 0x333333, x, 0, -0.2, false));
+  }
+  return g;
+}
+
+const BUS_COLORS = [0xe3b23c, 0x3a6fd0, 0xd04a3a, 0x4fa35a];
+// A parked bus along x, `len` cells long, roof level with a shelter's.
+export function makeBus(len = 3) {
+  const g = new THREE.Group();
+  const c = pick(...BUS_COLORS);
+  g.add(box(len - 0.1, 0.55, 0.86, c, 0, 0.3));
+  g.add(box(len - 0.3, 0.4, 0.88, GLASS, 0, 0.85));
+  g.add(box(len - 0.1, 0.2, 0.86, c, 0, 1.2));
+  g.add(box(len - 0.4, 0.05, 0.6, 0xd8d8d8, 0, 1.4));
+  for (const x of [-len / 2 + 0.55, len / 2 - 0.55]) for (const z of [-0.4, 0.4]) g.add(box(0.5, 0.42, 0.14, TIRE, x, 0, z));
+  return g;
+}
+
+const PICKET = 0xf4efe4;
+// White picket fence along x. `loose`: three boards are gone and one hangs
+// from the top rail by a nail. The rails hide all of it from above, and the
+// boards cast no shadow, so the shadow band has no notch where they are gone.
+export function makePicket(loose = false) {
+  const g = new THREE.Group();
+  for (const y of [0.3, 0.65]) g.add(box(1, 0.07, 0.06, PICKET, 0, y));
+  for (const x of [-0.4, -0.2, 0, 0.2, 0.4]) {
+    if (loose && Math.abs(x) < 0.3) continue;
+    g.add(box(0.12, 0.9, 0.05, PICKET, x, 0, 0, false));
+    g.add(box(0.12, 0.08, 0.05, 0xd9d2c2, x, 0.9, 0, false));
+  }
+  if (loose) {
+    const b = box(0.12, 0.85, 0.05, PICKET, 0, 0, 0, false);
+    const a = 0.6;
+    b.position.set(-0.05 + Math.sin(a) * 0.42, 0.68 - Math.cos(a) * 0.42, 0);
+    b.rotation.z = a;
+    g.add(b);
+  }
+  g.userData.kind = 'fence';
+  return g;
+}
+
+const CHAINLINK = new THREE.MeshLambertMaterial({ color: 0xb8bec8, transparent: true, opacity: 0.55 });
+// Chain-link panel with a post at its left edge and a top rail. `hole`: the
+// mesh is cut away low, with the wire curling at the edges. The mesh casts no
+// shadow: a shadow map ignores opacity and would print the hole on the ground.
+export function makeChainlink(hole = false) {
+  const g = new THREE.Group();
+  const steel = 0x6a7078;
+  g.add(box(0.08, 1.3, 0.08, steel, -0.5, 0));
+  g.add(box(1, 0.05, 0.05, steel, 0, 1.27));
+  if (!hole) g.add(box(0.96, 1.22, 0.02, CHAINLINK, 0, 0.05, 0, false));
+  else {
+    g.add(box(0.96, 0.6, 0.02, CHAINLINK, 0, 0.67, 0, false));
+    for (const x of [-0.42, 0.42]) g.add(box(0.12, 0.62, 0.02, CHAINLINK, x, 0.05, 0, false));
+    for (let i = 0; i < 5; i++) g.add(box(0.04, rand(0.08, 0.18), 0.04, 0x8a9098, rand(-0.3, 0.3), 0.5 + rand(0, 0.15), rand(-0.04, 0.04), false));
+  }
+  g.userData.kind = 'fence';
+  return g;
+}
+
+const WALL_H = 1.3;
+// Brick wall with a coping. `culvert`: a dark drain mouth through the base.
+export function makeWall(culvert = false) {
+  const g = new THREE.Group();
+  const brick = 0x9a4b3b, mortar = 0xb8a090;
+  if (!culvert) {
+    g.add(box(1, WALL_H, 0.5, brick));
+    for (let y = 0.2; y < WALL_H - 0.15; y += 0.25) g.add(box(1.01, 0.03, 0.51, mortar, 0, y, 0, false));
+  } else {
+    g.add(box(1, WALL_H - 0.6, 0.5, brick, 0, 0.6));
+    for (const x of [-0.4, 0.4]) g.add(box(0.2, 0.6, 0.5, brick, x, 0));
+    g.add(box(0.6, 0.6, 0.5, 0x120f0e, 0, 0, 0, false));
+    g.add(box(0.5, 0.02, 0.46, 0x3a5a6a, 0, 0.005, 0, false));   // a trickle, kept under the coping
+    for (let y = 0.7; y < WALL_H - 0.15; y += 0.25) g.add(box(1.01, 0.03, 0.51, mortar, 0, y, 0, false));
+  }
+  g.add(box(1, 0.08, 0.56, 0xb0a898, 0, WALL_H));
+  return g;
+}
+
+// ---- freight cars (src/scenarios/freight.js) ----
+// One car per mover. Every box car shares the same floor and roof, so from
+// above the three box kinds read alike; the doors only show from the side.
+// `side` is the world-z side an open door faces: +1 toward lower rows (the
+// player's approach), -1 toward higher rows. box2 opens both ways.
+const FREIGHT_COLORS = [0x8b2f2f, 0x2f4f8b, 0x6b4a2f, 0x3a6b3a, 0x7a5a2a, 0x4a4a5a];
+const FREIGHT_ROOF = 0x333333;
+const FREIGHT_INSIDE = 0x1c1a18;
+const DOOR_W = 0.7;
+export function makeFreightCar(kind, side = 1) {
+  const g = new THREE.Group();
+  wheels(g, 0, CAR_LEN, 2);
+  const base = { mesh: g, len: CAR_LEN, kind, side, rideY: 0.45, offCause: 'hauled' };
+  if (kind === 'flat') {
+    g.add(box(CAR_LEN, 0.3, 0.9, 0x6b4a2f, 0, 0.15));
+    g.add(box(CAR_LEN, 0.06, 0.6, 0x8a6a4a, 0, 0.45));
+    return { ...base, beds: [[-CAR_LEN / 2, CAR_LEN / 2]] };
+  }
+  const c = pick(...FREIGHT_COLORS);
+  g.add(box(CAR_LEN, 0.3, 0.9, 0x444444, 0, 0.15));                     // floor
+  g.add(box(CAR_LEN + 0.06, 0.1, 0.94, FREIGHT_ROOF, 0, 1.3));           // roof, identical on every box car
+  if (kind === 'closed') {
+    g.add(box(CAR_LEN, 0.85, 0.88, c, 0, 0.45));
+    return { ...base, beds: [] };
+  }
+  const end = (CAR_LEN - DOOR_W) / 2;
+  g.add(box(end, 0.85, 0.88, c, -(DOOR_W + end) / 2, 0.45));             // walls either side of the doorway
+  g.add(box(end, 0.85, 0.88, c, (DOOR_W + end) / 2, 0.45));
+  const open = kind === 'box2' ? [-1, 1] : [side];
+  for (const s of open) g.add(box(DOOR_W + 0.04, 0.8, 0.05, 0x2a2a30, DOOR_W * 0.9, 0.48, s * 0.46));   // the door, slid open along the wall
+  if (kind === 'box1') g.add(box(DOOR_W, 0.85, 0.08, FREIGHT_INSIDE, 0, 0.45, -side * 0.4));          // the far wall behind the doorway
+  return { ...base, beds: [[-DOOR_W / 2, DOOR_W / 2]], through: kind === 'box2' };
+}
+
+// ---- powerup items, second half (src/powerups.js: mushroom, acorn, chili, tilt) ----
+export function makeMushroom() {
+  const g = new THREE.Group();
+  g.add(box(0.2, 0.26, 0.2, 0xf2e6c8, 0, 0));
+  g.add(box(0.5, 0.22, 0.5, 0xe0473a, 0, 0.24));
+  g.add(box(0.3, 0.08, 0.3, 0xe0473a, 0, 0.46));
+  for (const [x, z] of [[-0.14, 0.1], [0.12, -0.12], [0.05, 0.16], [-0.1, -0.14]]) g.add(box(0.1, 0.05, 0.1, 0xffffff, x, 0.46, z, false));
+  return g;
+}
+
+export function makeAcorn() {
+  const g = new THREE.Group();
+  g.add(box(0.3, 0.3, 0.3, 0x9a6a3a, 0, 0));
+  g.add(box(0.2, 0.08, 0.2, 0x9a6a3a, 0, -0.06));
+  g.add(box(0.36, 0.14, 0.36, 0x5a3d24, 0, 0.28));
+  g.add(box(0.06, 0.12, 0.06, 0x3a2c20, 0, 0.42));
+  return g;
+}
+
+export function makeChili() {
+  const g = new THREE.Group();
+  const red = 0xe03c1e;
+  g.add(box(0.16, 0.34, 0.16, red, 0.02, 0));
+  g.add(box(0.14, 0.14, 0.14, red, -0.04, 0.32));
+  g.add(box(0.1, 0.12, 0.1, red, 0.08, -0.08));
+  g.add(box(0.06, 0.12, 0.06, 0x3a8c3a, -0.06, 0.44));
+  return g;
+}
+
+// A small board slab, tilted, with its rows drawn on it.
+export function makeTiltIcon() {
+  const g = new THREE.Group();
+  const slab = new THREE.Group();
+  slab.add(box(0.56, 0.06, 0.4, 0x8a8a92));
+  for (const z of [-0.12, 0, 0.12]) slab.add(box(0.5, 0.02, 0.06, 0x4a4a52, 0, 0.06, z, false));
+  slab.add(box(0.1, 0.08, 0.08, 0xffd93a, 0.12, 0.08, 0.12, false));
+  slab.rotation.z = -Math.PI / 4;
+  slab.position.y = 0.22;
+  g.add(slab);
+  return g;
+}
+
+const FIREBALL = [0xffe36b, 0xffb02a, 0xff6a1a];
+// An orange and yellow cube cluster, the chili's shot.
+export function makeFireball() {
+  const g = new THREE.Group();
+  g.add(box(0.3, 0.3, 0.3, new THREE.MeshBasicMaterial({ color: FIREBALL[1] }), 0, -0.15));
+  for (let i = 0; i < 5; i++) g.add(box(0.14, 0.14, 0.14, new THREE.MeshBasicMaterial({ color: pick(...FIREBALL) }), rand(-0.18, 0.18), rand(-0.22, 0.1), rand(-0.18, 0.18), false));
+  return g;
 }

@@ -18,6 +18,8 @@ const BUTTONS = [
   { code: 'KeyE', key: 'e', label: '↻', cls: 'mine e', title: 'turn right' },
   // Goose only: the honk that moves stalled traffic on.
   { code: 'KeyH', key: 'h', label: 'H', cls: 'perk honk', title: 'honk' },
+  // Chili only: fires along the facing direction, in the A button's place.
+  { code: 'KeyF', key: 'f', label: '✹', cls: 'act fire', title: 'fire' },
 ];
 
 export function wantsTouch() {

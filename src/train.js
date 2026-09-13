@@ -67,6 +67,18 @@ export class Train {
     }
   }
 
+  // The whistle: every follower waiting at the finish runs back and rejoins
+  // the line here. Returns how many came.
+  recall() {
+    const n = this.waiting;
+    if (!n) return 0;
+    if (this.waitingMeshes) { for (const w of this.waitingMeshes) w.mesh.parent?.remove(w.mesh); this.waitingMeshes = null; }
+    this.waiting = 0;
+    for (let i = 0; i < n; i++) this.hatch(true);
+    this.voice?.(1.6);
+    return n;
+  }
+
   // The follower standing on a cell, if any.
   chickAt(c, r) {
     return this.chicks.find((k) => k.rec && k.rec.row === r && Math.round(this.resolveX(k.rec)) === c) ?? null;

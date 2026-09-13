@@ -31,7 +31,7 @@ const HEARING_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [50, 53, 57, 60], [43,
 let ctx, master, bus, delayBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
-const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false };
+const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
 const TALLY_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55]]; // C F G C
 const EPILOGUE_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [53, 57, 60, 64], [55, 59, 62, 65]]; // Cmaj7 Am7 Fmaj7 G7
 let mood = { ...QUIET };
@@ -122,7 +122,7 @@ const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, {
 
 // ---------- step sequencer ----------
 function scheduleStep(s, t) {
-  const target = MOODS[mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.hearing ? 'hearing' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm'];
+  const target = MOODS[mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.hearing ? 'hearing' : mood.gauntlet ? 'gauntlet' : mood.danger || mood.star ? 'danger' : 'calm'];
   // A running continue countdown pushes the tempo up toward the end.
   const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : target.bpm;
   bpm += (goalBpm - bpm) * 0.12;
@@ -131,7 +131,7 @@ function scheduleStep(s, t) {
   const chord = prog[bar % prog.length];
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
-  const danger = (mood.danger || mood.gauntlet) && !mood.dead;
+  const danger = (mood.danger || mood.gauntlet || mood.star) && !mood.dead;   // a star drives like danger
 
   filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff, t, 0.2);
 
@@ -205,8 +205,8 @@ function scheduleStep(s, t) {
     if (s % 4 === 2 && Math.random() < 0.5) shaker(t);
   }
 
-  if (mood.tilted) {
-    // Peek overlay: high sparkle arp cycling the chord two octaves up.
+  if (mood.tilted || mood.star) {
+    // Peek overlay: high sparkle arp cycling the chord two octaves up. A star gets it too.
     const tone = chord[(s + bar) % chord.length] + 24;
     if (s % 2 === 0 || danger) sparkle(tone, t, sixteenth * 2.5);
     if (s % 4 === 0) shaker(t, 0.05);

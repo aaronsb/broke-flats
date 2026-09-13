@@ -17,6 +17,10 @@
     #bar span { white-space: nowrap; }
     #bar b { color: var(--accent); font-weight: normal; }
     #coins.draining b { animation: pulse .5s infinite alternate; display: inline-block; }
+    /* Active powerups: NAME 6s per power, hidden when none. */
+    #power { color: var(--accent); }
+    #power[hidden] { display: none; }
+    #power b { color: var(--ink); }
     @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
     #card  { position: absolute; top: 58px; left: 0; right: 0; text-align: center; }
     #hint  { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; opacity: .85; }
@@ -52,6 +56,10 @@
     #touchbar .perk { position: absolute; bottom: 158px; display: none; border-radius: 50%; }
     body.honk #touchbar .perk.honk { display: block; right: 14px; background: rgba(217, 112, 42, .82); }
     #touchbar .act.a { right: 70px; bottom: 56px; width: 64px; height: 64px; background: rgba(217, 112, 42, .85); }
+    /* A chili in hand: the fire button stands where A was. */
+    #touchbar .act.fire { display: none; right: 70px; bottom: 56px; width: 64px; height: 64px; background: rgba(224, 60, 30, .9); }
+    body.chili #touchbar .act.a { display: none; }
+    body.chili #touchbar .act.fire { display: block; }
     #touchbar .act.b { right: 14px; bottom: 100px; }
     #touchbar .act.c { right: 14px; bottom: 12px; }
     #touchbar .act.s { right: 150px; bottom: 12px; font-size: var(--ui); }
@@ -183,6 +191,7 @@
       <span>LIVES <b id="lives">0</b></span>
       <span>TRIES <b id="tries">0</b></span>
       <span id="chicks">FLOCK <b>0</b></span>
+      <span id="power" hidden></span>
       <span>BEST <b id="best">0</b></span>
     </div>
     <div id="debug" hidden></div>

@@ -1,9 +1,10 @@
 // Playtest controls. Backquote toggles the panel; keys only act while it is open.
 import { SCENARIOS } from './scenarios/index.js';
+import { BARRIER_IDS } from './scenarios/barrier.js';
 import { SKIES } from './sky.js';
 import { SCENERY } from './scenery/index.js';
 
-const FORCE = { KeyQ: 'road', KeyE: 'river', KeyI: 'runway', KeyO: 'rail', KeyL: 'mines', KeyT: 'grass', KeyY: 'hedge', KeyU: 'meadow' };
+const FORCE = { KeyQ: 'road', KeyE: 'river', KeyI: 'runway', KeyO: 'rail', KeyB: 'freight', KeyL: 'mines', KeyT: 'grass', KeyU: 'meadow' };
 
 export function installDebug(game, ui) {
   const panel = ui.debug;
@@ -11,7 +12,7 @@ export function installDebug(game, ui) {
     panel.innerHTML = [
       '<b>DEBUG</b> (` closes)',
       '1-4 level &nbsp; 5 hearing &nbsp; N next level',
-      'Q road &nbsp; E river &nbsp; I runway &nbsp; O rail &nbsp; L mines &nbsp; T grass &nbsp; Y hedge &nbsp; U meadow &nbsp; 0 clear',
+      'Q road &nbsp; E river &nbsp; I runway &nbsp; O rail &nbsp; B freight &nbsp; L mines &nbsp; T grass &nbsp; Y barrier (again: next variant) &nbsp; U meadow &nbsp; 0 clear',
       'K sky &nbsp; J scenery &nbsp; V gauntlet &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
       `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · scenery: ${game.debug.scenery ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,
     ].join('<br>');
@@ -31,6 +32,7 @@ export function installDebug(game, ui) {
     else if (c === 'Digit5') game.stageClear();
     else if (c === 'KeyN') game.nextLevel();
     else if (c in FORCE) { game.debug.force = FORCE[c]; game.restartStage(); }
+    else if (c === 'KeyY') { game.debug.force = BARRIER_IDS[(BARRIER_IDS.indexOf(game.debug.force) + 1) % BARRIER_IDS.length]; game.restartStage(); }
     else if (c === 'Digit0') { game.debug.force = null; game.restartStage(); }
     else if (c === 'KeyK') {
       const names = Object.keys(SKIES);

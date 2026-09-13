@@ -12,7 +12,7 @@ The Claude-in-Chrome tab cannot reach this machine's dev server. Everything is v
 
 1. **Build**: `npx vite build 2>&1 | tail -1`. Must end in `✓ built`.
 2. **Smoke** the scenarios that touch what changed: `make smoke S=<name>`. Each prints its key lines and ends with `errors: none`. Anything else is a runtime error with a stack; fix before going on.
-3. **Shots**: `make shots` writes one PNG per view into `docs/screenshots/` and regenerates `docs/screenshots.md`. Then `Read` the PNGs that show the change (`select.png`, `top.png`, `iso.png`, `night-iso.png`, `battle-land.png`, `battle-air.png`, `river-iso.png`, `runway-iso.png`, `hedge-iso.png`, `tally.png`, `game-over.png`, `touch.png`, `rail-top.png`).
+3. **Shots**: `make shots` writes one PNG per view into `docs/screenshots/` and regenerates `docs/screenshots.md`. Then `Read` the PNGs that show the change (`select.png`, `top.png`, `iso.png`, `night-iso.png`, `battle-land.png`, `battle-air.png`, `river-iso.png`, `runway-iso.png`, `freight-iso.png`, `barrier-<variant>-top.png` and `-iso.png` (hedge, trees, busStop, picket, chainlink, wall), `tally.png`, `game-over.png`, `touch.png`, `rail-top.png`).
 4. **Say what you saw.** Describe the frame in the reply: what is right, what is off. If it is off, fix and re-shoot.
 5. Commit and push only when 1–4 are clean. Pushes to `main` deploy to GitHub Pages.
 
@@ -24,7 +24,7 @@ container, a machine with only Chromium — put a path in `CHROME_BIN`:
 
 ## Scenario names
 
-`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, hearing pilots) · `battle` (the hearing: kills, next level) · `river` `runway` `rail` `bounce` `cab` `wing` `hint` `traffic` `halt` `halt-crash` `gauntlet` (scenario mechanics) · `perks` (chicken fences, pig bushes, frog long jump, robot heavy) · `perks2` (cat nine lives, goose honk) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
+`hops` (crossing, tilt drain, coins) · `train` `occupied` (followers, swap rule) · `respawn` `lives` (deaths, economy, continue countdown) · `tally` (finish tally) · `coop` (two players, leash, hearing pilots) · `battle` (the hearing: kills, next level) · `river` `runway` `rail` `freight` (the endless train: through a two-sided box car, refused at a one-sided car's closed side, the one gate; writes `freight-top.png` and `freight-iso.png`) `bounce` `cab` `wing` `hint` `traffic` `halt` `halt-crash` `gauntlet` (scenario mechanics) · `barrier` (every barrier variant: the weak cell passes, the rest refuse, the double band, the road follow-up) · `perks` (chicken fences, pig bushes, frog long jump, robot heavy) · `perks2` (cat nine lives, goose honk) · `powerups` (crates top-down and tilted, the star, hourglass, magnet, whistle and golden egg; writes `crate-top.png` and `crate-iso.png`) · `powerups2` (mushroom stride and crush, acorn under a truck, chili shots and chip, tilt slide and return; writes `giant-iso.png` and `tilt.png`) · `night` `skies` (lighting) · `debug` `playtest` `touch` (tooling) · `poses` (every death pose and the arrivals) · `logo` (the attract intro on its beats) · `phone` `tablet` (a whole run at a device shape) · `shots`.
 
 The list lives in `scripts/smoke.mjs`; `make` prints it.
 

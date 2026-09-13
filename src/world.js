@@ -4,6 +4,8 @@ import { randInt } from './util.js';
 
 export { W, SPAN } from './lane.js';
 
+const FOLLOW_CHANCE = 0.4;   // a band with followers (a road, for the barriers) gets one this often
+
 // The board: owns the rows, sequences scenario bands, and dispatches the
 // per-row hooks. Scenario-specific behaviour lives in src/scenarios/.
 export class World {
@@ -19,6 +21,7 @@ export class World {
     this.lastUsed = {};
     this.dangerBands = 0;
     this.done = false;       // finish line has been queued
+    this.frozen = false;     // hourglass: every lane's movers hold still
     this.onFinish = config.onFinish;
   }
 
@@ -56,6 +59,7 @@ export class World {
     if (!lane) return false;
     const kind = lane.blockKind(c);
     if (kind && !player?.passes?.(kind)) return true;
+    if (player?.giant && lane.scenario.id === 'hedge' && c === lane.data.weak) return true;   // too big for the tunnel
     if (fromRow !== null && lane.scenario.blockedFrom?.(lane, c, fromRow)) return true;
     const from = fromRow !== null ? this.rows.get(fromRow) : null;
     if (from?.scenario.blockedExit?.(from, c, r)) return true;
@@ -65,13 +69,22 @@ export class World {
   // ---- sequencer ----
   weightOf(s) { return this.config.weights[s.id] ?? 0; }
 
-  pickScenario(r) {
+  // Scenarios allowed to start a band at row r: weighted, and past their gap
+  // (a family shares one gap, so its variants do not stack up).
+  candidates(r) {
     const gap = (s) => (this.config.ignoreGaps && !s.keepGap ? 0 : s.minGap ?? 0);
-    const pool = Object.values(SCENARIOS).filter((s) => this.weightOf(s) > 0 && r - (this.lastUsed[s.id] ?? -100) >= gap(s));
-    if (pool.length === 0) return SCENARIOS[INTRO];
+    return Object.values(SCENARIOS).filter((s) => this.weightOf(s) > 0 && r - (this.lastUsed[s.family ?? s.id] ?? -100) >= gap(s));
+  }
+
+  weightedPick(pool) {
     let roll = Math.random() * pool.reduce((a, s) => a + this.weightOf(s), 0);
     for (const s of pool) { roll -= this.weightOf(s); if (roll <= 0) return s; }
     return pool[pool.length - 1];
+  }
+
+  pickScenario(r) {
+    const pool = this.candidates(r);
+    return pool.length === 0 ? SCENARIOS[INTRO] : this.weightedPick(pool);
   }
 
   // After the level's danger-band quota, lay the finish line and then only meadow.
@@ -87,21 +100,30 @@ export class World {
     if (this.queue.length === 0 && this.dangerBands >= this.config.bands) this.queueFinish();
     if (this.queue.length === 0) {
       const s = this.pickScenario(r);
-      if (s.danger) this.dangerBands++;
-      const count = randInt(s.band[0], s.band[1]);
-      const pad = s.pad && { scenario: SCENARIOS[s.pad], index: 0, count: 1 };
-      // Scenarios with `flank` need flat neighbours (a runway's wings reach over
-      // the rows either side): add one before if the last row is not flat, and one after.
-      const flankSpec = () => ({ scenario: SCENARIOS[s.flank[Math.floor(Math.random() * s.flank.length)]], index: 0, count: 1 });
-      const prev = this.rows.get(r - 1);
-      if (s.flank && prev && !s.flank.includes(prev.scenario.id)) this.queue.push(flankSpec());
-      if (pad) this.queue.push(pad);
-      for (let i = 0; i < count; i++) this.queue.push({ scenario: s, index: i, count });
-      if (pad) this.queue.push({ ...pad });
-      if (s.flank) this.queue.push(flankSpec());
-      this.lastUsed[s.id] = r;
+      this.queueBand(s, r);
+      // A band that others like to follow (a road, for a barrier): roll one to come next.
+      const tails = this.candidates(r).filter((t) => t.follows === s.id);
+      if (tails.length && Math.random() < FOLLOW_CHANCE) this.queueBand(this.weightedPick(tails), r);
     }
     return this.queue.shift();
+  }
+
+  // Queue one band of s (with its pad and flank rows) to start at the end of the queue.
+  queueBand(s, r) {
+    if (s.danger) this.dangerBands++;
+    const band = typeof s.band === 'function' ? s.band(this.config.level ?? 1) : s.band;
+    const count = randInt(band[0], band[1]);
+    const pad = s.pad && { scenario: SCENARIOS[s.pad], index: 0, count: 1 };
+    // Scenarios with `flank` need flat neighbours (a runway's wings reach over
+    // the rows either side): add one before if the last row is not flat, and one after.
+    const flankSpec = () => ({ scenario: SCENARIOS[s.flank[Math.floor(Math.random() * s.flank.length)]], index: 0, count: 1 });
+    const prev = this.queue.length ? this.queue[this.queue.length - 1] : this.rows.get(r - 1);
+    if (s.flank && prev && !s.flank.includes(prev.scenario.id)) this.queue.push(flankSpec());
+    this.lastUsed[s.family ?? s.id] = r + this.queue.length;
+    if (pad) this.queue.push(pad);
+    for (let i = 0; i < count; i++) this.queue.push({ scenario: s, index: i, count });
+    if (pad) this.queue.push({ ...pad });
+    if (s.flank) this.queue.push(flankSpec());
   }
 
   // Rows behind the start are plain meadow so the tilted view has ground behind the player.

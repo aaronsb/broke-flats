@@ -2,13 +2,14 @@
 // side bays hide a coin or egg from straight above.
 import { W } from '../lane.js';
 import { randInt, pick, clamp } from '../util.js';
+import { rollCrate } from '../powerups.js';
 
 export default {
   id: 'grass',
   danger: false,
   weight: 3,
   band: [1, 3],
-  build(lane, { world }) {
+  build(lane, { world, level, gauntlet }) {
     lane.terrain();
     lane.edges();
     const scenery = lane.scenery;
@@ -34,5 +35,6 @@ export default {
       if (Math.random() < 0.22) { const o = scenery.obstacle(); lane.add(o, c); lane.block(c, o.userData.kind); }
       else if (Math.random() < 0.04) lane.coin(c);
     }
+    rollCrate(lane, { level, gauntlet });
   },
 };

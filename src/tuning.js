@@ -21,6 +21,7 @@ const UNLOCK = {
   river:  { log: 1, boat: 2, gator: 3, sub: 4 },
   runway: { taxi: 1, takeoff: 2, landing: 3 },
   rail:   { diesel: 1, steam: 2, bullet: 4 },
+  freight: { closed: 1, box2: 1, flat: 1, box1: 2 },   // one-sided cars, the trap, wait a level
 };
 export function kindsFor(scenario, level) {
   return Object.entries(UNLOCK[scenario]).filter(([, at]) => level >= at).map(([k]) => k);

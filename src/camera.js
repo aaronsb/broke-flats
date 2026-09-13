@@ -27,6 +27,7 @@ const FIT_PULL = 1.6;
 const PRESETS = {
   top:        { tilt: 0,    yaw: 0,   fov: 12 },
   iso:        { tilt: 0.85, yaw: 0.55, fov: 20 },   // near-orthographic isometric
+  slide:      { tilt: 0.85, yaw: 0.55, fov: 20, roll: 0.45 },   // the tilt powerup: iso, rolled so the board slopes to +x
   select:     { tilt: 1.2,  yaw: 0,    fov: 38, span: 3.1 },
   // Battle: camera about 9-10 units up and 8-9 behind the chicken; the tilt
   // picks which row sits mid-screen. Targets are set by the battle mode.
@@ -47,6 +48,8 @@ export class CameraRig {
     this.aspect = 1;
     this.view = { ...PRESETS.top };
     this.goal = PRESETS.top;
+    this.goalName = 'top';
+    this.zoom = 1; this.zoomGoal = 1;   // a giant player pulls the camera back a little
     this.distance = 40;
     this.applyView();
   }
@@ -61,17 +64,18 @@ export class CameraRig {
       ? v.span * clamp(FIT_REF / this.aspect, 1, FIT_PULL)
       : Math.min(HALF / this.aspect, HALF_H_MAX);
     const derived = halfH / Math.tan((v.fov * Math.PI) / 360);
-    this.distance = derived;
-    this.halfW = halfH * this.aspect;   // world units visible either side of the target
+    this.distance = derived * this.zoom;
+    this.halfW = halfH * this.zoom * this.aspect;   // world units visible either side of the target
     c.fov = v.fov;
     c.aspect = this.aspect;
     c.position.set(0, this.distance, 0);
+    c.rotation.z = v.roll ?? 0;
     c.updateProjectionMatrix();
     this.pivot.rotation.x = v.tilt;
     this.rig.rotation.y = v.yaw;
   }
 
-  setGoal(name) { this.goal = PRESETS[name]; }
+  setGoal(name) { this.goal = PRESETS[name]; this.goalName = name; }
 
   snap(x, z, name) {
     if (name) { this.setGoal(name); this.view = { ...this.goal }; }
@@ -86,6 +90,8 @@ export class CameraRig {
     this.view.yaw = lerp(this.view.yaw, this.goal.yaw, k);
     this.view.fov = lerp(this.view.fov, this.goal.fov, k);
     this.view.span = lerp(this.view.span ?? 0, this.goal.span ?? 0, k);
+    this.view.roll = lerp(this.view.roll ?? 0, this.goal.roll ?? 0, k);
+    this.zoom = lerp(this.zoom, this.zoomGoal, k);
     const f = damp(5, dt);
     this.rig.position.x = lerp(this.rig.position.x, tx, f);
     this.rig.position.z = lerp(this.rig.position.z, tz, f);

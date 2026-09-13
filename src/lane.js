@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { makeGround, makeCoin, makeEgg, makeFlagMarker, setBrake } from './meshes.js';
+import { makeGround, makeCoin, makeEgg, makeFlagMarker, makeCrate, setBrake } from './meshes.js';
+import { POWERUPS } from './powerups.js';
 import { rand } from './util.js';
 import { sfx } from './sfx.js';
 
@@ -51,11 +52,13 @@ export class Lane {
     this.coins = new Map();
     this.eggs = new Map();
     this.flags = new Map();      // player-planted markers, any row
+    this.crates = new Map();     // powerup crates: c -> { mesh, item, id }
     this.movers = [];
     this.dir = 0;
     this.speed = 0;
     this.halts = false;      // traffic brakes for a procession (roads)
     this.blockers = null;    // [{ x, n }] cells held by a player and followers, refreshed per frame
+    this.freeze = false;     // this row's movers hold still (see `frozen`)
     this.data = {};          // scenario-private state
   }
 
@@ -106,6 +109,45 @@ export class Lane {
     if (Math.random() > chance) return;
     const c = Math.round(rand(-W + 1, W - 1));
     if (Math.random() < eggShare) this.egg(c); else this.coin(c);
+  }
+
+  // Time stopped: the hourglass sets it on the world, and a row can hold
+  // its own. advance() and the self-moving scenarios (rail, runway) read it.
+  get frozen() { return this.freeze || !!this.world?.frozen; }
+  set frozen(v) { this.freeze = v; }
+
+  // A powerup crate. Top-down it is a plain box; the item floats above it and
+  // is shown only while the camera is tilted (the crossing mode toggles it).
+  crate(c, id) {
+    const spec = POWERUPS[id];
+    if (!spec) return null;
+    const mesh = makeCrate();
+    const item = spec.make();
+    item.position.y = 1.1;
+    item.visible = false;
+    mesh.add(item);
+    this.crates.set(c, { mesh, item, id });
+    this.add(mesh, c);
+    return mesh;
+  }
+
+  // Removes the crate at c and returns its powerup id, or null.
+  takeCrate(c) {
+    const crate = this.crates.get(c);
+    if (!crate) return null;
+    this.group.remove(crate.mesh);
+    this.crates.delete(c);
+    return crate.id;
+  }
+
+  // A crate in this cell or one either side of it, on this row or its neighbours.
+  crateNear(c) {
+    for (const r of [this.r - 1, this.r, this.r + 1]) {
+      const lane = r === this.r ? this : this.world?.laneAt(r);
+      if (!lane) continue;
+      for (const k of lane.crates.keys()) if (Math.abs(k - c) <= 1) return true;
+    }
+    return false;
   }
 
   toggleFlag(c) {
@@ -199,7 +241,7 @@ export class Lane {
   riding(m, player) { return !!player && (player.carrier === m || player.hopCarrier === m); }
 
   moverAt(x, pad) {
-    for (const m of this.movers) if (Math.abs(x - m.x) < m.len / 2 + pad) return m;
+    for (const m of this.movers) if (!m.held && Math.abs(x - m.x) < m.len / 2 + pad) return m;
     return null;
   }
 
@@ -239,9 +281,10 @@ export class Lane {
   }
 
   advance(dt) {
+    if (this.frozen) return;
     // Stallers: go -> slowing -> stopped -> go, each phase eased.
     for (const m of this.movers) {
-      if (!m.staller) continue;
+      if (!m.staller || m.held) continue;
       const st = m.staller;
       st.wait -= dt;
       if (st.wait <= 0) {
@@ -252,7 +295,7 @@ export class Lane {
     }
     // Car following, nearest ahead first so a wreck this frame is skipped by
     // whoever was behind it: they follow the survivor instead.
-    const ordered = [...this.movers].sort((a, b) => a.x * this.dir - b.x * this.dir);
+    const ordered = this.movers.filter((m) => !m.held).sort((a, b) => a.x * this.dir - b.x * this.dir);   // held: slid off by the tilt, waiting to come back
     const n = ordered.length;
     const gapMin = this.gapMin ?? 0;
     for (let i = 0; i < n; i++) {
@@ -298,13 +341,23 @@ export class Lane {
       if (m.x < -SPAN) m.x += 2 * SPAN;
       m.mesh.position.x = m.x;
     }
+    // Held movers (slid off by the tilt powerup) trail back in from beyond
+    // the ring at row speed, out of everyone's way, and rejoin at the edge.
+    for (const m of this.movers) {
+      if (!m.held) continue;
+      m.x += this.dir * this.speed * dt;
+      m.mesh.position.x = m.x;
+      if (m.x * this.dir >= -SPAN) { m.held = false; m.mesh.visible = true; }
+    }
   }
 
   // Two vehicles meet: the faster one breaks apart and the slower one drives on.
-  crash(a, b) {
-    const m = (a.v ?? 1) >= (b.v ?? 1) ? a : b;
+  crash(a, b) { this.wreck((a.v ?? 1) >= (b.v ?? 1) ? a : b); }
+
+  // One mover comes apart and leaves the row.
+  wreck(m, kick = 1.1) {
     const fx = this.world?.config?.fx;
-    if (fx) fx.explode(m.mesh, 1.1); else this.group.remove(m.mesh);
+    if (fx) fx.explode(m.mesh, kick); else this.group.remove(m.mesh);
     m.wrecked = true;
     this.movers = this.movers.filter((o) => o !== m);
     sfx.boom(1.2);
@@ -314,5 +367,6 @@ export class Lane {
     const spin = (coin) => { coin.rotation.y = time * 1.4; coin.position.y = Math.sin(time * 2.5) * 0.06; };
     for (const coin of this.coins.values()) spin(coin);
     for (const m of this.movers) if (m.coin) spin(m.coin);
+    for (const c of this.crates.values()) { c.item.rotation.y = time * 0.9; c.item.position.y = 1.1 + Math.sin(time * 2) * 0.08; }
   }
 }

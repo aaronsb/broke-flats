@@ -72,6 +72,7 @@ export default {
   },
 
   update(lane, dt) {
+    if (lane.frozen) return;
     const near = Math.abs(lane.r - (lane.world?.focusRow ?? lane.r)) <= 7;
     for (const m of lane.movers) {
       const p = progress(lane, m);

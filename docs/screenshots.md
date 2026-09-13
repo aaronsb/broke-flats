@@ -1,10 +1,58 @@
 # Screenshots
 
-Captured by `make shots` on 2026-09-12.
+Captured by `make shots` on 2026-09-13.
 
 ## about
 
 ![about.png](screenshots/about.png)
+
+## barrier-busStop-iso
+
+![barrier-busStop-iso.png](screenshots/barrier-busStop-iso.png)
+
+## barrier-busStop-top
+
+![barrier-busStop-top.png](screenshots/barrier-busStop-top.png)
+
+## barrier-chainlink-iso
+
+![barrier-chainlink-iso.png](screenshots/barrier-chainlink-iso.png)
+
+## barrier-chainlink-top
+
+![barrier-chainlink-top.png](screenshots/barrier-chainlink-top.png)
+
+## barrier-hedge-iso
+
+![barrier-hedge-iso.png](screenshots/barrier-hedge-iso.png)
+
+## barrier-hedge-top
+
+![barrier-hedge-top.png](screenshots/barrier-hedge-top.png)
+
+## barrier-picket-iso
+
+![barrier-picket-iso.png](screenshots/barrier-picket-iso.png)
+
+## barrier-picket-top
+
+![barrier-picket-top.png](screenshots/barrier-picket-top.png)
+
+## barrier-trees-iso
+
+![barrier-trees-iso.png](screenshots/barrier-trees-iso.png)
+
+## barrier-trees-top
+
+![barrier-trees-top.png](screenshots/barrier-trees-top.png)
+
+## barrier-wall-iso
+
+![barrier-wall-iso.png](screenshots/barrier-wall-iso.png)
+
+## barrier-wall-top
+
+![barrier-wall-top.png](screenshots/barrier-wall-top.png)
 
 ## battle-air
 
@@ -18,17 +66,17 @@ Captured by `make shots` on 2026-09-12.
 
 ![battle-sea.png](screenshots/battle-sea.png)
 
+## freight-iso
+
+![freight-iso.png](screenshots/freight-iso.png)
+
+## freight-top
+
+![freight-top.png](screenshots/freight-top.png)
+
 ## game-over
 
 ![game-over.png](screenshots/game-over.png)
-
-## hedge-iso
-
-![hedge-iso.png](screenshots/hedge-iso.png)
-
-## hedge-top
-
-![hedge-top.png](screenshots/hedge-top.png)
 
 ## iso
 

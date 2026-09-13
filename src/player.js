@@ -4,6 +4,7 @@ import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { SWIM_Y } from './scenarios/river.js';
 import { DEATHS } from './deaths.js';
+import { POWERUPS } from './powerups.js';
 import { POSES, pickPose } from './poses.js';
 import { sfx, voices } from './sfx.js';
 import { lerp, rand, pick } from './util.js';
@@ -21,6 +22,10 @@ const GRAVITY = 14;
 const BURST_GAP = 0.32;   // hops closer than this count toward a burst
 const BURST_HOPS = 4;     // burst length that earns a call
 export const DEATH_FLAP = 0.8; // seconds of frame-flapping before the death pose
+const TILT_GRAB = 1.5;    // a crate grabbed while peeking lasts this much longer
+const SIZE_TWEEN = 0.4;   // seconds a mushroom or acorn takes to change the player's size, with a boing
+const GIANT_ARC = 0.75;   // a giant's two-row hop flies higher
+const GIANT_HOP = 1.5;    // and takes this many times as long
 
 export class Player {
   constructor(scene, world, character = { make: makeChicken, voice: 'chicken' }, variant) {
@@ -35,11 +40,14 @@ export class Player {
     this.heavy = !!character.heavy;       // never bounces off a bumper, sinks on touching water
     this.mesh = character.make(variant);
     this.voice = voices[character.voice];
+    this.powers = new Map();    // active powerups: id -> { left, ctx } (see powerups.js)
+    this.powerCtx = null;       // hook: () => extra ctx fields (mode, game, train) for a grant
     scene.add(this.mesh);
     this.reset();
   }
 
   reset() {
+    this.clearPowers();
     POSES[this.deathAnim]?.exit?.(this);
     this.restore?.();
     this.posed = false;
@@ -68,6 +76,10 @@ export class Player {
     this.invincible = false;
     this.frozen = false;
     this.bump = 0;
+    this.size = 1; this.sizeFrom = 1; this.sizeGoal = 1; this.sizeT = SIZE_TWEEN;   // mesh scale, tweened (mushroom, acorn)
+    this.giant = false;       // mushroom: two-cell hops, crushes movers, too big for a hedge tunnel
+    this.tiny = false;        // acorn: under truck beds, through fences, a bounce keeps the buffered hop
+    this.stride = 1;
     this.lastHop = -10; this.burst = 0; this.idle = 0;
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
@@ -79,6 +91,7 @@ export class Player {
 
   // Remove everything this player put in the scene.
   dispose() {
+    this.clearPowers();
     POSES[this.deathAnim]?.exit?.(this);
     this.restore();
     if (this.halo) { this.mesh.remove(this.halo); this.halo = null; }
@@ -86,9 +99,83 @@ export class Player {
     this.scene.remove(this.mesh);
   }
 
+  // ---- powerups ----
+  ctxFor() { return { player: this, world: this.world, ...(this.powerCtx?.() ?? {}) }; }
+
+  // Grant a powerup for `mul` times its base duration. Instant ones apply and
+  // are gone; re-granting an active one tops its time back up.
+  grant(id, mul = 1) {
+    const spec = POWERUPS[id];
+    if (!spec) return false;
+    const ctx = this.ctxFor();
+    const left = (spec.duration ?? 0) * mul;
+    if (!left) { spec.apply?.(ctx); return true; }
+    const active = this.powers.get(id);
+    if (active) { active.left = Math.max(active.left, left); spec.regrant?.(active.ctx); return true; }
+    this.powers.set(id, { left, ctx });
+    spec.apply?.(ctx);
+    return true;
+  }
+
+  hasPower(id) { return this.powers.has(id); }
+
+  // End a power early (a chili out of shots).
+  revoke(id) {
+    const e = this.powers.get(id);
+    if (!e) return;
+    this.powers.delete(id);
+    POWERUPS[id]?.expire?.(e.ctx);
+  }
+
+  // Grow or shrink toward `goal` over SIZE_TWEEN seconds, overshooting on the way.
+  setSize(goal) {
+    this.sizeFrom = this.size;
+    this.sizeGoal = goal;
+    this.sizeT = 0;
+  }
+
+  // Opening a crate: the peek pays off in duration.
+  takePower(id) {
+    const tilted = !!this.ctxFor().mode?.tilted;
+    this.grant(id, tilted ? TILT_GRAB : 1);
+    sfx.power();
+    this.fx?.sparkles(new THREE.Vector3(this.x, this.y, this.z), 10);
+  }
+
+  tickPowers(dt) {
+    for (const [id, e] of this.powers) {
+      const spec = POWERUPS[id];
+      e.left -= dt;
+      if (e.left <= 0) { this.powers.delete(id); spec.expire?.(e.ctx); continue; }
+      spec.update?.(e.ctx, dt);
+    }
+  }
+
+  clearPowers() {
+    if (!this.powers?.size) return;
+    const had = [...this.powers];
+    this.powers.clear();
+    for (const [id, e] of had) POWERUPS[id]?.expire?.(e.ctx);
+  }
+
+  // Under a star (or as a giant) the thing that would have killed you blows up
+  // instead. Water and being carried off the edge still count: there is nothing to blow up.
+  starSave(cause) {
+    if (cause === 'water' || Math.abs(this.x) > W + 0.5) return false;
+    const lane = this.world.laneAt(this.moving && this.t > 0.5 ? this.trow : this.row);
+    const m = lane?.moverAt(this.x, 0.6);
+    if (m) { lane.wreck(m, 1.3); if (this.carrier === m) this.carrier = null; }
+    return true;
+  }
+
   // Which kinds of static block this player walks through.
   passes(kind) {
-    return (kind === 'fence' && this.fences) || (kind === 'bush' && this.bushes);
+    return (kind === 'fence' && (this.fences || this.tiny)) || (kind === 'bush' && this.bushes);
+  }
+
+  // Whether a hop may land on (tc, tr) from this player's row.
+  canHop(tc, tr) {
+    return Math.abs(tc) <= W && tr >= 0 && tr >= this.maxRow - BACK_LIMIT && !!this.world.laneAt(tr) && !this.world.isBlocked(tc, tr, this.row, this) && !this.isOccupied?.(tc, tr);
   }
 
   // Ground height on arrival at a cell: a fence rail for a fences player,
@@ -103,15 +190,17 @@ export class Player {
   hop(dc, dr) {
     if (!this.alive || this.frozen) return;
     if (this.moving) {
-      if (this.bouncing) return;   // a bounce swallows queued input
+      if (this.bouncing && !this.tiny) return;   // a bounce swallows queued input; a tiny player keeps it
       if (this.longJump && this.extend(dc, dr)) return;
       this.buffered = [dc, dr];
       return;
     }
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
-    const tc = Math.round(this.x) + dc;
-    const tr = this.row + dr;
-    if (Math.abs(tc) > W || tr < 0 || tr < this.maxRow - BACK_LIMIT || !this.world.laneAt(tr) || this.world.isBlocked(tc, tr, this.row, this) || this.isOccupied?.(tc, tr)) {
+    // A giant strides two cells; where the far cell is off the board or blocked, one.
+    this.stride = this.giant && this.canHop(Math.round(this.x) + dc * 2, this.row + dr * 2) ? 2 : 1;
+    const tc = Math.round(this.x) + dc * this.stride;
+    const tr = this.row + dr * this.stride;
+    if (!this.canHop(tc, tr)) {
       this.bump = 0.12;
       sfx.bump();
       return;
@@ -131,7 +220,7 @@ export class Player {
     this.airborne = high ? { hover: HOVER, vy: 0 } : null;
     this.tcol = tc; this.trow = tr;
     this.moving = true; this.t = 0;
-    this.long = false; this.arc = ARC;
+    this.long = false; this.arc = this.stride > 1 ? GIANT_ARC : ARC;
     this.carrier = null;
     sfx.hop();
     this.call();
@@ -191,7 +280,7 @@ export class Player {
     const fromDeck = this.moving && this.hopCarrier;
     const col = fromDeck ? Math.round(this.from.x) : Math.round(this.x) - lane.dir;
     const row = this.moving ? this.trow : this.row;
-    if (Math.abs(col) > W || this.world.isBlocked(col, row, row, this) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
+    if (Math.abs(col) > W || this.world.isBlocked(col, row, row, this) || this.isOccupied?.(col, row)) { this.die(lane.scenario.id === 'rail' || lane.scenario.id === 'freight' ? 'train' : lane.scenario.id === 'runway' ? 'plane' : 'car'); return; }
     this.row = row; this.col = col;
     this.from = { x: this.x, z: this.z, y: this.y };
     this.to = { x: col, z: -row };
@@ -202,7 +291,7 @@ export class Player {
     this.facing = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     this.bounces = (this.bounces ?? 0) + 1;
     this.bouncing = true;        // no second hit until this hop lands
-    this.buffered = null;        // and no automatic retry into the same bumper
+    if (!this.tiny) this.buffered = null;   // and no automatic retry into the same bumper; a tiny player keeps its hop
     sfx.bump();
   }
 
@@ -213,6 +302,8 @@ export class Player {
 
   die(cause) {
     if (!this.alive || this.invincible) return;
+    if ((this.hasPower('star') || this.giant) && this.starSave(cause)) return;
+    this.clearPowers();
     this.alive = false;
     this.deadBy = cause;
     this.deadFor = 0;
@@ -238,6 +329,8 @@ export class Player {
     const wing = this.world.wingAt(this.x, this.row);
     if (wing) { this.mount(wing); this.onLanded?.(); this.onLandedHint?.(); return; }
     let cause = lane.scenario.onLand?.(lane, this);
+    // A giant coming down on a river crushes the boat or the gator, then meets the water.
+    if (cause && cause !== 'water' && this.giant && lane.scenario.id === 'river') { this.starSave(cause); cause = this.swims ? null : 'water'; }
     if (cause === 'bounce') {
       if (!this.heavy) { this.moving = true; this.t = 1; this.bounce(lane); return; }
       // Heavy: past the end of a log is open water; a bumper on land pulls away.
@@ -247,6 +340,8 @@ export class Player {
     if (this.carrier) this.carrierOffset = this.x - this.carrier.x;
     if (this.bushes && lane.blockKind(this.col) === 'bush') this.rustle();
     if (lane.takeCoin(this.col)) this.gotCoin();
+    const power = lane.takeCrate(this.col);
+    if (power) this.takePower(power);
     if (this.carrier && Math.abs(this.x - this.carrier.x) < 0.6 && lane.takeMoverCoin(this.carrier)) this.gotCoin();
     if (this.row > this.maxRow) this.maxRow = this.row;
     this.onLanded?.();
@@ -313,13 +408,20 @@ export class Player {
 
   update(dt) {
     if (!this.alive) { this.updateDead(dt); return; }
+    this.tickPowers(dt);
     const m = this.mesh;
     let sx = 1, sy = 1;
     this.idle += dt;
     if (this.idle > 9 && Math.random() < dt * 0.15) { this.idle = 0; this.voice?.(); }
 
+    if (this.sizeT < SIZE_TWEEN) {
+      this.sizeT = Math.min(SIZE_TWEEN, this.sizeT + dt);
+      const k = this.sizeT / SIZE_TWEEN;
+      this.size = lerp(this.sizeFrom, this.sizeGoal, 1 - Math.cos(k * Math.PI * 1.5) * (1 - k));   // lands early, overshoots, settles
+    }
+
     if (this.moving) {
-      this.t += dt / (this.long ? 2 * HOP : HOP);
+      this.t += dt / (this.long ? 2 * HOP : this.stride > 1 ? GIANT_HOP * HOP : HOP);
       const t = Math.min(1, this.t);
       if (this.hopCarrier) {
         const dx = this.hopCarrier.x - this.hopCarrierX;
@@ -370,14 +472,15 @@ export class Player {
     if (!this.carrier?.wing && !this.airborne && !(this.moving && this.bouncing)) {
       const checkRow = this.moving && this.t > 0.5 ? this.trow : this.row;
       const lane = this.world.laneAt(checkRow);
-      const cause = lane?.scenario.lethalAt?.(lane, this.x, this);
-      if (cause === 'bounce') { if (!this.heavy) this.bounce(lane); }   // heavy: the bumper pulls away
+      let cause = lane?.scenario.lethalAt?.(lane, this.x, this);
+      if (cause && cause !== 'bounce' && this.tiny && lane.moverAt(this.x, 0.35)?.tall) cause = null;   // an acorn slips under a truck
+      if (cause === 'bounce') { if (!this.heavy && !this.hasPower('star') && !this.giant) this.bounce(lane); }   // heavy: the bumper pulls away; a star or a giant shrugs it off
       else if (cause) this.die(cause);
     }
 
     m.position.set(this.x, this.y, this.z);
     m.rotation.y = this.facing;
-    m.scale.set(sx, sy, sx);
+    m.scale.set(sx * this.size, sy * this.size, sx * this.size);
 
     if (this.arriving) {
       const a = this.arriving;

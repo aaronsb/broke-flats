@@ -15,6 +15,7 @@ import { Debris } from '../debris.js';
 import { stampOf } from '../stamp.js';
 import { GAUNTLET_BONUS } from '../game.js';
 import { grievanceFor } from '../grievances.js';
+import { POWERUPS } from '../powerups.js';
 
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
@@ -62,7 +63,9 @@ export class CrossingMode {
     this.world.ensure(26);
     this.finished = false;
     this.tally = null;
+    this.followerMul = null;     // a golden egg sets 1; otherwise FOLLOWER_MUL at the tally
     this.tilted = false;
+    this.forceTilt = false;      // the tilt powerup holds the iso view without a coin cost
     this.sinceTilt = 0;
     this.hinted = new Set();     // rows already dinged for
     this.focus = { x: 0, z: 0 };
@@ -98,6 +101,7 @@ export class CrossingMode {
       // so it rides on the run to become the way they come back.
       p.onDie = (cause) => { run.lastPose = p.deathAnim; run.lastCause = cause; if (cause === 'water') this.fx.splash(p.mesh.position); };
       p.isOccupied = (col, row) => this.blocked(p, col, row);
+      p.powerCtx = () => ({ mode: this, game: this.game, train: this.trains?.[i] });
       const col = roster.length > 1 ? (i === 0 ? -1 : 1) : 0;
       p.col = col; p.x = col; p.mesh.position.x = col;
       if (run.lastPose) p.arrive(run.lastPose);
@@ -153,7 +157,7 @@ export class CrossingMode {
     for (const p of this.players) p.dispose();
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
-    document.body.classList.remove('mines', 'honk');
+    document.body.classList.remove('mines', 'honk', 'chili');
   }
 
   alive() { return this.players.filter((p) => p.alive); }
@@ -176,15 +180,22 @@ export class CrossingMode {
     this.tilted = on;
     this.sinceTilt = 0;
     this.game.ui.view.classList.toggle('on', on);
-    this.game.camera.setGoal(on ? 'iso' : 'top');
+    if (!this.forceTilt) this.game.camera.setGoal(on ? 'iso' : 'top');
     sfx.tilt();
+  }
+
+  // The tilt powerup: the camera rides into the rolled iso view for free and
+  // comes back to wherever the peek left it.
+  setForceTilt(on) {
+    this.forceTilt = on;
+    this.game.camera.setGoal(on ? 'slide' : this.tilted ? 'iso' : 'top');
   }
 
   onKey(e) {
     if (e.code === 'Space') { this.setTilt(!this.tilted); return true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { this.setTilt(true); return true; }
     if (e.code === 'KeyQ' || e.code === 'KeyE') { this.players[0].turn(e.code === 'KeyQ' ? 1 : -1); return true; }
-    if (e.code === 'KeyF') { this.plantFlag(this.players[0]); return true; }
+    if (e.code === 'KeyF') { const p = this.players[0]; if (p.hasPower('chili')) this.fire(p); else this.plantFlag(p); return true; }
     const solo = this.players.length === 1;
     if (e.code === 'KeyH' || e.code === 'KeyG') { this.honk(this.players[solo || e.code === 'KeyH' ? 0 : 1]); return true; }
     for (let i = 0; i < KEYMAPS.length; i++) {
@@ -210,6 +221,13 @@ export class CrossingMode {
       if (lane?.halts) n += lane.honk(p.x, HONK_RADIUS, this.fx);
     }
     return n;
+  }
+
+  // A chili in hand: F (touch: the fire button in A's place) sends a fireball the way the player faces.
+  fire(p) {
+    const e = p.powers.get('chili');
+    if (!e || !p.alive) return;
+    POWERUPS.chili.fire(e.ctx);
   }
 
   // Toggle a flag on the cell the player faces, on any row.
@@ -298,6 +316,12 @@ export class CrossingMode {
     const danger = alive.some((p) => world.laneAt(p.moving ? p.trow : p.row)?.scenario.danger);
     music.setMood({ danger, tilted: this.tilted });
 
+    // Crates show their item only from the side; the HUD chip lists what is running.
+    const side = this.tilted || this.forceTilt;
+    for (const lane of world.rows.values()) for (const c of lane.crates.values()) c.item.visible = side;
+    this.showPowers();
+    document.body.classList.toggle('chili', this.players[0].hasPower('chili'));
+
     if (this.tilted) {
       game.run.coins -= TILT_COST * dt;
       if (game.run.coins <= 0) { game.run.coins = 0; this.setTilt(false); }
@@ -342,6 +366,22 @@ export class CrossingMode {
     if (this.tally) { this.updateTally(dt); return; }
     if (this.finished) { this.startTally(front); return; }
     for (const p of this.players) if (!p.alive && !p.gone && p.deadFor > DEATH_FLAP + 0.9) { this.respawn(p); return; }
+  }
+
+  // NAME 6s per active power on the leader, hidden when there are none. A
+  // power with its own `label(entry)` (a chili's shots) writes its own chip.
+  showPowers() {
+    const el = this.powerChip ??= document.getElementById('power');
+    if (!el) return;
+    const parts = [];
+    for (const [id, e] of this.players[0].powers) {
+      const spec = POWERUPS[id];
+      const name = spec?.name ?? id.toUpperCase();
+      parts.push(spec?.label?.(e) ?? (Number.isFinite(e.left) ? `${name} <b>${Math.ceil(e.left)}s</b>` : name));
+    }
+    const html = parts.join(' · ');
+    if (html !== this.powerHtml) { this.powerHtml = html; el.innerHTML = html; }
+    el.hidden = !parts.length;
   }
 
   // Crossing the line freezes the score tiers, then leaves a few seconds to
@@ -392,7 +432,7 @@ export class CrossingMode {
       stamp: `FILED · DAY ${level}`,
       ruling,
       mul: game.scoreMul(),
-      stamps: { count: T.led + T.found, image: (i) => stamp(owners[i] ?? 0), each: FOLLOWER_MUL },
+      stamps: { count: T.led + T.found, image: (i) => stamp(owners[i] ?? 0), each: this.followerMul ?? FOLLOWER_MUL },
       onTotal: (v) => { game.run.score += v; },
       done: () => { T.summaryDone = true; },
     });

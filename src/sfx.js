@@ -215,4 +215,15 @@ export const sfx = {
   // A short rising triad with the octave on top: the ruling went your way.
   fanfare: () => { [72, 76, 79, 84].forEach((n, i) => setTimeout(() => voice({ wave: 'square', freq: N(n), attack: 0.004, decay: 0.03, sustain: 0.7, hold: i === 3 ? 0.32 : 0.08, release: i === 3 ? 0.3 : 0.06, vol: 0.07 }), i * 95));
                    setTimeout(() => voice({ wave: 'triangle', freq: N(76), attack: 0.01, decay: 0.05, sustain: 0.6, hold: 0.3, release: 0.3, vol: 0.05 }), 285); },
+  // Powerups (src/powerups.js). A crate opening: a quick rising four-note run.
+  power: () => voice({ wave: 'square', freq: N(72), arp: [N(76), N(79), N(84), N(88)], arpStep: 0.05, attack: 0.002, decay: 0.03, sustain: 0.7, hold: 0.16, release: 0.12, vol: 0.07 }),
+  // A referee's whistle: a high square with a fast warble, blown twice.
+  whistle: () => { for (const d of [0, 260]) setTimeout(() => voice({ wave: 'square', freq: 2200, arp: [2350, 2200, 2350, 2200, 2350, 2200], arpStep: 0.03, attack: 0.01, decay: 0.03, sustain: 0.8, hold: 0.12, release: 0.06, vol: 0.06 }), d); },
+  // A clock: tick and tock alternate, a fifth apart.
+  clock: (tock = false) => voice({ wave: 'square', freq: N(tock ? 77 : 84), attack: 0.001, decay: 0.02, sustain: 0.2, hold: 0.01, release: 0.05, vol: 0.05 }),
+  // A giant shrinking back: a quick rising squeak.
+  squeak: () => voice({ wave: 'square', freq: N(84), slideTo: N(100), attack: 0.005, decay: 0.03, sustain: 0.6, hold: 0.08, release: 0.08, vol: 0.06 }),
+  // The tilt: after the slam, everything on the board slides off. A long falling noise wash.
+  slide: () => { voice({ wave: 'noise', freq: 2400, slideTo: 180, filter: 'lowpass', attack: 0.1, decay: 0.3, sustain: 0.8, hold: 1.2, release: 0.6, vol: 0.14 });
+                 voice({ wave: 'sawtooth', freq: N(52), slideTo: N(36), attack: 0.1, decay: 0.3, sustain: 0.6, hold: 1.0, release: 0.6, vol: 0.04 }); },
 };
