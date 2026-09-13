@@ -1282,9 +1282,25 @@ if (script === 'powerups2') {
   check(spent === 0 && !gone[0] && !gone[1] && gone[2], `the chili did not end after its last shot (${JSON.stringify(gone)})`);
 
   // Tilt: the camera rides into the rolled iso view, every road within range slides off within 1.5 s, and traffic is back after 5 s.
+  // Count wrecks over the tilt window. Road traffic crashes by design: the
+  // player stands still for five seconds here, the queue halts for them, and a
+  // follower now and then rear-ends a staller that stopped inside its reaction
+  // time (Lane.advance, CRASH_DV) — the same mechanic the halt-crash scenario
+  // exists to test. So the count coming back has to allow for wrecks rather
+  // than demand the row be whole, or this reads as a tilt failure two runs in
+  // ten. What it still catches is a mover that leaves a row without one.
+  await evaluate(`(() => { const proto = Object.getPrototypeOf(__p2.roads()[0]);
+    const snap = (m) => m && { x: +m.x.toFixed(1), v: +(m.v ?? 1).toFixed(2), len: m.len, held: !!m.held, slid: !!m.__slid, staller: m.staller?.phase ?? null, vis: m.mesh.visible };
+    if (!proto.__countsWrecks) {
+      const crash = proto.crash; proto.crash = function (a, b) { (window.__wrecks ??= []).push({ r: this.r, why: 'crash', gapMin: this.gapMin, a: snap(a), b: snap(b), gap: +((b.x - a.x) * this.dir - (a.len + b.len) / 2).toFixed(2) }); return crash.call(this, a, b); };
+      const orig = proto.wreck; proto.wreck = function (m, k) { (window.__wrecks ??= []).push({ r: this.r, why: 'wreck', m: snap(m) }); return orig.call(this, m, k); };
+      proto.__countsWrecks = true;
+    }
+    window.__wrecks = []; })()`);
   const tilt = await evaluate(`(() => { const p = __p2.p(); p.clearPowers(); for (const l of __p2.roads()) l.frozen = false; const l0 = __p2.roads()[0]; __p2.put(0, l0.r - 2);
     const lanes = __p2.roads().filter((l) => Math.abs(l.r - p.row) <= 14); window.__tilt = { lanes, n: lanes.map((l) => l.movers.length), row: p.row };
     p.grant('tilt'); return { lanes: lanes.length, movers: __tilt.n.reduce((a, b) => a + b, 0), goal: __game.camera.goalName, forced: __game.mode.forceTilt, tilted: __game.mode.tilted, coins: __game.run.coins }; })()`);
+  await evaluate(`(() => { const e = __p2.p().powers.get('tilt'); for (const s of e?.ctx?.sliding ?? []) s.m.__slid = true; })()`);
   await sleep(600);
   await shot('tilt');
   await sleep(900);
@@ -1297,11 +1313,12 @@ if (script === 'powerups2') {
   check(mid.row === mid.row0, 'the player moved during the tilt');
   await sleep(3800);
   const back = await evaluate(`(() => { const lanes = __tilt.lanes; return { goal: __game.camera.goalName, forced: __game.mode.forceTilt, frozen: lanes.some((l) => l.frozen),
-    counts: lanes.map((l) => l.movers.length), same: lanes.every((l, i) => l.movers.length === __tilt.n[i]),
-    showing: lanes.map((l) => l.movers.filter((m) => !m.held && m.mesh.visible && Math.abs(m.x) <= 35).length), stray: lanes.some((l) => l.movers.some((m) => m.held && m.mesh.visible)) }; })()`);
+    counts: lanes.map((l) => l.movers.length), lost: lanes.map((l, i) => __tilt.n[i] - l.movers.length - (window.__wrecks ?? []).filter((w) => w.why === 'wreck' && w.r === l.r).length),
+    showing: lanes.map((l) => l.movers.filter((m) => !m.held && m.mesh.visible && Math.abs(m.x) <= 35).length), stray: lanes.some((l) => l.movers.some((m) => m.held && m.mesh.visible)),
+    wrecks: window.__wrecks ?? [] }; })()`);
   console.log('tilt after 5 s', back);
   check(back.goal === 'top' && !back.forced && !back.frozen, `the board did not come back after the tilt (${JSON.stringify(back)})`);
-  check(back.same && back.showing.every((n) => n > 0) && !back.stray, `traffic did not drift back in (${JSON.stringify(back)})`);
+  check(back.lost.every((n) => n === 0) && back.showing.every((n) => n > 0) && !back.stray, `traffic did not drift back in (${JSON.stringify(back)}); lost counts a mover gone from a row with no wreck to account for it`);
   console.log('powerup shots written to', OUT);
 }
 if (script === 'freight') {
