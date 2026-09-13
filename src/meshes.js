@@ -421,18 +421,45 @@ export function makeSub(len = 2.6) {
   return { mesh: g, len, bed: [-len / 2 + 0.3, len / 2 - 0.1], rideY: 0.11, offCause: 'water' };
 }
 
-// Alligator: ride the back, never the head.
+// Alligator: ride the back, never the head. The jaws are two frames like a
+// character's poses (`frames[0]` shut, `frames[1]` gaping) and setFrame swaps
+// them; the body is built once and shared by both.
+const GATOR_HIDE = 0x3f7a3a, GATOR_MAW = 0xb04a52;
+const gatorTeeth = (jaw, x, y, h) => { for (const z of [-0.25, -0.08, 0.08, 0.25]) jaw.add(box(0.08, h, 0.08, 0xffffff, x, y, z)); };
+
 export function makeGator(len = 3.2) {
   const g = new THREE.Group();
-  const hide = 0x3f7a3a, belly = 0x5a9a4a;
-  const body = len - 1.1;
+  const hide = GATOR_HIDE, belly = 0x5a9a4a;
+  const body = len - 1.1, snout = len / 2 - 0.5;
   g.add(box(body, 0.35, 0.8, hide, -0.45, -0.3));                     // body
   for (let x = -body / 2 - 0.3; x < body / 2 - 0.4; x += 0.4) g.add(box(0.2, 0.12, 0.3, belly, x, 0.05));  // ridges
   g.add(box(0.7, 0.2, 0.4, hide, -len / 2 + 0.2, -0.25));            // tail
-  g.add(box(0.95, 0.3, 0.7, hide, len / 2 - 0.5, -0.28));            // head
   g.add(box(0.15, 0.15, 0.15, 0xffe36b, len / 2 - 0.75, 0.02, 0.25)); // eyes
   g.add(box(0.15, 0.15, 0.15, 0xffe36b, len / 2 - 0.75, 0.02, -0.25));
-  for (const z of [-0.25, -0.08, 0.08, 0.25]) g.add(box(0.08, 0.1, 0.08, 0xffffff, len / 2 - 0.08, -0.22, z)); // teeth
+
+  const shut = new THREE.Group();
+  shut.add(box(0.95, 0.3, 0.7, hide, snout, -0.28));                  // one solid head
+  gatorTeeth(shut, len / 2 - 0.08, -0.22, 0.1);
+
+  const gape = new THREE.Group();
+  gape.add(box(0.95, 0.12, 0.7, hide, snout, -0.28));                 // lower jaw, flat on the water
+  gape.add(box(0.85, 0.04, 0.55, GATOR_MAW, snout + 0.02, -0.16));    // the maw, open to the sky
+  gatorTeeth(gape, len / 2 - 0.1, -0.16, 0.09);
+  // The jaw swings well past vertical-looking, because the game is played from
+  // straight above: at a shallow angle the raised jaw still covers the maw in
+  // plan and the gape reads only from the tilted peek. cos(1.15) leaves about
+  // 0.6 of the head's length of open red showing from directly overhead.
+  const upper = new THREE.Group();                                     // hinged at the back of the head
+  upper.position.set(snout - 0.45, -0.16, 0);
+  upper.rotation.z = 1.15;
+  upper.add(box(0.95, 0.16, 0.7, hide, 0.475, 0));
+  gatorTeeth(upper, 0.85, -0.09, 0.09);
+  gape.add(upper);
+
+  for (const f of [shut, gape]) g.add(f);
+  gape.visible = false;
+  g.frames = [shut, gape];
+
   return { mesh: g, len, bed: [-len / 2 + 0.2, len / 2 - 1.0], head: [len / 2 - 1.0, len / 2 + 0.1], rideY: 0.05, offCause: 'water' };
 }
 

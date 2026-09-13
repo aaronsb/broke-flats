@@ -139,10 +139,28 @@ if (script === 'tally') {
 }
 if (script === 'river') {
   await start();
-  await evaluate(`__game.debug.on = true; __game.debug.force = 'river'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
+  // Level 4: every kind is in play. Gators are gated to level 3 (tuning.js), so
+  // a level 1 river never builds one and the gator checks below see nothing.
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'river'; __game.debug.god = true; __game.run.level = 4; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(180); }
   await sleep(2000);
   console.log('river', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'river'); const kinds = {}; for (const l of rows) for (const m of l.movers) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1; return [rows.length, kinds, rows.reduce((a, l) => a + l.movers.filter(m => m.diver).length, 0), __game.mode.players[0].row, !!__game.mode.players[0].carrier] })()`));
+  // Composition is a roll, so a board may hold no gator row at all. Rebuild
+  // until one turns up rather than let the checks pass on an empty set.
+  const gatorRows = `[...__game.mode.world.rows.values()].filter(l => l.data.turn)`;
+  let rows = 0;
+  for (let i = 0; i < 8 && !rows; i++) {
+    rows = await evaluate(`${gatorRows}.length`);
+    if (!rows) { await evaluate(`__game.restartStage()`); await sleep(400); }
+  }
+  // Jaws swap frames, and the row comes about. Elections are minutes apart at
+  // play speed, so the clock is wound forward instead of waited out.
+  await evaluate(`window.__g = { jaw: new Set(), dir: new Set(), every: ${gatorRows}[0]?.data.turn.every };
+    window.__gt = setInterval(() => { for (const l of ${gatorRows}) { __g.dir.add(l.dir); for (const m of l.movers) if (m.gape) __g.jaw.add(m.mesh.frames.findIndex(f => f.visible)); l.data.turn.t = 0; } }, 100)`);
+  await sleep(2500);
+  await evaluate(`clearInterval(__gt)`);
+  console.log('gators', await evaluate(`(() => { const l = ${gatorRows}[0]; const heads = l ? l.movers.filter(m => m.gape).length : 0;
+    return [${gatorRows}.length, heads, [...__g.jaw].sort(), [...__g.dir].sort(), Math.round(__g.every), l ? l.movers.every(m => Math.abs(m.mesh.rotation.y - (l.dir < 0 ? Math.PI : 0)) < 1e-6) : null] })()`));
 }
 if (script === 'runway') {
   await start();
