@@ -22,7 +22,8 @@ import runway from './runway.js';
 import rail from './rail.js';
 import mines from './mines.js';
 import freight from './freight.js';
+import maze from './maze.js';
 import { BARRIERS } from './barrier.js';
 
-export const SCENARIOS = { meadow, grass, road, river, runway, rail, freight, mines, ...BARRIERS, finish };
+export const SCENARIOS = { meadow, grass, road, river, runway, rail, freight, mines, maze, ...BARRIERS, finish };
 export const INTRO = 'meadow';

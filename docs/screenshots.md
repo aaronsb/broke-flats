@@ -82,6 +82,14 @@ Captured by `make shots` on 2026-09-13.
 
 ![iso.png](screenshots/iso.png)
 
+## maze-iso
+
+![maze-iso.png](screenshots/maze-iso.png)
+
+## maze-top
+
+![maze-top.png](screenshots/maze-top.png)
+
 ## mines-iso
 
 ![mines-iso.png](screenshots/mines-iso.png)
@@ -133,6 +141,14 @@ Captured by `make shots` on 2026-09-13.
 ## select
 
 ![select.png](screenshots/select.png)
+
+## snow-iso
+
+![snow-iso.png](screenshots/snow-iso.png)
+
+## snow-top
+
+![snow-top.png](screenshots/snow-top.png)
 
 ## sunset-iso
 

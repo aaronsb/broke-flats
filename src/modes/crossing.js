@@ -10,6 +10,7 @@ import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
 import { W } from '../lane.js';
 import { FLAG_BONUS } from '../scenarios/mines.js';
+import { MAZE_CLEAR_BONUS } from '../scenarios/maze.js';
 import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
 import { stampOf } from '../stamp.js';
@@ -58,6 +59,7 @@ export class CrossingMode {
       onFinish: () => { this.finished = true; },
     });
     this.world.onMine = () => { this.mined = 0.001; };
+    this.world.players = () => this.players;   // maze ghosts read the players they hunt
     this.buildPlayers();
     this.game.run.lastPose = null;   // spent: the next arrival is earned afresh
     this.world.ensure(26);
@@ -77,6 +79,8 @@ export class CrossingMode {
     this.mines = this.game.run.gauntlet === 'mines' || this.game.debug.force === 'mines';
     document.body.classList.toggle('mines', this.mines);
     if (this.mines) this.hint = 'arrows hop · Q/E turn · F flag the cell you face · followers sweep: beep and a red blink on a mine';
+    this.maze = this.game.run.gauntlet === 'maze' || this.game.debug.force === 'maze';
+    if (this.maze) this.hint = 'arrows hop · four vehicles hunt the maze · eat every coin for the bonus · SPACE peek finds the gaps';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
     const geese = this.players.filter((p) => p.honk);
     document.body.classList.toggle('honk', geese.length > 0);
@@ -275,6 +279,8 @@ export class CrossingMode {
       if (lane.scenario.id === 'road') for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len });
       if (lane.scenario.id === 'runway') for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len, y: m.y + 0.2, front: 0.2, lateral: [-1.15, 1.15] });
       if (lane.scenario.id === 'rail' && lane.data.state === 'run') for (const m of lane.movers) out.push({ x: m.x, z: -lane.r, dir: lane.dir, len: m.len, y: 0.8 });
+      // Maze ghosts drive both axes; the pool only beams along x, so those heading up or down keep their lamps alone.
+      if (lane.scenario.id === 'maze') for (const m of lane.movers) if (m.ghost?.dir && m.ghost.dir[1] === 0) out.push({ x: m.x, z: m.z ?? -lane.r, dir: m.ghost.dir[0], len: 1.6 });
     }
     return out;
   }
@@ -392,7 +398,7 @@ export class CrossingMode {
     const found = this.trains.reduce((a, t) => a + t.waiting, 0);
     const missed = Math.max(0, (this.world.data.eggsPlaced ?? 0) - this.trains.reduce((a, t) => a + t.hatched, 0));
     const per = this.trains.map((t) => t.count + t.waiting);   // whose stamps, in roster order
-    this.tally = { t: 0, led, found, missed, per, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines' };
+    this.tally = { t: 0, led, found, missed, per, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines', maze: this.maze };
     for (const p of this.players) p.invincible = true;
     // Minefield finale: everything left in the ground goes up, nearest rows first.
     if (this.tally.mines) for (const l of this.world.rows.values()) if (l.scenario.id === 'mines') l.scenario.detonateAll(l, this.players[0].row);
@@ -413,6 +419,13 @@ export class CrossingMode {
       const planted = [...this.world.rows.values()].reduce((a, l) => a + l.flags.size, 0);
       lines.push({ label: 'FLAGS RIGHT', count: hits, each: FLAG_BONUS });
       if (planted > hits) lines.push({ label: 'FLAGS WRONG', count: planted - hits, each: 0 });
+    }
+    if (T.maze) {
+      // Every pellet eaten pays the clear bonus; otherwise the panel says how many were left.
+      const rows = [...this.world.rows.values()].filter((l) => l.scenario.id === 'maze');
+      const left = rows.reduce((a, l) => a + l.coins.size, 0);
+      if (rows.length && !left) lines.push({ label: 'MAZE CLEARED', each: MAZE_CLEAR_BONUS });
+      else lines.push({ label: 'PELLETS LEFT', count: left, each: 0 });
     }
     if (T.gauntlet) lines.push({ label: 'PHEW, MADE IT', each: GAUNTLET_BONUS });
     game.run.coins += T.led + T.found;

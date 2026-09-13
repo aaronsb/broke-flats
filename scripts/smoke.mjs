@@ -44,6 +44,21 @@ const barrierShots = async (v, shot) => {
   await key('Space', ' '); await sleep(1500); await shot(`barrier-${v}-iso`);
   await key('Space', ' '); await sleep(300);
 };
+// The maze gauntlet at level 1 (always a road maze) in the forest by day, shot
+// straight down and tilted with the player standing beside the lowest weakness.
+const mazeShots = async (shot) => {
+  await evaluate(`__game.debug.force = null; __game.debug.sky = 'day'; __game.debug.scenery = 'forest'; __game.debug.god = true; __game.run.level = 1; __game.run.gauntlet = 'maze'; __game.restartStage(); __game.run.coins = 50`); await sleep(900);
+  await evaluate(`(() => { const m = __game.mode.world.data.maze; const put = (i, j) => { const p = __game.mode.player; const row = m.firstRow + j, x = i - 8; p.row = row; p.col = x; p.x = x; p.z = -row; p.mesh.position.set(x, 0, -row); };
+    for (let j = 1; j < m.rows - 1; j++) for (let i = 1; i < m.grid[j].length - 1; i++) if (m.grid[j][i] === 2) { const below = m.grid[j - 1][i] === 1 && m.grid[j + 1][i] === 1; put(below ? i : i - 1, below ? j - 1 : j); return; }
+    put(m.path[1], 1); })()`);
+  await sleep(700);
+  const seen = await evaluate(`(() => { const m = __game.mode.world.data.maze; return { kind: m.kind, wall: m.wall, rows: m.rows, ghosts: m.ghosts.all.filter(g => g.mesh).length }; })()`);
+  await shot('maze-top');
+  await key('Space', ' '); await sleep(1500); await shot('maze-iso');
+  await key('Space', ' '); await sleep(300);
+  await evaluate(`__game.run.gauntlet = null; __game.debug.scenery = null`);
+  return seen;
+};
 if (script === 'hops') {
   await start();
   for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(220); }
@@ -638,6 +653,97 @@ if (script === 'barrier') {
   console.log('follows', seq);
   check(seq.share > 0.25 && seq.share < 0.55, `${seq.share} of road bands were followed by a barrier, expected about 0.4`);
 }
+if (script === 'skid') {
+  // Wet and icy boards (sky.js `slip`): three hops landing inside the skid
+  // window slide the player on, one cell on rain, two on snow. Hops are driven
+  // and stepped in game time from inside the page, so the renderer's pace does
+  // not decide what counts as fast.
+  const load = async (q) => { await send('Page.navigate', { url: BASE + q }); await sleep(3500); };
+  const check = (ok, msg) => { if (!ok) errors.push(`skid: ${msg}`); };
+  // Park at row 5, column 0, with the column ahead cleared of blocks and crates.
+  const PARK = `const p = __game.mode.players[0]; const w = __game.mode.world;
+    for (let r = 5; r <= 12; r++) { const l = w.laneAt(r); l.blocked.delete(0); l.kinds.delete(0); l.crates.delete(0); }
+    p.row = 5; p.col = 0; p.x = 0; p.z = -5; p.mesh.position.set(0, 0, -5); p.maxRow = 5; p.moving = false; p.recent = []; p.skids = 0; p.skidding = false;
+    const r0 = p.row; const step = (n) => { for (let i = 0; i < n; i++) p.update(0.02); }; const run = () => { for (let i = 0; i < 200 && p.moving; i++) p.update(0.02); };`;
+  const fast = `(() => { ${PARK} const puffs = __game.mode.fx.puffs.length; for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); }
+    return { slip: w.config.sky.slip, row: p.row - r0, alive: p.alive, spray: __game.mode.fx.puffs.length - puffs, ground: w.laneAt(5).group.children[0].material.color.getHexString() }; })()`;
+  const slow = `(() => { ${PARK} for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); step(30); } return { row: p.row - r0 }; })()`;
+  const blocked = `(() => { ${PARK} w.laneAt(r0 + 4).block(0); for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); } return { row: p.row - r0, bump: p.bump > 0, skids: p.skids, skidding: p.skidding, alive: p.alive }; })()`;
+  const puddles = `[...__game.mode.world.rows.values()].reduce((a, l) => a + l.group.children.filter(o => o.userData.puddle).length, 0)`;
+
+  await load('?start&sky=rain&force=grass&coins=30');
+  const rain = await evaluate(fast);
+  console.log('rain fast', rain);
+  check(rain.slip === 1, `rain slip is ${rain.slip}`);
+  check(rain.row === 4 && rain.alive, `three fast hops on rain landed +${rain.row}, not +4`);
+  check(rain.spray > 0, 'no spray flew off the skid');
+  check(rain.ground !== '9ad24a' && rain.ground !== '8fca43', `the wet grass kept its dry colour (${rain.ground})`);
+  const rainSlow = await evaluate(slow);
+  console.log('rain slow', rainSlow);
+  check(rainSlow.row === 3, `three slow hops on rain landed +${rainSlow.row}, not +3`);
+  const rainBlocked = await evaluate(blocked);
+  console.log('rain blocked', rainBlocked);
+  check(rainBlocked.row === 3 && rainBlocked.bump && rainBlocked.skids === 0 && !rainBlocked.skidding && rainBlocked.alive, `a skid into a block did not stop with a bump: ${JSON.stringify(rainBlocked)}`);
+  const nPuddles = await evaluate(puddles);
+  console.log('puddles', nPuddles);
+  check(nPuddles > 0, 'no puddles on the wet board');
+
+  await load('?start&sky=snow&force=grass&coins=30');
+  const snow = await evaluate(fast);
+  console.log('snow fast', snow);
+  check(snow.slip === 2, `snow slip is ${snow.slip}`);
+  check(snow.row === 5 && snow.alive, `three fast hops on snow landed +${snow.row}, not +5`);
+  check(snow.ground === '9ad24a' || snow.ground === '8fca43', `snow tinted the grass (${snow.ground}); it should settle on top instead`);
+  console.log('snow look', await evaluate(`[__game.sky.name, __game.sky.snow, !!__game.sky.flakes, !!__game.sky.rain, __game.sky.headlights]`));
+  check(await evaluate(`!!__game.sky.flakes && !__game.sky.rain`), 'snow did not put up flakes (or left the rain on)');
+  // Snow accumulates: the first grass row's splats are one InstancedMesh whose drawn count grows.
+  const snowRow = `(() => { const l = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'grass').sort((a, b) => a.r - b.r)[0]; const s = l.data.snow; const im = l.group.children.find(o => o.isInstancedMesh);
+    return { row: l.r, has: !!s && s.mesh === im, total: s?.total ?? 0, count: im?.count ?? -1, t: +(__game.mode.world.data.snowT ?? 0).toFixed(2), movers: l.movers.length }; })()`;
+  const s0 = await evaluate(snowRow); await sleep(3000); const s1 = await evaluate(snowRow);
+  console.log('snow piles', s0, s1);
+  check(s0.has && s0.total > 0 && s0.total <= 6000, `the grass row has no snow instances: ${JSON.stringify(s0)}`);
+  check(s1.count > s0.count && s1.count <= s1.total, `the snow did not deepen over 3 s: ${s0.count} -> ${s1.count} of ${s1.total}`);
+  const snowSlow = await evaluate(slow);
+  console.log('snow slow', snowSlow);
+  check(snowSlow.row === 3, `three slow hops on snow landed +${snowSlow.row}, not +3`);
+  const snowBlocked = await evaluate(blocked);
+  console.log('snow blocked', snowBlocked);
+  check(snowBlocked.row === 3 && snowBlocked.bump && snowBlocked.skids === 0, `a snow skid into a block did not stop with a bump: ${JSON.stringify(snowBlocked)}`);
+  const noIntro = await evaluate(`(() => { ${PARK} p.row = 0; p.z = 0; p.mesh.position.z = 0; p.maxRow = 0; const s = p.row; for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); } return { row: p.row - s }; })()`);
+  console.log('from the start line', noIntro);
+  check(noIntro.row === 3, `a fast run from the start line skidded (+${noIntro.row})`);
+
+  // Roads under snow: the row is snowed, the traffic is not.
+  await load('?start&sky=snow&force=road&god');
+  const roadSnow = await evaluate(`(() => { const l = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'road' && l.movers.length); if (!l) return null;
+    return { row: l.r, movers: l.movers.length, total: l.data.snow?.total ?? 0, snowed: l.movers.some(m => { let hit = false; m.mesh.traverse(o => { if (o.isInstancedMesh) hit = true; }); return hit; }) }; })()`);
+  console.log('road under snow', roadSnow);
+  check(roadSnow && roadSnow.total > 0 && !roadSnow.snowed, `a snowed road row is wrong: ${JSON.stringify(roadSnow)}`);
+  // Perks: the robot is heavy and skids one cell less; a frog's long jump is one hop.
+  await load('?start&sky=snow&force=grass&chars=robot');
+  const robot = await evaluate(fast);
+  console.log('robot on snow', robot);
+  check(robot.row === 4, `the robot on snow landed +${robot.row}, not +4`);
+  await load('?start&sky=rain&force=grass&chars=frog');
+  const frog = await evaluate(`(() => { ${PARK} p.hop(0, 1); p.update(0.02); p.hop(0, 1); const long = p.long; run(); p.hop(0, 1); run(); p.hop(0, 1); run(); return { long, row: p.row - r0 }; })()`);
+  console.log('frog on rain', frog);
+  check(frog.long && frog.row === 5, `a frog's long jump then two hops landed +${frog.row}, not +5`);
+
+  // A skid onto a road with a car parked at the skid cell dies as a car death.
+  await load('?start&sky=rain&force=road');
+  const car = await evaluate(`(() => { ${PARK} for (let r = r0; r <= r0 + 4; r++) { const l = w.laneAt(r); l.freeze = true; for (const m of l.movers) { m.x = -30; m.mesh.position.x = -30; m.staller = null; } }
+    const l = w.laneAt(r0 + 4); const m = l.movers[0]; m.x = 0; m.mesh.position.x = 0;
+    for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); } return { road: l.scenario.id, row: p.row - r0, alive: p.alive, by: p.deadBy }; })()`);
+  console.log('into a car', car);
+  check(car.road === 'road' && !car.alive && car.by === 'car', `the skid into a parked car did not die of it: ${JSON.stringify(car)}`);
+
+  // The level table: snow is level 5, and level 6 loops back to day on the last entry's mix.
+  const levels = await evaluate(`(() => { __game.debug.sky = null; __game.setLevel(5); const five = [__game.sky.name, __game.sky.slip, document.getElementById('level').textContent];
+    __game.setLevel(6); const six = [__game.sky.name, __game.level.scenery, !!__game.level.weights.runway]; return { five, six }; })()`);
+  console.log('levels', levels);
+  check(levels.five[0] === 'snow' && levels.five[1] === 2 && levels.five[2].includes('SNOW'), `level 5 is not snow: ${JSON.stringify(levels.five)}`);
+  check(levels.six[0] === 'day' && levels.six[1] === 'forest' && levels.six[2], `level 6 did not loop to day with the full mix: ${JSON.stringify(levels.six)}`);
+}
 if (script === 'shots') {
   const fs0 = await import('node:fs');
   // The attract intro takes the screen for a stretch of every loop; wait it out
@@ -675,6 +781,11 @@ if (script === 'shots') {
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(400); await shot('rain-top');
   await key('Space', ' '); await sleep(1500); await shot('rain-iso');
+  await evaluate(`__game.run.level = 4; __game.nextLevel()`); await sleep(500);
+  await evaluate(`__game.mode.world.data.snowT = 60`);   // two thirds settled: the splats read as a fall in progress
+  for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
+  await sleep(400); await shot('snow-top');
+  await key('Space', ' '); await sleep(1500); await shot('snow-iso');
   await evaluate(`__game.debug.force = 'river'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(300); await shot('river-top');
@@ -685,6 +796,7 @@ if (script === 'shots') {
   await sleep(500); await shot('mines-top');
   await key('Space', ' '); await sleep(1500); await shot('mines-iso');
   await key('Space', ' '); await sleep(300);
+  await mazeShots(shot);
   await evaluate(`__game.run.gauntlet = null; __game.debug.scenery = null; __game.debug.force = 'runway'; __game.debug.sky = 'sunset'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(1500); await shot('runway-top');
@@ -1155,6 +1267,96 @@ if (script === 'freight') {
   await evaluate(`__game.run.coins = 50`);   // the peek burns coins
   await key('Space', ' '); await sleep(1500); await shotF('freight-iso');
   await key('Space', ' '); await sleep(300);
+}
+if (script === 'maze') {
+  await start();
+  const check = (ok, msg) => { if (!ok) errors.push(`maze: ${msg}`); };
+  const until = async (expr, ms) => { for (let i = 0; i < ms / 100; i++) { if (await evaluate(expr)) return true; await sleep(100); } return false; };
+  // Page helpers: the maze record, a BFS over its corridors, the player dropped on a cell, the ghosts' state.
+  await evaluate(`window.__mz = {
+    maze: () => __game.mode.world.data.maze,
+    lanes: () => [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'maze'),
+    reach() { const m = this.maze(); const g = m.grid, rows = m.rows, cols = g[0].length; const seen = new Set(); const q = [];
+      for (let i = 0; i < cols; i++) if (g[0][i] === 1) { q.push([i, 0]); seen.add(i + ',0'); }
+      while (q.length) { const [i, j] = q.shift(); if (j === rows - 1) return true;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = i + di, b = j + dj; if (a < 0 || a >= cols || b < 0 || b >= rows || g[b][a] !== 1 || seen.has(a + ',' + b)) continue; seen.add(a + ',' + b); q.push([a, b]); } }
+      return false; },
+    put(i, j) { const m = this.maze(); const p = __game.mode.players[0]; const row = m.firstRow + j, x = i - 8; p.row = row; p.col = x; p.x = x; p.z = -row; p.y = 0; p.moving = false; p.carrier = null; p.airborne = null; p.buffered = null; p.mesh.position.set(x, 0, -row); return p; },
+    ghosts() { return this.maze().ghosts.all.map(g => ({ name: g.name, pos: g.pos.map(v => +v.toFixed(2)), dead: +g.dead.toFixed(2), mesh: !!g.mesh })); },
+    far(g, k) { const m = this.maze(); const G = m.gates[0]; const cells = []; for (let j = 1; j <= m.rows - 2; j++) for (let i = 1; i < m.grid[j].length - 1; i++) if (m.grid[j][i] === 1) cells.push([i, j, Math.hypot(i - G.i, j - G.j)]); cells.sort((a, b) => b[2] - a[2]); const c = cells[k]; m.ghosts.teleport(g, c[0], c[1]); return c[2]; },
+  }`);
+  // Level 2 rolls road or track; the toot and the gates need track.
+  let kind = null;
+  for (let n = 0; n < 14 && kind !== 'track'; n++) { await evaluate(`__game.debug.force = null; __game.debug.god = true; __game.run.level = 2; __game.run.gauntlet = 'maze'; __game.restartStage()`); await sleep(900); kind = await evaluate(`__mz.maze()?.kind`); }
+  check(kind === 'track', `no track maze rolled at level 2 (last: ${kind})`);
+  const board = await evaluate(`(() => { const m = __mz.maze(); const lanes = __mz.lanes(); return { kind: m.kind, wall: m.wall, rows: m.rows, lanes: lanes.length, everyRowOpen: m.grid.every(r => r.some(v => v === 1)), reach: __mz.reach(), ghosts: m.ghosts.all.length, meshes: m.ghosts.all.filter(g => g.mesh).length, coins: lanes.reduce((a, l) => a + l.coins.size, 0), crates: lanes.reduce((a, l) => a + l.crates.size, 0), weak: m.grid.flat().filter(v => v === 2).length, hidden: lanes.filter(l => l.data.hidden).length, gates: m.gates.length, pathOpen: lanes.every(l => m.grid[l.data.j][l.data.pathCol + 8] === 1), speed: +m.ghosts.speed.toFixed(2), level: document.getElementById('level').textContent, mood: __game.mode.mood.gauntlet }; })()`);
+  console.log('board', board);
+  check(board.lanes === board.rows && board.rows % 2 === 1, `${board.lanes} maze rows laid for a ${board.rows}-row maze`);
+  check(board.everyRowOpen, 'a maze row has no open cell');
+  check(board.reach, 'no corridor path from the start row to the finish row');
+  check(board.pathOpen, 'pathCol points at a wall on some row');
+  check(board.ghosts === 4 && board.meshes === 4, `${board.ghosts} ghosts, ${board.meshes} with meshes`);
+  check(board.coins > 10, `${board.coins} coins`);
+  check(board.weak > 0 && board.hidden > 0, 'no weaknesses, or no row marked hidden');
+  check(board.gates >= 1 && board.gates <= 2, `${board.gates} gates on a track maze`);
+  check(board.level.includes('MAZE GAUNTLET'), 'no MAZE GAUNTLET tag in the bar');
+  // Standing on a ghost's cell is the kind's death (god mode keeps the player standing).
+  const lethal = await evaluate(`(() => { const m = __mz.maze(); const g = m.ghosts.all[1]; const lane = __game.mode.world.laneAt(m.firstRow + Math.round(g.pos[1])); return [lane.scenario.lethalAt(lane, g.pos[0] - 8), lane.movers.length]; })()`);
+  console.log('lethal', lethal);
+  check(lethal[0] === 'train', `lethalAt on a train ghost's cell gave ${lethal[0]}`);
+  // A train ghost toots within five cells: park the player on one for a couple of seconds.
+  const parked = await evaluate(`(() => { const m = __mz.maze(); const g = m.ghosts.all[0]; m.ghosts.honks = 0; const [i, j] = g.pos.map(Math.round); __mz.put(i, j); return [i, j, __game.mode.players[0].invincible]; })()`);
+  await sleep(2500);
+  const honks = await evaluate(`[__mz.maze().ghosts.honks, __game.mode.players[0].alive]`);
+  console.log('toots', parked, honks);
+  check(honks[0] > 0, 'no toot from a train ghost within range');
+  check(honks[1], 'god mode did not hold the player on the ghost');
+  // The gate: a living train ghost on the cell drops it and the cell refuses entry from the row below; all far away, it lifts.
+  const allUp = async () => check(await until(`__mz.ghosts().every(g => g.mesh)`, 15000), 'not every ghost came back within 15 s');
+  await allUp();
+  const dropped = await evaluate(`(() => { const m = __mz.maze(); const G = m.gates[0]; const g = m.ghosts.all.find(g => g.mesh); m.ghosts.teleport(g, G.i, G.j); return [G.i, G.j, g.name]; })()`);
+  await sleep(400);
+  const down = await evaluate(`(() => { const m = __mz.maze(); const G = m.gates[0]; const w = __game.mode.world; const r = m.firstRow + G.j; return [G.down, w.isBlocked(G.i - 8, r, r - 1), w.isBlocked(G.i - 8, r, r), G.arms.length, +G.arms[0].pivot.rotation.z.toFixed(2)]; })()`);
+  console.log('gate down', dropped, down);
+  check(down[0] && down[1] && !down[2] && down[3] >= 1, `gate did not drop and block: ${JSON.stringify(down)}`);
+  await allUp();
+  const farthest = await evaluate(`(() => { const m = __mz.maze(); return m.ghosts.all.map((g, k) => +__mz.far(g, k).toFixed(1)); })()`);
+  await sleep(400);
+  const up = await evaluate(`(() => { const m = __mz.maze(); const G = m.gates[0]; const w = __game.mode.world; const r = m.firstRow + G.j; return [G.down, w.isBlocked(G.i - 8, r, r - 1)]; })()`);
+  console.log('gate up', farthest, up);
+  check(Math.min(...farthest) > 4, `no cell more than 4 from the gate (${farthest})`);
+  check(!up[0] && !up[1], `gate stayed down with every ghost far away: ${JSON.stringify(up)}`);
+  // Two ghosts in one cell: both blow up and both are back within RESPAWN.
+  await allUp();
+  await evaluate(`(() => { const m = __mz.maze(); const G = m.ghosts; const b = G.all[1]; G.teleport(G.all[0], ...b.pos.map(Math.round)); })()`);
+  const blew = await until(`(() => { const g = __mz.ghosts(); return g[0].dead > 0 && g[1].dead > 0 && !g[0].mesh && !g[1].mesh; })()`, 1500);
+  console.log('crashed', blew, await evaluate(`__mz.ghosts()`));
+  check(blew, 'two ghosts on one cell did not both explode');
+  const back = await until(`(() => { const g = __mz.ghosts(); return g[0].dead === 0 && g[1].dead === 0 && g[0].mesh && g[1].mesh; })()`, 12000);
+  console.log('respawned', back, await evaluate(`__mz.ghosts()`));
+  check(back, 'crashed ghosts did not respawn');
+  // Lane.wreck on a ghost's mover (what a fireball, a star or a giant calls) sends it home the same way.
+  await allUp();
+  await evaluate(`(() => { const m = __mz.maze(); const g = m.ghosts.all[3]; const lane = __game.mode.world.laneAt(m.firstRow + Math.round(g.pos[1])); lane.wreck(g.mover, 1.2); })()`);
+  const wrecked = await until(`__mz.ghosts()[3].dead > 0`, 1500);
+  const rebuilt = wrecked && await until(`(() => { const g = __mz.ghosts()[3]; return g.dead === 0 && g.mesh; })()`, 12000);
+  console.log('wrecked', wrecked, 'rebuilt', rebuilt);
+  check(wrecked && rebuilt, 'a wrecked ghost did not respawn');
+  // The hourglass holds every living ghost still.
+  await allUp();
+  await evaluate(`__mz.put(__mz.maze().path[0], 0); __game.mode.players[0].grant('hourglass')`); await sleep(200);
+  const before = await evaluate(`__mz.ghosts()`);
+  await sleep(600);
+  const after = await evaluate(`__mz.ghosts()`);
+  await evaluate(`__game.mode.players[0].revoke('hourglass')`);
+  const still = before.map((g, k) => (g.dead === 0 && after[k].dead === 0 ? String(g.pos) === String(after[k].pos) : null)).filter((v) => v !== null);
+  console.log('frozen', still);
+  check(still.length >= 3 && still.every(Boolean), `ghosts moved under the hourglass: ${JSON.stringify([before, after])}`);
+  // Pictures: the level-1 road maze in the forest.
+  const fsM = await import('node:fs');
+  const shotBoard = await mazeShots(async (name) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fsM.writeFileSync(`${OUT}/${name}.png`, Buffer.from(r.data, 'base64')); });
+  console.log('shots', shotBoard);
+  check(shotBoard.kind === 'road' && shotBoard.ghosts === 4, `level-1 maze at the top shot: ${JSON.stringify(shotBoard)}`);
 }
 console.log('errors:', errors.length ? errors : 'none');
 ws.close();

@@ -22,6 +22,7 @@ const BLURB = {
   hedge: 'barrier: hedge wall, a tunnel under one cell', trees: 'barrier: touching canopies, one trunk missing', busStop: 'barrier: shelters and buses, one shelter with no back wall',
   picket: 'barrier: white pickets, one loose board (chicken hops any)', chainlink: 'barrier: chain-link run, a hole cut low (chicken hops any)', wall: 'barrier: brick wall, a culvert under one cell',
   mines: 'minesweeper field: mounds from the side, dots on safe cells, coins mark the path',
+  maze: 'maze gauntlet: a Pac-Man board walled with the scenery, four vehicles hunting the corridors, weaknesses only the tilt shows, a bonus for every coin eaten',
 };
 
 const rows = [];

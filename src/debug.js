@@ -4,7 +4,7 @@ import { BARRIER_IDS } from './scenarios/barrier.js';
 import { SKIES } from './sky.js';
 import { SCENERY } from './scenery/index.js';
 
-const FORCE = { KeyQ: 'road', KeyE: 'river', KeyI: 'runway', KeyO: 'rail', KeyB: 'freight', KeyL: 'mines', KeyT: 'grass', KeyU: 'meadow' };
+const FORCE = { KeyQ: 'road', KeyE: 'river', KeyI: 'runway', KeyO: 'rail', KeyB: 'freight', KeyL: 'mines', KeyZ: 'maze', KeyT: 'grass', KeyU: 'meadow' };
 
 export function installDebug(game, ui) {
   const panel = ui.debug;
@@ -12,7 +12,7 @@ export function installDebug(game, ui) {
     panel.innerHTML = [
       '<b>DEBUG</b> (` closes)',
       '1-4 level &nbsp; 5 hearing &nbsp; N next level',
-      'Q road &nbsp; E river &nbsp; I runway &nbsp; O rail &nbsp; B freight &nbsp; L mines &nbsp; T grass &nbsp; Y barrier (again: next variant) &nbsp; U meadow &nbsp; 0 clear',
+      'Q road &nbsp; E river &nbsp; I runway &nbsp; O rail &nbsp; B freight &nbsp; L mines &nbsp; Z maze &nbsp; T grass &nbsp; Y barrier (again: next variant) &nbsp; U meadow &nbsp; 0 clear',
       'K sky &nbsp; J scenery &nbsp; V gauntlet &nbsp; G god &nbsp; C +10 coins &nbsp; H hatch chick',
       `<i>force: ${game.debug.force ?? 'none'} · sky: ${game.debug.sky ?? 'level'} · scenery: ${game.debug.scenery ?? 'level'} · god: ${game.debug.god ? 'on' : 'off'}</i>`,
     ].join('<br>');

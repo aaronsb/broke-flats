@@ -137,6 +137,9 @@ export const sfx = {
   // Train horn: two-tone sawtooth chord, twice.
   horn: () => { for (const d of [0, 420]) setTimeout(() => { voice({ wave: 'sawtooth', freq: N(57), attack: 0.03, decay: 0.05, sustain: 0.8, hold: 0.25, release: 0.12, vol: 0.07 });
                                                               voice({ wave: 'sawtooth', freq: N(61), attack: 0.03, decay: 0.05, sustain: 0.8, hold: 0.25, release: 0.12, vol: 0.05 }); }, d); },
+  // A maze train's toot: one short two-tone blast, a fourth above the crossing horn.
+  toot: () => { voice({ wave: 'sawtooth', freq: N(62), attack: 0.02, decay: 0.04, sustain: 0.8, hold: 0.14, release: 0.1, vol: 0.07 });
+                voice({ wave: 'sawtooth', freq: N(66), attack: 0.02, decay: 0.04, sustain: 0.8, hold: 0.14, release: 0.1, vol: 0.05 }); },
   // Wheels on rails: a long lowpassed noise rumble.
   rumble: () => voice({ wave: 'noise', freq: 260, slideTo: 180, filter: 'lowpass', attack: 0.2, decay: 0.3, sustain: 0.8, hold: 1.6, release: 0.8, vol: 0.17 }),
   // Jet whoosh: a bandpassed noise sweep, rising for take-off, falling for landing.
@@ -226,4 +229,6 @@ export const sfx = {
   // The tilt: after the slam, everything on the board slides off. A long falling noise wash.
   slide: () => { voice({ wave: 'noise', freq: 2400, slideTo: 180, filter: 'lowpass', attack: 0.1, decay: 0.3, sustain: 0.8, hold: 1.2, release: 0.6, vol: 0.14 });
                  voice({ wave: 'sawtooth', freq: N(52), slideTo: N(36), attack: 0.1, decay: 0.3, sustain: 0.6, hold: 1.0, release: 0.6, vol: 0.04 }); },
+  // A skid on a wet or icy board: a short noisy slide that drops in pitch as it runs out.
+  skid: () => voice({ wave: 'noise', freq: vary(2200, 0.15), slideTo: 500, filter: 'bandpass', attack: 0.005, decay: 0.04, sustain: 0.7, hold: 0.12, release: 0.14, vol: 0.09 }),
 };

@@ -13,9 +13,9 @@ Playtest parameters are ON in `src/config.js` (`PLAYTEST_URL`). When off, every 
 | `battle` | flag | Like `start`, then straight into the hearing at the Department of Pedestrian Grievances |
 | `hearing` | flag | Alias of `battle` |
 | `level` | 1–99 | Start on this level |
-| `force` | `meadow` `grass` `road` `river` `runway` `rail` `freight` `mines` `hedge` `trees` `busStop` `picket` `chainlink` `wall` | Every band on the board is this scenario |
-| `gauntlet` | `road` `river` `runway` `rail` `freight` `mines` | A gauntlet level of this hazard |
-| `sky` | `day` `sunset` `night` `rain` | Override the level's sky |
+| `force` | `meadow` `grass` `road` `river` `runway` `rail` `freight` `mines` `maze` `hedge` `trees` `busStop` `picket` `chainlink` `wall` | Every band on the board is this scenario |
+| `gauntlet` | `road` `river` `runway` `rail` `freight` `mines` `maze` | A gauntlet level of this hazard |
+| `sky` | `day` `sunset` `night` `rain` `snow` | Override the level's sky |
 | `scenery` | `forest` `residential` `city` `parking` | Override the level's scenery theme |
 | `chars` | `chicken` `goose` `duck` `frog` `cat` `pig` `robot` | Roster, comma separated; two ids gives co-op |
 | `coins` | 0–9999 | Coin balance after start |
@@ -34,8 +34,9 @@ Flags are present-or-absent. Without `start` the options are staged and apply wh
 | 2 | sunset | residential | 9 | air 2 · sea 2 · land 2 | [`?start&level=2`](https://aaronsb.github.io/broke-flats/?start&level=2) |
 | 3 | night | city | 10 | air 2 · sea 2 · land 3 | [`?start&level=3`](https://aaronsb.github.io/broke-flats/?start&level=3) |
 | 4 | rain | parking | 10 | air 3 · sea 2 · land 2 | [`?start&level=4`](https://aaronsb.github.io/broke-flats/?start&level=4) |
+| 5 | snow | residential | 11 | air 3 · sea 2 · land 3 | [`?start&level=5`](https://aaronsb.github.io/broke-flats/?start&level=5) |
 
-Levels past 4 repeat the table with rising difficulty: [`?start&level=5`](https://aaronsb.github.io/broke-flats/?start&level=5), [`?start&level=8`](https://aaronsb.github.io/broke-flats/?start&level=8).
+Levels past 5 repeat the table with rising difficulty: [`?start&level=6`](https://aaronsb.github.io/broke-flats/?start&level=6), [`?start&level=10`](https://aaronsb.github.io/broke-flats/?start&level=10).
 
 ## Scenarios
 
@@ -51,6 +52,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 | `rail` | trains with ridable cars and crossing gates | [`?start&force=rail&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=rail&god&coins=50) | [`?start&force=rail&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=rail&sky=night&god&coins=50) | [`?start&level=8&force=rail&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=rail&god&coins=50) |
 | `freight` | endless slow train, one gate always down; cross through open box cars or over flat cars | [`?start&force=freight&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=freight&god&coins=50) | [`?start&force=freight&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=freight&sky=night&god&coins=50) | [`?start&level=8&force=freight&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=freight&god&coins=50) |
 | `mines` | minesweeper field: mounds from the side, dots on safe cells, coins mark the path | [`?start&force=mines&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=mines&god&coins=50) | [`?start&force=mines&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=mines&sky=night&god&coins=50) | [`?start&level=8&force=mines&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=mines&god&coins=50) |
+| `maze` | maze gauntlet: a Pac-Man board walled with the scenery, four vehicles hunting the corridors, weaknesses only the tilt shows, a bonus for every coin eaten | [`?start&force=maze&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=maze&god&coins=50) | [`?start&force=maze&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=maze&sky=night&god&coins=50) | [`?start&level=8&force=maze&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=maze&god&coins=50) |
 | `hedge` | barrier: hedge wall, a tunnel under one cell | [`?start&force=hedge&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=hedge&god&coins=50) | [`?start&force=hedge&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=hedge&sky=night&god&coins=50) | [`?start&level=8&force=hedge&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=hedge&god&coins=50) |
 | `trees` | barrier: touching canopies, one trunk missing | [`?start&force=trees&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=trees&god&coins=50) | [`?start&force=trees&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=trees&sky=night&god&coins=50) | [`?start&level=8&force=trees&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=trees&god&coins=50) |
 | `busStop` | barrier: shelters and buses, one shelter with no back wall | [`?start&force=busStop&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=busStop&god&coins=50) | [`?start&force=busStop&sky=night&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&force=busStop&sky=night&god&coins=50) | [`?start&level=8&force=busStop&god&coins=50`](https://aaronsb.github.io/broke-flats/?start&level=8&force=busStop&god&coins=50) |
@@ -68,6 +70,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 | `rail` | [`?start&level=4&gauntlet=rail`](https://aaronsb.github.io/broke-flats/?start&level=4&gauntlet=rail) |
 | `freight` | [`?start&level=4&gauntlet=freight`](https://aaronsb.github.io/broke-flats/?start&level=4&gauntlet=freight) |
 | `mines` | [`?start&level=4&gauntlet=mines`](https://aaronsb.github.io/broke-flats/?start&level=4&gauntlet=mines) |
+| `maze` | [`?start&level=4&gauntlet=maze`](https://aaronsb.github.io/broke-flats/?start&level=4&gauntlet=maze) |
 
 ## Skies and scenery
 
@@ -77,6 +80,7 @@ Each forced across the whole board, with god mode and a full pocket so nothing i
 | `sunset` | [`?start&sky=sunset`](https://aaronsb.github.io/broke-flats/?start&sky=sunset) | [`?battle&sky=sunset`](https://aaronsb.github.io/broke-flats/?battle&sky=sunset) |
 | `night` | [`?start&sky=night`](https://aaronsb.github.io/broke-flats/?start&sky=night) | [`?battle&sky=night`](https://aaronsb.github.io/broke-flats/?battle&sky=night) |
 | `rain` | [`?start&sky=rain`](https://aaronsb.github.io/broke-flats/?start&sky=rain) | [`?battle&sky=rain`](https://aaronsb.github.io/broke-flats/?battle&sky=rain) |
+| `snow` | [`?start&sky=snow`](https://aaronsb.github.io/broke-flats/?start&sky=snow) | [`?battle&sky=snow`](https://aaronsb.github.io/broke-flats/?battle&sky=snow) |
 
 | Scenery | Hunting maze in it |
 | --- | --- |

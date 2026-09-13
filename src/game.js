@@ -17,7 +17,7 @@ const START_LIVES = 4;       // one coin buys this many
 const ODD_WEATHER = 0.1;     // chance the first level opens under a different sky
 const CONTINUE_TIME = 10;    // seconds to decide at game over
 const GAUNTLET_CHANCE = 0.06; // a level that is all one hazard, from level 2 on
-const GAUNTLET_KINDS = ['road', 'river', 'runway', 'rail', 'mines'];
+const GAUNTLET_KINDS = ['road', 'river', 'runway', 'rail', 'mines', 'maze'];
 export const GAUNTLET_BONUS = 500;
 
 export class Game {
