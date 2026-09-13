@@ -78,6 +78,14 @@ Captured by `make shots` on 2026-09-13.
 
 ![battle-sea.png](screenshots/battle-sea.png)
 
+## cover-iso
+
+![cover-iso.png](screenshots/cover-iso.png)
+
+## cover-top
+
+![cover-top.png](screenshots/cover-top.png)
+
 ## freight-iso
 
 ![freight-iso.png](screenshots/freight-iso.png)

@@ -812,10 +812,20 @@ if (script === 'shots') {
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(400); await shot('snow-top');
   await key('Space', ' '); await sleep(1500); await shot('snow-iso');
-  await evaluate(`__game.debug.force = 'river'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
+  await evaluate(`__game.debug.force = 'river'; __game.debug.sky = 'day'; __game.run.level = 4; __game.restartStage()`); await sleep(500);   // level 4: gators and subs are in play
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(300); await shot('river-top');
   await key('Space', ' '); await sleep(1500); await shot('river-iso');
+  await key('Space', ' '); await sleep(300);
+  // A powerup crate under cover: nothing to see straight down, the crate and
+  // its item plain the moment the board tilts.
+  await evaluate(`__game.debug.force = 'grass'; __game.debug.sky = 'day'; __game.debug.scenery = 'city'; __game.run.level = 5; __game.restartStage()`); await sleep(600);
+  for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
+  await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row + 1);
+    for (const c of [...lane.crates.keys()]) lane.takeCrate(c);
+    lane.cover(p.col); lane.crate(p.col, 'star'); })()`); await sleep(500);
+  await shot('cover-top');
+  await key('Space', ' '); await sleep(1500); await shot('cover-iso');
   await key('Space', ' '); await sleep(300);
   await evaluate(`__game.debug.force = null; __game.run.gauntlet = 'mines'; __game.debug.sky = 'day'; __game.debug.scenery = 'residential'; __game.run.level = 1; __game.restartStage()`); await sleep(800);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
@@ -1016,6 +1026,78 @@ if (script === 'perks2') {
   const chickenHonk = await evaluate(`(() => { const p = __game.mode.players[0]; p.honk = false; return __game.mode.honk(p); })()`);
   if (chickenHonk !== 0) errors.push('perks2: a non-goose honked');
 }
+if (script === 'cover') {
+  // Crates under cover (src/powerups.js rollCrate, Lane.cover). The point of
+  // the change is that a crate cannot be seen from straight above, so the check
+  // is geometric rather than a look at a picture: for each crate, is there a
+  // static mesh in the row whose world box spans the crate in x and z and sits
+  // entirely above it? That is what "hidden from above" means on a board of
+  // axis-aligned boxes, and no screenshot can tell you it holds for every crate.
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  const check = (ok, msg) => { if (!ok) errors.push(`cover: ${msg}`); };
+
+  // Rows scroll out of the world as the player climbs, so the tally is kept in
+  // the page and added to as we go rather than read once at the end.
+  //
+  // Coverage is sampled rather than matched against one mesh: a striped awning
+  // is five separate strips and no one of them spans the crate, though together
+  // they roof it completely. Every point on a 5x5 grid over the crate's own
+  // footprint must have some static mesh of the row above it.
+  const TALLY = `(() => {
+    const t = (window.__cover ??= { crates: new Map(), covers: new Map() });
+    for (const lane of __game.mode.world.rows.values()) {
+      for (const c of lane.data.covers ?? []) t.covers.set(lane.r + ':' + c, true);
+      if (!lane.crates.size) continue;
+      const skip = new Set(); for (const c of lane.crates.values()) c.mesh.traverse((o) => skip.add(o));
+      lane.group.updateMatrixWorld(true);
+      const roofs = [];
+      lane.group.traverse((o) => { if (o.isMesh && !skip.has(o)) roofs.push(new THREE.Box3().setFromObject(o)); });
+      for (const [c, crate] of lane.crates) {
+        const cb = new THREE.Box3().setFromObject(crate.mesh);
+        const over = roofs.filter((b) => b.min.y >= cb.max.y - 0.05);
+        let open = 0, lowest = null;
+        for (let i = 0; i < 5; i++) for (let k = 0; k < 5; k++) {
+          const x = cb.min.x + (cb.max.x - cb.min.x) * (i + 0.5) / 5;
+          const z = cb.min.z + (cb.max.z - cb.min.z) * (k + 0.5) / 5;
+          const hit = over.filter((b) => b.min.x <= x && b.max.x >= x && b.min.z <= z && b.max.z >= z);
+          if (!hit.length) open++;
+          else { const y = Math.min(...hit.map((b) => b.min.y)); lowest = lowest === null ? y : Math.min(lowest, y); }
+        }
+        t.crates.set(lane.r + ':' + c, { r: lane.r, c, open, roof: open ? null : +lowest.toFixed(2) });
+      }
+    }
+    return { crates: [...t.crates.values()], covers: t.covers.size };
+  })()`;
+
+  // Walk a long way through each scenery so the roll has rows enough to place
+  // crates on, measuring the board every few hops before the rows scroll off.
+  for (const theme of ['forest', 'residential', 'city', 'parking']) {
+    await send('Page.navigate', { url: `${BASE}?start&force=grass&sky=day&scenery=${theme}&level=5&god&coins=60` }); await sleep(3200);
+    let seen = null;
+    for (let b = 0; b < 8; b++) {
+      for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(90); }
+      seen = await evaluate(TALLY);
+    }
+    const bare = seen.crates.filter((c) => c.roof === null);
+    console.log(`cover ${theme}`, { crates: seen.crates.length, covers: seen.covers, bare: bare.length, roofs: [...new Set(seen.crates.map((c) => c.roof))].sort() });
+    check(seen.crates.length > 0, `${theme}: no crate appeared in 64 rows, so nothing was checked`);
+    check(bare.length === 0, `${theme}: ${bare.length} crate(s) with open sky over part of them: ${JSON.stringify(bare.slice(0, 3))} (open = sample points of 25 with nothing above)`);
+    // Empty bays have to outnumber full ones or the cover is the brown box again.
+    check(seen.covers >= seen.crates.length * 1.5, `${theme}: ${seen.covers} covers for ${seen.crates.length} crates — too many roofs pay out, so the roof is the tell`);
+  }
+
+  // And the pair of pictures: a crate under city cover, straight down and tilted.
+  await send('Page.navigate', { url: BASE + '?start&force=grass&sky=day&scenery=city&level=5&coins=60' }); await sleep(3200);
+  await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row + 1);
+    window.__cover = null; lane.cover(p.col); lane.crate(p.col, 'star'); })()`); await sleep(500);
+  await shot('cover-top');
+  const planted = await evaluate(TALLY);
+  console.log('planted crate', planted.crates);
+  check(planted.crates.length >= 1 && planted.crates.every((c) => c.roof !== null), `the planted crate was not roofed (${JSON.stringify(planted.crates)})`);
+  await key('Space', ' '); await sleep(1600); await shot('cover-iso');
+}
+
 if (script === 'powerups') {
   // Crates and the powerup registry (src/powerups.js). A crate placed in front
   // of the player is a plain box top-down and shows its item tilted; hopping

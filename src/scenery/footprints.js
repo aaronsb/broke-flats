@@ -3,6 +3,8 @@
 // share. Cells of one building share a style so they read as one block.
 import { pick, randInt } from '../util.js';
 
+const LIFT_CHANCE = 0.3;      // buildings whose ground floor is cut back to a pillar
+
 const SHAPES = [
   [[0, 0], [1, 0], [2, 0], [3, 0]],
   [[0, 0], [0, 1], [0, 2], [0, 3]],
@@ -25,7 +27,13 @@ export class Footprints {
     const x0 = randInt(xMin, xMax - w);
     const cells = shape.map(([dx, dr]) => [r + dr, x0 + dx]);
     if (cells.some(([cr, cx]) => this.cells.has(this.key(cr, cx)))) return false;
-    for (const [cr, cx] of cells) this.cells.set(this.key(cr, cx), { x: cx, style });
+    // Some blocks stand on a truncated ground floor: one cell of the four
+    // starts a storey up on a pillar and the mass carries over the open bay
+    // beneath. The shape still covers four squares, only two or three of them
+    // touch the ground. Out here it is silhouette; the version a player can
+    // walk under is scenery.overhang().
+    const lift = Math.random() < LIFT_CHANCE ? randInt(0, cells.length - 1) : -1;
+    cells.forEach(([cr, cx], i) => this.cells.set(this.key(cr, cx), { x: cx, style, lift: i === lift }));
     return true;
   }
 

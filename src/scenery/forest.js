@@ -1,4 +1,4 @@
-import { makeTree, makeUmbrellaTree } from '../meshes.js';
+import { makeTree, makeUmbrellaTree, makeBoughTree } from '../meshes.js';
 import { W } from '../lane.js';
 import { rand } from '../util.js';
 
@@ -15,4 +15,5 @@ export default {
   },
   obstacle: () => makeTree(),
   shelter: () => makeUmbrellaTree(),
+  overhang: () => makeBoughTree(),
 };

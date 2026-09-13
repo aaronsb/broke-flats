@@ -240,7 +240,10 @@ export default {
       if (at(g.i, j + 1) === 1) { const m = lane.add(makeGate(1), c + 0.5); m.position.z = -0.5; m.rotation.y = Math.PI; g.arms.push(m); }
       (lane.data.gates ??= []).push(g);
     }
-    // Pickups: a crate on one corridor cell now and then, coins as pellets on the rest.
+    // Pickups: a crate on one corridor cell now and then, coins as pellets on
+    // the rest. Crossing rows put every crate under an overhang (Lane.cover);
+    // a maze corridor does not, because a roof in a corridor reads as another
+    // wall, and the board is already dense enough to hide a box in.
     const gated = new Set(maze.gates.filter((g) => g.j === j).map((g) => g.i - W));
     const cells = free.filter((c) => !gated.has(c));
     if (cells.length && Math.random() < CRATE_CHANCE) { const c = cells.splice(randInt(0, cells.length - 1), 1)[0]; lane.crate(c, rollPowerup()); }

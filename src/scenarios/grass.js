@@ -35,6 +35,8 @@ export default {
       if (Math.random() < 0.22) { const o = scenery.obstacle(); lane.add(o, c); lane.block(c, o.userData.kind); }
       else if (Math.random() < 0.04) lane.coin(c);
     }
-    rollCrate(lane, { level, gauntlet });
+    // The shelter's own three cells are spoken for: another roof under that one
+    // would stand its shopfront straight through the canopy.
+    rollCrate(lane, { level, gauntlet, avoid: shade === null ? null : [shade - 1, shade, shade + 1] });
   },
 };
