@@ -851,3 +851,16 @@ export function makeFireball() {
   for (let i = 0; i < 5; i++) g.add(box(0.14, 0.14, 0.14, new THREE.MeshBasicMaterial({ color: pick(...FIREBALL) }), rand(-0.18, 0.18), rand(-0.22, 0.1), rand(-0.18, 0.18), false));
   return g;
 }
+
+// ---- weather ----
+
+// A puddle: a flat pale disc with a lighter centre where the sky shows in it.
+export function makePuddle() {
+  const g = new THREE.Group();
+  g.add(box(0.9, 0.01, 0.6, 0x9cc3e6, 0, 0, 0, false));
+  g.add(box(0.5, 0.01, 0.3, 0xcfe6f8, rand(-0.1, 0.1), 0.004, rand(-0.06, 0.06), false));
+  g.rotation.y = rand(-0.25, 0.25);
+  g.userData.puddle = true;
+  return g;
+}
+

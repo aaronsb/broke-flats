@@ -10,6 +10,8 @@ export const LEVELS = [
     battle: { air: 2, sea: 2, land: 3, duration: 35 } },
   { sky: 'rain',   scenery: 'parking',     bands: 10, weights: { road: 4, river: 4, runway: 2, rail: 2, freight: 1.5, grass: 3, meadow: 1, chainlink: 1, wall: 1, busStop: 0.5, picket: 0.5 },
     battle: { air: 3, sea: 2, land: 2, duration: 35 } },
+  { sky: 'snow',   scenery: 'residential', bands: 11, weights: { road: 4, river: 4, runway: 2, rail: 2, freight: 1.5, grass: 3, meadow: 1, chainlink: 1, wall: 1, busStop: 0.5, picket: 0.5 },
+    battle: { air: 3, sea: 2, land: 3, duration: 35 } },
 ];
 
 // The first pass through the table introduces crossing types one level at a

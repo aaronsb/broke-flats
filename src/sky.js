@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { music } from './music.js';
 
 // Lighting presets. Applied per level; scenarios read `sky.name` to add
 // their own emitters (headlights, fireflies) when it is dark.
@@ -12,11 +13,19 @@ export const SKIES = {
             horizon: { sea: 0xd9683a, far: 0x7a3a6a, near: 0x4a2a4a, cloud: 0xffc9a0, disc: 0xffd36b, discY: 22 } },
   night:  { bg: 0x0b1230, hemi: [0x2a3a70, 0x0c1418, 0.45], sun: [0x8090ff, 0.35], sunPos: [6, 22, -4], fog: [4, 26], label: 'NIGHT', dark: true,
             horizon: { sea: 0x0e1e4a, far: 0x141c3e, near: 0x0a1028, cloud: 0x263258, disc: 0xe8ecff, discY: 50, stars: true } },
-  rain:   { bg: 0x6f7d8c, hemi: [0x9aa8b8, 0x3f4a3a, 0.55], sun: [0xcfd8e0, 0.8], sunPos: [-8, 22, 10], fog: [3, 22], label: 'RAIN', rain: true,
+  rain:   { bg: 0x6f7d8c, hemi: [0x9aa8b8, 0x3f4a3a, 0.55], sun: [0xcfd8e0, 0.8], sunPos: [-8, 22, 10], fog: [3, 22], label: 'RAIN', rain: true, wet: true, slip: 1,
             horizon: { sea: 0x4a6478, far: 0x55606c, near: 0x3c4a44, cloud: 0x8a96a2, disc: 0x8a96a2, discY: 40 } },
+  // Pale grey, cold fog close in, headlights on. slip 2: fast hops slide two cells.
+  snow:   { bg: 0xb9c2cb, hemi: [0xdce4ec, 0x8c949c, 0.7],  sun: [0xeef2f6, 0.9], sunPos: [-8, 22, 10], fog: [2, 20], label: 'SNOW', snow: true, slip: 2, headlights: true,
+            horizon: { sea: 0x7d95a6, far: 0xa4aeb8, near: 0xcfd6dc, cloud: 0xdde2e6, disc: 0xd2d8de, discY: 40 } },
 };
+// A weather field the board reads through the Sky: `wet` darkens the ground and
+// lays puddles, `snow` whitens it, `slip` is how many cells a fast run skids.
 
 const RAIN_COUNT = 500;
+const SNOW_COUNT = 420;
+const SNOW_FALL = 2.2;     // flakes drop this fast; rain falls at 18
+const SNOW_DRIFT = 0.9;    // and sway sideways this much
 const HORIZON_Z = 90;   // how far ahead of the camera target the backdrop starts
 
 // Unlit, unfogged, so it reads as a flat pixel backdrop behind the fogged ground.
@@ -86,6 +95,7 @@ export class Sky {
     scene.fog = new THREE.Fog(0xffffff, 40, 60);
     scene.background = new THREE.Color(0xffffff);
     this.rain = null;
+    this.flakes = null;
     this.horizon = new Horizon(scene);
     this.fogOffsets = [6, 34];
     this.apply('day');
@@ -99,7 +109,10 @@ export class Sky {
     sc.left = -size; sc.right = size; sc.top = size; sc.bottom = -size;
     sc.updateProjectionMatrix();
   }
-  get headlights() { const s = SKIES[this.name]; return !!(s.dark || s.dusk); }
+  get headlights() { const s = SKIES[this.name]; return !!(s.dark || s.dusk || s.headlights); }
+  get wet() { return !!SKIES[this.name].wet; }
+  get snow() { return !!SKIES[this.name].snow; }
+  get slip() { return SKIES[this.name].slip ?? 0; }
 
   apply(name) {
     const s = SKIES[name];
@@ -112,24 +125,44 @@ export class Sky {
     this.fogOffsets = s.fog;
     this.horizon.apply(s.horizon);
     this.setRain(!!s.rain);
+    this.setSnow(!!s.snow);
+    music.setWeather?.(name);
+  }
+
+  // A cloud of points over the action, `count` of them, drops falling in a 30x16x30 box.
+  particles(count, color, size, opacity) {
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 30;
+      pos[i * 3 + 1] = Math.random() * 16;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 30;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const m = new THREE.PointsMaterial({ color, size, transparent: true, opacity });
+    return new THREE.Points(g, m);
   }
 
   setRain(on) {
     if (on && !this.rain) {
-      const pos = new Float32Array(RAIN_COUNT * 3);
-      for (let i = 0; i < RAIN_COUNT; i++) {
-        pos[i * 3] = (Math.random() - 0.5) * 30;
-        pos[i * 3 + 1] = Math.random() * 16;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 30;
-      }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const m = new THREE.PointsMaterial({ color: 0xdde8f0, size: 0.12, transparent: true, opacity: 0.7 });
-      this.rain = new THREE.Points(g, m);
+      this.rain = this.particles(RAIN_COUNT, 0xdde8f0, 0.12, 0.7);
       this.scene.add(this.rain);
     } else if (!on && this.rain) {
       this.scene.remove(this.rain);
       this.rain = null;
+    }
+  }
+
+  // Flakes: bigger, whiter, slow, and each sways on its own phase.
+  setSnow(on) {
+    if (on && !this.flakes) {
+      this.flakes = this.particles(SNOW_COUNT, 0xffffff, 0.2, 0.9);
+      this.flakes.userData.phase = Float32Array.from({ length: SNOW_COUNT }, () => Math.random() * Math.PI * 2);
+      this.flakeTime = 0;
+      this.scene.add(this.flakes);
+    } else if (!on && this.flakes) {
+      this.scene.remove(this.flakes);
+      this.flakes = null;
     }
   }
 
@@ -149,6 +182,19 @@ export class Sky {
         let y = a.getY(i) - 18 * dt;
         if (y < 0) y += 16;
         a.setY(i, y);
+      }
+      a.needsUpdate = true;
+    }
+    if (this.flakes) {
+      this.flakes.position.set(cx, 0, cz);
+      this.flakeTime += dt;
+      const a = this.flakes.geometry.attributes.position;
+      const ph = this.flakes.userData.phase;
+      for (let i = 0; i < SNOW_COUNT; i++) {
+        let y = a.getY(i) - SNOW_FALL * dt;
+        if (y < 0) y += 16;
+        a.setY(i, y);
+        a.setX(i, a.getX(i) + Math.cos(this.flakeTime * 1.3 + ph[i]) * SNOW_DRIFT * dt);
       }
       a.needsUpdate = true;
     }

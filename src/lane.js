@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { makeGround, makeCoin, makeEgg, makeFlagMarker, makeCrate, setBrake } from './meshes.js';
+import { makeGround, makeCoin, makeEgg, makeFlagMarker, makeCrate, setBrake, makePuddle } from './meshes.js';
 import { POWERUPS } from './powerups.js';
-import { rand } from './util.js';
+import { rand, randInt } from './util.js';
 import { sfx } from './sfx.js';
 
 export const W = 8;          // playable columns run -W..W
@@ -36,6 +36,7 @@ const HONK_V = 1.2;          // a honked vehicle pulls away at this speed and ea
 const HONK_WAIT = [4, 12];   // seconds a honked staller keeps going before its next stop
 const TOUCH = 0.05;          // bumpers this close have met
 const CRASH_DV = 0.15;       // meeting while this much faster than the vehicle ahead is a crash
+const PUDDLE_ROWS = new Set(['grass', 'meadow', 'road']);   // rows that take puddles on a wet board
 
 // One board row. Scenarios fill it through these helpers; the board and the
 // player only read the fields (blocked, coins, movers, dir, speed).
@@ -69,8 +70,27 @@ export class Lane {
   }
 
   ground(color, top = 0, thick = 0.5) {
-    this.add(makeGround(GW, color, top, thick));
+    this.add(makeGround(GW, this.weathered(color), top, thick));
     this.verge(color, top);
+    if (this.world?.config?.sky?.wet && PUDDLE_ROWS.has(this.scenario.id)) this.puddles(randInt(0, 2), top);
+  }
+
+  // The sky's weather on a ground colour: rain darkens it 12% and pulls it a
+  // little toward blue. Snow leaves the colour alone and settles on top instead (snow.js).
+  weathered(color) {
+    const sky = this.world?.config?.sky;
+    if (typeof color !== 'number' || !sky?.wet) return color;
+    return new THREE.Color(color).multiplyScalar(0.88).lerp(new THREE.Color(0x3a5a9a), 0.1).getHex();
+  }
+
+  // Puddles on a wet row: flat pale discs at random columns, laid before the
+  // row's blocks so one may end up under a tree.
+  puddles(n, top = 0) {
+    for (let i = 0; i < n; i++) {
+      const p = makePuddle();
+      p.position.set(randInt(-W + 1, W - 1) + rand(-0.2, 0.2), top + 0.008, rand(-0.15, 0.15));
+      this.add(p);
+    }
   }
 
   // The play area ends at ±W and, on a road or a river, nothing said so: you
@@ -84,7 +104,7 @@ export class Lane {
     // grass. Dark ground gets a pale verge, bright ground a deep one.
     const c = new THREE.Color(color);
     const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
-    const shade = (lum > 0.3 ? c.multiplyScalar(0.55) : c.lerp(new THREE.Color(0xffffff), 0.42)).getHex();
+    const shade = this.weathered((lum > 0.3 ? c.multiplyScalar(0.55) : c.lerp(new THREE.Color(0xffffff), 0.42)).getHex());
     for (const s of [-1, 1]) this.add(makeGround(VERGE_W, shade, top + 0.012, 0.02), s * (W + 0.5 + VERGE_W / 2));
   }
 

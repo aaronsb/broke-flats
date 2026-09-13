@@ -2,7 +2,7 @@
 // step reads the current mood and picks voices from it, so the music reacts
 // within a beat. Moods: calm (safe row), danger (road or river), hearing
 // (hold music while the complaints get filed), and a "peek" overlay while
-// the camera is tilted.
+// the camera is tilted. Weather (rain, snow) colours the board moods.
 
 import { ac } from './sfx.js';
 
@@ -28,7 +28,29 @@ const MOODS = {
 // Hold music: a soft bossa loop of sevenths. Cmaj7 Am7 Dm7 G7, the elevator's own.
 const HEARING_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [50, 53, 57, 60], [43, 47, 50, 53]];
 
-let ctx, master, bus, delayBus, filter;
+// Weather colours the board moods (calm, danger, gauntlet) and nothing else.
+// Rain: the calm chords with the majors swapped for their relative minors,
+// slower, the lead under a lower cutoff, and soft triangle phrases that step
+// down the scale, each starting from a different height, so the tune falls.
+// Snow: sevenths, slower still in calm, a bell line stepping down the chord
+// every two bars, a few high pings scattered per bar, the bass resting every
+// other bar, a whisper of high pad.
+const RAIN_PROG = [[57, 60, 64], [53, 57, 60], [50, 53, 57], [52, 55, 59]];       // Am F Dm Em
+const SNOW_PROG = [[53, 57, 60, 64], [48, 52, 55, 59], [57, 60, 64, 67], [52, 55, 59, 62]]; // Fmaj7 Cmaj7 Am7 Em7
+const WEATHER = {
+  rain: { tempo: { calm: 0.88, danger: 0.88, gauntlet: 0.88 }, cutoff: 0.6, prog: RAIN_PROG },
+  snow: { tempo: { calm: 0.8, danger: 0.92, gauntlet: 0.92 }, cutoff: 1.5, prog: SNOW_PROG },
+};
+// Bell steps over the two-bar cycle: five on the even bar, one answer on the odd.
+const SNOW_BELL = [[0, 3, 6, 10, 13], [4]];
+const RAIN_SCALE = PENTA.map((n) => n + 12);
+let weather = null;
+// Phrase state for the weather figures: where the rain phrase is on its way
+// down and how long it rests; where the bell line is on its ladder; which
+// steps of this bar get a ping.
+const fig = { rainIdx: 0, rainLeft: 0, rainRest: 0, snowIdx: 0, pings: [] };
+
+let ctx, master, bus, delayBus, hiBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
 const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
@@ -63,6 +85,10 @@ function setup() {
   delayBus.connect(d).connect(fb).connect(d);
   d.connect(wet).connect(bus);
   delayBus.connect(bus);
+  // Weather figures skip the lowpass so they stay clear under rain's low cutoff; their echoes take the dark path.
+  hiBus = ctx.createGain();
+  hiBus.connect(comp);
+  hiBus.connect(d);
 }
 
 // ---------- voices ----------
@@ -111,29 +137,56 @@ function bass(note, t, dur, driving) {
   if (mood.tilted) { osc('sine', N(note - 12), t, dur, 0.35, bus, { attack: 0.02 }); return; }
   osc(driving ? 'sawtooth' : 'square', N(note - 12), t, dur, driving ? 0.22 : 0.18, bus, { attack: 0.004 });
 }
-function pad(chord, t, dur) {
+function pad(chord, t, dur, vol = 0.05) {
   for (const n of chord) {
-    osc('triangle', N(n), t, dur, 0.05, bus, { attack: 0.35, detune: 6 });
-    osc('triangle', N(n), t, dur, 0.05, bus, { attack: 0.35, detune: -6 });
+    osc('triangle', N(n), t, dur, vol, bus, { attack: 0.35, detune: 6 });
+    osc('triangle', N(n), t, dur, vol, bus, { attack: 0.35, detune: -6 });
   }
 }
 const lead = (note, t, dur, vol = 0.09) => osc('square', N(note), t, dur, vol, delayBus, { attack: 0.004 });
 const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, { attack: 0.003 });
+// Snow bell: a sine with a detuned twin for shimmer and a short triangle strike an octave up.
+function bell(note, t, dur, vol = 0.07) {
+  osc('sine', N(note), t, dur, vol, hiBus, { attack: 0.004 });
+  osc('sine', N(note), t, dur * 0.8, vol * 0.5, hiBus, { attack: 0.004, detune: 9 });
+  osc('triangle', N(note + 12), t, dur * 0.3, vol * 0.25, hiBus, { attack: 0.002, detune: -5 });
+}
+// Rain drop: a soft triangle with a short release, nudged late by a random slice of the step.
+const drop = (note, t, sixteenth, vol = 0.03) => osc('triangle', N(note), t + Math.random() * sixteenth * 0.25, sixteenth * 1.3, vol, hiBus, { attack: 0.003 });
+// Snow ping: a tiny high sine with a detuned twin, light catching a flake.
+function ping(note, t, dur, vol = 0.028) {
+  const detune = (Math.random() - 0.5) * 24;
+  osc('sine', N(note), t, dur, vol, hiBus, { attack: 0.002, detune });
+  osc('sine', N(note), t, dur * 0.8, vol * 0.6, hiBus, { attack: 0.002, detune: detune + 11 });
+}
 
 // ---------- step sequencer ----------
+const BOARD = { calm: true, danger: true, gauntlet: true };
+function moodName(m) {
+  return m.tally ? 'tally' : m.epilogue ? 'epilogue' : m.attract ? 'attract' : m.dead ? 'calm' : m.hearing ? 'hearing' : m.gauntlet ? 'gauntlet' : m.danger || m.star ? 'danger' : 'calm';
+}
+// The weather in force for this mood: set only on the live board.
+const boardWeather = (name) => (weather && BOARD[name] && !mood.dead ? WEATHER[weather] : null);
+function tempoFor(name) {
+  const wx = boardWeather(name);
+  return MOODS[name].bpm * (wx ? wx.tempo[name] : 1);
+}
+
 function scheduleStep(s, t) {
-  const target = MOODS[mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.hearing ? 'hearing' : mood.gauntlet ? 'gauntlet' : mood.danger || mood.star ? 'danger' : 'calm'];
+  const name = moodName(mood);
+  const target = MOODS[name];
+  const wx = boardWeather(name);
   // A running continue countdown pushes the tempo up toward the end.
-  const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : target.bpm;
+  const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : tempoFor(name);
   bpm += (goalBpm - bpm) * 0.12;
   const beat = 60 / bpm, sixteenth = beat / 4;
-  const prog = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : mood.tilted ? PEEK_PROG : CALM_PROG;
+  const prog = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : mood.tilted ? PEEK_PROG : wx ? wx.prog : CALM_PROG;
   const chord = prog[bar % prog.length];
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
   const danger = (mood.danger || mood.gauntlet || mood.star) && !mood.dead;   // a star drives like danger
 
-  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff, t, 0.2);
+  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff * (wx ? wx.cutoff : 1), t, 0.2);
 
   if (mood.dead) {
     if (s === 0) pad(chord, t, beat * 4);
@@ -194,15 +247,52 @@ function scheduleStep(s, t) {
       lead(tone, t, sixteenth * 1.5, 0.07);
     }
   } else {
-    // Calm: pad, slow bass, sparse pentatonic wandering.
+    // Calm: pad, slow bass, sparse pentatonic wandering. Snow rests the bass
+    // every other bar and thins the lead so the bells carry the tune.
+    const snow = wx === WEATHER.snow;
     if (s === 0) pad(chord, t, beat * 4);
-    if (s === 0 || s === 8) bass(root, t, beat * 1.8, false);
-    if (s === 12 && bar % 2 === 1) bass(root + 7, t, beat * 0.9, false);
-    if (s % 2 === 0 && Math.random() < 0.3) {
-      const i = Math.floor(Math.random() * scale.length);
+    if (!snow || bar % 2 === 0) {
+      if (s === 0 || s === 8) bass(root, t, beat * 1.8, false);
+      if (s === 12 && bar % 2 === 1) bass(root + 7, t, beat * 0.9, false);
+    }
+    if (s % 2 === 0 && Math.random() < (wx ? 0.15 : 0.3)) {
+      const i = Math.floor(Math.random() * scale.length) % scale.length;
       lead(scale[i], t, sixteenth * 3, 0.06);
     }
     if (s % 4 === 2 && Math.random() < 0.5) shaker(t);
+  }
+
+  if (wx === WEATHER.rain) {
+    // Falling phrases: four to six drops stepping down the scale one per sixteenth,
+    // each phrase starting from a random height, then a rest of a few steps.
+    if (fig.rainLeft > 0 && fig.rainIdx >= 0) {
+      drop(RAIN_SCALE[fig.rainIdx % RAIN_SCALE.length], t, sixteenth, danger ? 0.022 : 0.03);
+      fig.rainIdx--; fig.rainLeft--;
+      if (fig.rainLeft === 0 || fig.rainIdx < 0) { fig.rainLeft = 0; fig.rainRest = 2 + Math.floor(Math.random() * 6); }
+    } else if (fig.rainRest > 0) {
+      fig.rainRest--;
+    } else {
+      fig.rainLeft = 4 + Math.floor(Math.random() * 3);
+      fig.rainIdx = Math.min(RAIN_SCALE.length - 1, fig.rainLeft - 1 + Math.floor(Math.random() * (RAIN_SCALE.length - fig.rainLeft + 1)));
+    }
+  }
+  if (wx === WEATHER.snow) {
+    // A bell line stepping down a two-octave ladder of chord tones over two bars,
+    // starting from a random rung each cycle; two to four pings scattered through
+    // the bar; a whisper of the top two chord tones two octaves up.
+    const ladder = [...chord.map((n) => n + 24), ...chord.map((n) => n + 12)].sort((a, b) => b - a);
+    if (s === 0) {
+      if (bar % 2 === 0) fig.snowIdx = Math.floor(Math.random() * 2);
+      const count = 2 + Math.floor(Math.random() * 3);
+      fig.pings = [];
+      while (fig.pings.length < count) { const at = Math.floor(Math.random() * STEPS); if (!fig.pings.includes(at)) fig.pings.push(at); }
+      for (const n of chord.slice(-2)) osc('sine', N(n + 24), t, beat * 4.2, 0.016, bus, { attack: 0.9, detune: 4 });
+    }
+    if (SNOW_BELL[bar % 2].includes(s)) {
+      bell(ladder[fig.snowIdx % ladder.length], t, beat * (danger ? 1.2 : 2), danger ? 0.055 : 0.07);
+      fig.snowIdx++;
+    }
+    if (fig.pings.includes(s)) ping(chord[Math.floor(Math.random() * chord.length) % chord.length] + 36, t + Math.random() * sixteenth * 0.5, sixteenth * 0.7);
   }
 
   if (mood.tilted || mood.star) {
@@ -236,11 +326,15 @@ export const music = {
   // Scene change: drop every flag, snap the tempo to the new mood, restart on the downbeat.
   reset(m = {}) {
     mood = { ...QUIET, ...m };
-    const name = mood.tally ? 'tally' : mood.epilogue ? 'epilogue' : mood.attract ? 'attract' : mood.dead ? 'calm' : mood.hearing ? 'hearing' : mood.gauntlet ? 'gauntlet' : mood.danger ? 'danger' : 'calm';
-    bpm = MOODS[name].bpm;
+    bpm = tempoFor(moodName(mood));
     step = 0; bar = 0;
+    fig.rainLeft = 0; fig.rainRest = 0; fig.snowIdx = 0; fig.pings = [];
     if (ctx) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   },
+  // Weather is a property of the level, so it survives reset(). A sky id:
+  // 'rain' or 'snow' colours the board moods; anything else clears it.
+  setWeather(name) { weather = Object.hasOwn(WEATHER, name) ? name : null; },
+  get weather() { return weather; },
   toggleMute() {
     muted = !muted;
     if (master) master.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.05);

@@ -26,6 +26,11 @@ const TILT_GRAB = 1.5;    // a crate grabbed while peeking lasts this much longe
 const SIZE_TWEEN = 0.4;   // seconds a mushroom or acorn takes to change the player's size, with a boing
 const GIANT_ARC = 0.75;   // a giant's two-row hop flies higher
 const GIANT_HOP = 1.5;    // and takes this many times as long
+// Skids (sky.js `slip`). The last SKID_HOPS hops landing inside SKID_WINDOW
+// seconds of game time make a fast run; on a slippery board it slides on.
+const SKID_HOPS = 3;
+const SKID_WINDOW = 0.9;
+const INTRO_ROWS = 4;     // no skid lands here: the start line never slides you into the first band
 
 export class Player {
   constructor(scene, world, character = { make: makeChicken, voice: 'chicken' }, variant) {
@@ -81,6 +86,9 @@ export class Player {
     this.tiny = false;        // acorn: under truck beds, through fences, a bounce keeps the buffered hop
     this.stride = 1;
     this.lastHop = -10; this.burst = 0; this.idle = 0;
+    this.time = 0;            // game seconds, for the skid window
+    this.recent = [];         // the last SKID_HOPS hops: { dir: [dc, dr], t }
+    this.skids = 0; this.skidding = false; this.skidDir = null;   // forced hops still to go, and the one in flight
     this.mesh.scale.set(1, 1, 1);
     this.mesh.position.set(0, 0, 0);
     this.mesh.rotation.set(0, 0, 0);
@@ -197,7 +205,7 @@ export class Player {
     }
     this.facing = dr > 0 ? 0 : dr < 0 ? Math.PI : dc < 0 ? Math.PI / 2 : -Math.PI / 2;
     // A giant strides two cells; where the far cell is off the board or blocked, one.
-    this.stride = this.giant && this.canHop(Math.round(this.x) + dc * 2, this.row + dr * 2) ? 2 : 1;
+    this.stride = this.giant && !this.skidding && this.canHop(Math.round(this.x) + dc * 2, this.row + dr * 2) ? 2 : 1;
     const tc = Math.round(this.x) + dc * this.stride;
     const tr = this.row + dr * this.stride;
     if (!this.canHop(tc, tr)) {
@@ -205,14 +213,15 @@ export class Player {
       sfx.bump();
       return;
     }
+    if (!this.skidding) { this.recent.push({ dir: [dc, dr], t: this.time }); if (this.recent.length > SKID_HOPS) this.recent.shift(); }
     this.from = { x: this.x, z: this.z, y: this.y };
     // A hop that starts on a carrier moves with it (a sideways hop along a deck
     // lands on the deck, not where the deck used to be).
     this.hopCarrier = dr === 0 && this.carrier ? this.carrier : null;
     this.hopCarrierX = this.hopCarrier?.x ?? 0;
     this.hopDir = [dc, dr];
-    // Water to water for a swimmer is a paddle, not a flap.
-    this.paddling = this.swims && !this.carrier && this.world.laneAt(this.row)?.scenario.id === 'river' && this.world.laneAt(tr)?.scenario.id === 'river';
+    // Water to water for a swimmer is a paddle, not a flap; a skid glides the same way.
+    this.paddling = this.skidding || (this.swims && !this.carrier && this.world.laneAt(this.row)?.scenario.id === 'river' && this.world.laneAt(tr)?.scenario.id === 'river');
     // Leaving something tall: the hop keeps its altitude, then comes the drop.
     // A swimmer bound for open water settles at swimming depth.
     const high = this.y > 0.6;
@@ -222,8 +231,37 @@ export class Player {
     this.moving = true; this.t = 0;
     this.long = false; this.arc = this.stride > 1 ? GIANT_ARC : ARC;
     this.carrier = null;
+    if (this.skidding) { sfx.skid(); return; }
     sfx.hop();
     this.call();
+  }
+
+  // A fast run on a slippery board slides on after the last hop lands: one
+  // forced hop per slip, one cell at a time, so every landing check runs.
+  // Called on every landing; true when a forced hop went out.
+  skid(bounced) {
+    if (this.skids > 0) return this.slide();
+    this.skidding = false;
+    const slip = Math.max(0, (this.world.config.sky?.slip ?? 0) - (this.heavy ? 1 : 0));
+    if (!slip || bounced || this.carrier || this.sizeT < SIZE_TWEEN || this.row < INTRO_ROWS || this.recent.length < SKID_HOPS) return false;
+    const r = this.recent;
+    if (r[r.length - 1].t - r[0].t > SKID_WINDOW) return false;
+    const dc = Math.sign(r.reduce((a, h) => a + h.dir[0], 0)), dr = Math.sign(r.reduce((a, h) => a + h.dir[1], 0));
+    this.recent = [];
+    if (!dc && !dr) return false;
+    this.skidDir = [dc, dr];
+    this.skids = slip;
+    return this.slide();
+  }
+
+  // One forced cell of a skid. A refused hop bumps and the skid is over.
+  slide() {
+    this.skids--;
+    this.skidding = true;
+    this.hop(...this.skidDir);
+    if (!this.moving) { this.skids = 0; this.skidding = false; return false; }
+    this.fx?.spray(new THREE.Vector3(this.x, 0, this.z), this.world.config.sky?.snow ? [0xffffff, 0xe8f0f6] : [0xbfe6ff, 0xffffff]);
+    return true;
   }
 
   // A second forward press inside LONG_WINDOW of a forward hop stretches it
@@ -305,6 +343,7 @@ export class Player {
     if ((this.hasPower('star') || this.giant) && this.starSave(cause)) return;
     this.clearPowers();
     this.alive = false;
+    this.skids = 0; this.skidding = false;
     this.deadBy = cause;
     this.deadFor = 0;
     this.moving = false;
@@ -322,6 +361,7 @@ export class Player {
   }
 
   land() {
+    const bounced = this.bouncing;
     this.bouncing = false;
     const lane = this.world.laneAt(this.row);
     if (!lane) return;
@@ -347,6 +387,7 @@ export class Player {
     this.onLanded?.();
     this.onLandedHint?.();
     if (lane.takeEgg(this.col)) this.onEgg?.();
+    if (this.skid(bounced)) return;
     if (this.buffered) { const b = this.buffered; this.buffered = null; this.hop(...b); }
   }
 
@@ -412,6 +453,7 @@ export class Player {
     const m = this.mesh;
     let sx = 1, sy = 1;
     this.idle += dt;
+    this.time += dt;
     if (this.idle > 9 && Math.random() < dt * 0.15) { this.idle = 0; this.voice?.(); }
 
     if (this.sizeT < SIZE_TWEEN) {

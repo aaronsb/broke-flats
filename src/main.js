@@ -46,7 +46,7 @@ const ui = {
 mountSign($('logo'));
 mountSign($('about-sign'));
 const game = new Game({ scene, camera, sky, ui, headlights });
-if (import.meta.env.DEV) { window.__game = game; import('./meshes.js').then((m) => { window.__meshes = m; }); }   // for the headless smoke test
+if (import.meta.env.DEV) { window.__game = game; window.__music = music; import('./meshes.js').then((m) => { window.__meshes = m; }); }   // for the headless smoke test
 const debugKey = installDebug(game, ui);
 installTouch(document.getElementById('hud'));
 let started = false;

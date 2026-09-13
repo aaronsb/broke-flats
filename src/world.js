@@ -1,6 +1,7 @@
 import { Lane } from './lane.js';
 import { SCENARIOS, INTRO } from './scenarios/index.js';
 import { randInt } from './util.js';
+import { snowLane, snowTick } from './snow.js';
 
 export { W, SPAN } from './lane.js';
 
@@ -134,12 +135,14 @@ export class World {
       world: this, index: spec.index, count: spec.count, prev: this.rows.get(r - 1),
       sky: this.config.sky, difficulty: this.config.difficulty, gauntlet: !!this.config.gauntlet, level: this.config.level ?? 1,
     });
+    if (this.config.sky?.snow) snowLane(lane, this);
     this.scene.add(lane.group);
     this.rows.set(r, lane);
   }
 
   // ---- per-frame ----
   update(dt, time) {
+    if (this.config.sky?.snow) snowTick(this, dt);
     for (const lane of this.rows.values()) {
       lane.scenario.update?.(lane, dt, time);
       lane.spinCoins(time);

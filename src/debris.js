@@ -43,6 +43,14 @@ export class Debris {
     sfx.splash();
   }
 
+  // Spray off a skidding player's feet: low cubes thrown out sideways, falling
+  // back fast. Pale blue off a wet board, white off snow.
+  spray(at, colors = [0xbfe6ff, 0xffffff], n = 6) {
+    for (let i = 0; i < n; i++)
+      this.puff(new THREE.Vector3(at.x, -0.5, at.z), pick(...colors), rand(0.08, 0.16), rand(0.25, 0.45),
+        new THREE.Vector3(rand(-2.5, 2.5), rand(1.5, 3), rand(-2.5, 2.5)), -1);
+  }
+
   // Transporter sparkle: bright cubes drifting up out of the body.
   sparkles(at, n = 14) {
     for (let i = 0; i < n; i++)
