@@ -8,6 +8,7 @@ import { SCENERY } from './scenery/index.js';
 import { DEATHS } from './deaths.js';
 import { CHARACTERS } from './characters.js';
 import { Summary } from './summary.js';
+import { Banner } from './banner.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
 
@@ -28,12 +29,13 @@ export class Game {
     this.headlights = headlights;
     this.ui = ui;
     this.summary = new Summary(ui);
+    this.banner = new Banner(ui);
     this.mode = null;
     this.over = false;
     this.best = Number(localStorage.getItem('rc-best') || 0);
     this.ui.best.textContent = this.best;
     this.run = this.freshRun(SESSION_COINS);
-    this.debug = { on: false, force: null, sky: null, scenery: null, god: false };
+    this.debug = { on: false, force: null, sky: null, scenery: null, god: false, quickBanner: false };   // quickBanner: the stage signs skip straight to play (the smoke harness sets it)
     this.picks = [0];          // roster indices into CHARACTERS, one per player
     this.hud(0);
   }
@@ -175,10 +177,12 @@ export class Game {
   scenery() { return SCENERY[this.debug.scenery ?? this.level.scenery]; }
 
   jumpLevel(n) { this.rollGauntlet(n); this.setLevel(n); this.setMode(new CrossingMode(this)); }
-  restartStage() { this.setLevel(this.run.level); this.setMode(new CrossingMode(this)); }
+  // A retry: the same board again, its sign shown short and without the tune.
+  restartStage() { this.setLevel(this.run.level); this.setMode(new CrossingMode(this, { retry: true })); }
 
   setMode(mode) {
     this.summary.clear();
+    this.banner.clear();
     this.mode?.exit();
     this.mode = mode;
     music.reset(mode.mood ?? {});
@@ -219,6 +223,7 @@ export class Game {
 
   gameOver(cause) {
     this.over = true;
+    this.banner.clear();
     if (this.run.score > this.best) { this.best = this.run.score; localStorage.setItem('rc-best', this.best); }
     this.ui.best.textContent = this.best;
     this.ui.overTitle.textContent = 'CLAIM DENIED';

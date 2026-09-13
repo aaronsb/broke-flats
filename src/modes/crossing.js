@@ -17,6 +17,7 @@ import { stampOf } from '../stamp.js';
 import { GAUNTLET_BONUS } from '../game.js';
 import { grievanceFor } from '../grievances.js';
 import { POWERUPS } from '../powerups.js';
+import { SKIES } from '../sky.js';
 
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
@@ -37,8 +38,9 @@ export const KEYMAPS = [
 ];
 
 export class CrossingMode {
-  constructor(game) {
+  constructor(game, { retry = false } = {}) {
     this.game = game;
+    this.retry = retry;   // the same board again after a death: a short sign, no tune
     this.hint = 'arrows / WASD hop · SPACE peek in 3D (burns coins) · M mute · P pixels';
   }
 
@@ -73,7 +75,7 @@ export class CrossingMode {
     this.focus = { x: 0, z: 0 };
     this.game.camera.snap(0, -3, 'top');
     this.game.ui.view.hidden = false;
-    if (this.game.run.gauntlet) { this.game.card(`${this.game.run.gauntlet.toUpperCase()} GAUNTLET`); setTimeout(() => this.game.card(''), 2200); }
+    this.sign();
     // Forced boards (debug, playtest URLs) lay mines without setting the
     // gauntlet, so ask both before showing the turn and flag controls.
     this.mines = this.game.run.gauntlet === 'mines' || this.game.debug.force === 'mines';
@@ -85,6 +87,18 @@ export class CrossingMode {
     const geese = this.players.filter((p) => p.honk);
     document.body.classList.toggle('honk', geese.length > 0);
     if (geese.length) this.hint += this.game.roster.length > 1 ? ` · ${geese.map((p) => (p.index ? 'G' : 'H')).join('/')} honk` : ' · H honk';
+  }
+
+  // The stage sign: the day and its sky, or the gauntlet's hazard board.
+  sign() {
+    const { level, sky, run, debug, banner } = this.game;
+    if (debug.quickBanner) return;
+    const day = `DAY ${level.number}`;
+    const label = SKIES[sky.name]?.label ?? '';
+    const wx = label === 'DAY' ? 'CLEAR SKIES' : label;   // DAY 1 over DAY read as a stutter
+    const pace = this.retry ? { ms: 1400, tune: false } : {};
+    if (run.gauntlet) banner.show('gauntlet', { title: `${run.gauntlet.toUpperCase()} GAUNTLET`, sub: `${day} · ${wx}`, variant: run.gauntlet, ...pace });
+    else banner.show('day', { title: day, sub: wx, advisory: sky.slip ? 'ADVISORY: SLIPPERY' : null, ...pace });
   }
 
   buildPlayers() {

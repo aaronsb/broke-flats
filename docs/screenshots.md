@@ -6,6 +6,18 @@ Captured by `make shots` on 2026-09-13.
 
 ![about.png](screenshots/about.png)
 
+## banner-day
+
+![banner-day.png](screenshots/banner-day.png)
+
+## banner-gauntlet
+
+![banner-gauntlet.png](screenshots/banner-gauntlet.png)
+
+## banner-hearing
+
+![banner-hearing.png](screenshots/banner-hearing.png)
+
 ## barrier-busStop-iso
 
 ![barrier-busStop-iso.png](screenshots/barrier-busStop-iso.png)

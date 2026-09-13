@@ -137,6 +137,133 @@ export function makeSeal() {
   return holder.firstElementChild;
 }
 
+// --- stage signs ----------------------------------------------------------
+// One board per stage kind for the banner scene (src/banner.js). Each is its
+// own prop in the crossing sign's style: chunky shapes, Arcade text, a class
+// on the part that moves so the CSS can drop, swing or blink it.
+const IRON = '#9aa0a8', IRON_DARK = '#767c84', BRASS = '#c9a34a', WALNUT = '#5a3a1e';
+
+// A chicken in silhouette, 52 x 44 from the origin, facing right.
+const chicken = (fill = TAR) => `
+  <g fill="${fill}">
+    <rect x="6" y="16" width="28" height="18"/><rect x="0" y="10" width="8" height="10"/><rect x="2" y="5" width="5" height="6"/>
+    <rect x="30" y="8" width="10" height="12"/><rect x="32" y="3" width="13" height="10"/><rect x="35" y="0" width="3" height="3"/><rect x="39" y="-1" width="3" height="4"/>
+    <rect x="45" y="6" width="6" height="3"/><rect x="36" y="13" width="3" height="4"/>
+    <rect x="14" y="34" width="3" height="6"/><rect x="23" y="34" width="3" height="6"/><rect x="12" y="40" width="8" height="2"/><rect x="21" y="40" width="8" height="2"/>
+  </g>`;
+
+// An escaped text node: the titles come from level data, so no markup rides along.
+const esc = (t) => String(t ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+// Day start: a white crossing-style board on a post, the chicken to the left
+// of the day count, the sky small underneath. Bad weather hangs a
+// weather-service placard from the bottom edge on two chains.
+const daySign = ({ title, sub, advisory }) => `
+  <svg class="board day" viewBox="0 0 300 250" role="img" aria-label="${esc(title)}">
+    <g class="post"><rect x="145" y="150" width="10" height="100" fill="${IRON}"/><rect x="145" y="150" width="3.5" height="100" fill="${IRON_DARK}"/></g>
+    <g class="plate">
+      <rect x="34" y="18" width="232" height="136" rx="8" fill="${TAR}"/>
+      <rect x="39" y="23" width="222" height="126" rx="5" fill="#f4f2ea"/>
+      <rect x="45" y="29" width="210" height="114" rx="3" fill="none" stroke="${TAR}" stroke-width="3"/>
+      <g transform="translate(58 62)">${chicken()}</g>
+      <text x="196" y="86" text-anchor="middle" font-size="${title?.length > 6 ? 16 : 22}" fill="${TAR}">${esc(title)}</text>
+      <text x="200" y="120" text-anchor="middle" font-size="10" fill="${TAR}" opacity=".78">${esc(sub)}</text>
+      <circle cx="52" cy="36" r="2.5" fill="${IRON_DARK}"/><circle cx="248" cy="36" r="2.5" fill="${IRON_DARK}"/>
+      <circle cx="52" cy="136" r="2.5" fill="${IRON_DARK}"/><circle cx="248" cy="136" r="2.5" fill="${IRON_DARK}"/>
+    </g>
+    ${advisory ? `
+    <g class="placard">
+      <rect x="92" y="154" width="2" height="16" fill="${IRON_DARK}"/><rect x="206" y="154" width="2" height="16" fill="${IRON_DARK}"/>
+      <rect x="72" y="170" width="156" height="38" rx="3" fill="${TAR}"/>
+      <rect x="75" y="173" width="150" height="32" rx="2" fill="#f0a020"/>
+      <text x="150" y="187" text-anchor="middle" font-size="6" fill="${TAR}" opacity=".8">WEATHER SERVICE</text>
+      <text x="150" y="199" text-anchor="middle" font-size="7.5" fill="${TAR}">${esc(advisory)}</text>
+    </g>` : ''}
+  </svg>`;
+
+// The hazard board's stripes: a black field under a tilted yellow-black band.
+const stripes = (id, a = YELLOW, b = TAR) => `
+  <defs><pattern id="${id}" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="28" height="28" fill="${b}"/><rect width="14" height="28" fill="${a}"/>
+  </pattern></defs>`;
+
+// Gauntlet: a striped hazard board on two posts. Mines swap the centre panel
+// for a red DANGER plaque; the maze puts up an arcade marquee ringed in bulbs.
+const gauntletSign = ({ title, sub, variant }) => {
+  const mines = variant === 'mines', maze = variant === 'maze';
+  const bulbs = maze ? [...Array(11)].map((_, i) => `<circle class="bulb ${i % 2 ? 'b' : 'a'}" cx="${52 + i * 19.6}" cy="42" r="4.5" fill="${YELLOW}"/><circle class="bulb ${i % 2 ? 'a' : 'b'}" cx="${52 + i * 19.6}" cy="166" r="4.5" fill="${YELLOW}"/>`).join('') : '';
+  const centre = maze ? `
+      <rect x="62" y="56" width="176" height="96" rx="4" fill="#12103a"/>
+      <text x="150" y="112" text-anchor="middle" font-size="34" fill="#ff4fa3" stroke="#7a1a4a" stroke-width="1.5">${esc(title)}</text>
+      <text x="150" y="136" text-anchor="middle" font-size="7.5" fill="${YELLOW}">${esc(sub)}</text>`
+    : mines ? `
+      <g class="plaque">
+        <rect x="58" y="52" width="184" height="104" rx="5" fill="#f4f2ea"/>
+        <rect x="63" y="57" width="174" height="94" rx="3" fill="#c8281e"/>
+        <rect x="68" y="62" width="164" height="84" rx="2" fill="none" stroke="#f4f2ea" stroke-width="2"/>
+        <text x="150" y="96" text-anchor="middle" font-size="26" fill="#f4f2ea">DANGER</text>
+        <text x="150" y="121" text-anchor="middle" font-size="${title?.length > 10 ? 10.5 : 14}" fill="#f4f2ea">${esc(title)}</text>
+        <text x="150" y="139" text-anchor="middle" font-size="6.5" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>
+      </g>`
+    : `
+      <rect x="58" y="60" width="184" height="88" rx="3" fill="${TAR}"/>
+      <text x="150" y="100" text-anchor="middle" font-size="${title?.length > 12 ? 12 : 16}" fill="${YELLOW}">${esc(title)}</text>
+      <text x="150" y="126" text-anchor="middle" font-size="7.5" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>`;
+  return `
+  <svg class="board gauntlet ${variant ?? ''}" viewBox="0 0 300 250" role="img" aria-label="${esc(title)}">
+    ${maze ? '' : stripes('bn-stripes')}
+    <g class="post"><rect x="78" y="180" width="9" height="70" fill="${IRON}"/><rect x="213" y="180" width="9" height="70" fill="${IRON}"/><rect x="78" y="180" width="3" height="70" fill="${IRON_DARK}"/><rect x="213" y="180" width="3" height="70" fill="${IRON_DARK}"/></g>
+    <g class="plate">
+      <rect x="34" y="24" width="232" height="160" rx="6" fill="${TAR}"/>
+      <rect x="40" y="30" width="220" height="148" rx="3" fill="${maze ? '#2a1e6e' : 'url(#bn-stripes)'}"/>
+      ${bulbs}${centre}
+    </g>
+  </svg>`;
+};
+
+// The hearing: a brass plaque in a walnut frame, the seal large on the left,
+// the department's name engraved beside it, a NOW SERVING card slotted below.
+const hearingSign = ({ title, sub }) => {
+  const words = String(title ?? '').split(' ');
+  const lines = words.length >= 3 ? [words.slice(0, 2).join(' '), ...words.slice(2)] : words;
+  const grain = [...Array(9)].map((_, i) => `<rect x="8" y="${14 + i * 18}" width="384" height="1.5" fill="#3d2410" opacity=".35"/>`).join('');
+  return `
+  <svg class="board hearing" viewBox="0 0 400 190" role="img" aria-label="${esc(title)}">
+    <defs><linearGradient id="bn-brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2c36a"/><stop offset=".5" stop-color="${BRASS}"/><stop offset="1" stop-color="#9d7a2c"/></linearGradient></defs>
+    <g class="plate">
+      <rect x="4" y="4" width="392" height="182" rx="6" fill="${WALNUT}"/>
+      ${grain}
+      <rect x="4" y="4" width="392" height="182" rx="6" fill="none" stroke="#2c1a0a" stroke-width="3"/>
+      <rect x="22" y="22" width="356" height="146" rx="3" fill="url(#bn-brass)"/>
+      <rect x="27" y="27" width="346" height="136" rx="2" fill="none" stroke="#6e5220" stroke-width="1.5"/>
+      <g fill="#6e5220"><circle cx="33" cy="33" r="2.5"/><circle cx="367" cy="33" r="2.5"/><circle cx="33" cy="157" r="2.5"/><circle cx="367" cy="157" r="2.5"/></g>
+      <g class="seal-slot" transform="translate(40 36)"></g>
+      <g fill="#3a2a12">${lines.map((ln, i) => `<text x="262" y="${64 + i * 26}" text-anchor="middle" font-size="${ln.length > 12 ? 11 : 13}" fill="#f0dc9a" opacity=".55" transform="translate(1 1)">${esc(ln)}</text><text x="262" y="${64 + i * 26}" text-anchor="middle" font-size="${ln.length > 12 ? 11 : 13}">${esc(ln)}</text>`).join('')}</g>
+      <rect x="168" y="130" width="188" height="26" rx="2" fill="#6e5220"/>
+      <rect x="172" y="133" width="180" height="20" rx="1" fill="#f4f2ea"/>
+      <text x="262" y="147" text-anchor="middle" font-size="8" fill="${TAR}">${esc(sub)}</text>
+    </g>
+  </svg>`;
+};
+
+const SIGNS = { day: daySign, gauntlet: gauntletSign, hearing: hearingSign };
+
+// A stage sign as a DOM element for the banner layer. The hearing's seal is
+// the shared `makeSeal()` nested inside its plaque.
+export function makeBanner(kind, opts = {}) {
+  const build = SIGNS[kind] ?? SIGNS.day;
+  const holder = document.createElement('div');
+  holder.innerHTML = build(opts);
+  const el = holder.firstElementChild;
+  const slot = el.querySelector('.seal-slot');
+  if (slot) {
+    const seal = makeSeal();
+    seal.setAttribute('width', '118'); seal.setAttribute('height', '118');
+    slot.appendChild(seal);
+  }
+  return el;
+}
+
 // --- attract intro -----------------------------------------------------
 // The framed scene holds the screen for an eighth of the loop, then hands it
 // back to the insert-coin screen until the next turn.

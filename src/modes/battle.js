@@ -10,6 +10,7 @@ import {
 } from '../meshes.js';
 import { Footprints } from '../scenery/footprints.js';
 import { Debris } from '../debris.js';
+import { HEADER } from '../summary.js';
 import { setFrame } from '../characters.js';
 import { W, VIEW as OFFSCREEN } from '../lane.js';   // VIEW is taken here by the camera presets
 import { sfx } from '../sfx.js';
@@ -101,7 +102,7 @@ export class BattleMode {
     this.aim = 'land';
     this.showAim();
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
-    this.game.card(`DAY ${level.number} · YOUR CASE IS CALLED`);
+    if (!this.game.debug.quickBanner) this.game.banner.show('hearing', { title: HEADER, sub: `NOW SERVING · DAY ${level.number}` });
   }
 
   // Grid the field and fill it in one theme's style. Target rows and the
@@ -485,7 +486,7 @@ export class BattleMode {
       if (this.summaryDone) game.nextLevel();
       return;
     }
-    this.timeLeft -= dt;
+    if (!this.game.banner.up) this.timeLeft -= dt;   // the clock waits for the sign
     game.card(`OFFICE CLOSES IN ${Math.ceil(this.timeLeft)} · AWARDED ${this.points}`);
     if (this.timeLeft <= 0) {
       this.ending = 0.001;

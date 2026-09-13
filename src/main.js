@@ -39,7 +39,7 @@ const ui = {
   score: $('score'), best: $('best'), coins: $('coins'), coinCount: $('coin-count'), level: $('level'), card: $('card'), tries: $('tries'),
   over: $('over'), overTitle: $('over-title'), overScore: $('over-score'), overCoins: $('over-coins'),
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'), about: $('about'),
-  intro: $('intro'),
+  intro: $('intro'), banner: $('banner'),
   summary: $('summary'), summaryTitle: $('summary-title'), summaryBody: $('summary-body'),
   p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
 };
@@ -167,6 +167,8 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { music.toggleMute(); return; }
   if (e.code === 'KeyP') { pixelScale = pixelScale >= 5 ? 1 : pixelScale + 1; resize(); return; }
   if (debugKey(e)) { e.preventDefault(); return; }
+  // A stage sign is up: the board waits, Enter or Space drops the sign early.
+  if (game.banner.up) { if (e.code === 'Enter' || e.code === 'Space') game.banner.skip(); e.preventDefault(); return; }
   if (game.summary.ready && (e.code === 'Enter' || e.code === 'Space')) { game.summary.confirm(); e.preventDefault(); return; }
   if (game.over) {
     if (e.code === 'KeyC') game.buyLife();
@@ -185,24 +187,25 @@ const held = new Map();
 addEventListener('keydown', (e) => { if (!e.repeat && REPEAT_KEYS.has(e.code) && !held.has(e.code)) held.set(e.code, { since: performance.now(), next: performance.now() + 500 }); });
 addEventListener('blur', () => held.clear());
 function repeatHeld(now) {
-  if (!started || game.over || !game.mode?.players) return;
+  if (!started || game.over || game.banner.up || !game.mode?.players) return;
   for (const [code, h] of held) {
     if (now < h.next) continue;
     h.next = now + 180;
     game.mode.onKey({ code, repeat: true });
   }
 }
-ui.view.addEventListener('click', () => { begin(); if (!game.over) game.mode.onViewButton(); });
+ui.view.addEventListener('click', () => { begin(); if (!game.over && !game.banner.up) game.mode.onViewButton(); });
 $('retry').addEventListener('click', () => { if (game.run.lives > 0) game.resume(); else if (!game.buyLife()) toTitle(); });
 
 let touchStart = null;
 canvas.addEventListener('pointerdown', (e) => { begin(); touchStart = { x: e.clientX, y: e.clientY }; });
 ui.summary.addEventListener('pointerdown', () => game.summary.confirm());
+ui.banner.addEventListener('pointerdown', () => game.banner.skip());
 canvas.addEventListener('pointerup', (e) => {
   if (!touchStart) return;
   const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
   touchStart = null;
-  if (!game.over) game.mode.onSwipe(dx, dy);
+  if (!game.over && !game.banner.up) game.mode.onSwipe(dx, dy);
 });
 
 // ---------- loop ----------

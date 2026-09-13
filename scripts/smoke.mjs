@@ -26,7 +26,10 @@ await send('Page.enable');
 const BASE = process.env.BASE ?? 'http://localhost:5173/';
 await send('Page.navigate', { url: BASE });
 await sleep(2500);
-const start = async () => { await key('Enter', 'Enter'); await sleep(4500); console.log('start', await state()); };
+// The stage sign is dropped and switched off for the rest of the run, so the
+// timings below read the board rather than the banner. The banner branch drives
+// it on its own.
+const start = async () => { await key('Enter', 'Enter'); await sleep(4500); await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`); console.log('start', await state()); };
 // Screenshots land in shots/ unless OUT says otherwise (make shots points it at
 // docs/screenshots). shots/ is gitignored, so running a scenario by hand never
 // drops PNGs in the repo root.
@@ -767,6 +770,11 @@ if (script === 'shots') {
   await evaluate(`__game.run.coins = 50`);
   await key('Space', ' '); await sleep(1500); await shot('iso');
   await key('Space', ' '); await sleep(300);
+  // The stage signs, caught once landed: the day, a gauntlet's danger plaque, the hearing's brass.
+  await evaluate(`__game.debug.quickBanner = false; __game.setMode(new __game.mode.constructor(__game))`); await sleep(1300); await shot('banner-day');
+  await evaluate(`__game.run.gauntlet = 'mines'; __game.setLevel(1); __game.setMode(new __game.mode.constructor(__game))`); await sleep(1400); await shot('banner-gauntlet');
+  await evaluate(`__game.run.gauntlet = null; __game.setLevel(1); __game.stageClear()`); await sleep(1400); await shot('banner-hearing');
+  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`); await sleep(400);
   await evaluate(`__game.run.level = 2; __game.nextLevel()`); await sleep(500);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(500); await shot('night-top');
@@ -1267,6 +1275,63 @@ if (script === 'freight') {
   await evaluate(`__game.run.coins = 50`);   // the peek burns coins
   await key('Space', ' '); await sleep(1500); await shotF('freight-iso');
   await key('Space', ' '); await sleep(300);
+}
+if (script === 'banner') {
+  const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };
+  const until = async (expr, ms) => { for (let i = 0; i < ms / 50; i++) { if (await evaluate(expr)) return true; await sleep(50); } return false; };
+  const read = () => evaluate(`(() => { const b = document.getElementById('banner'); const svg = b.querySelector('svg.board'); return { hidden: b.hidden, show: b.classList.contains('show'), up: __game.banner.up, kind: b.dataset.kind ?? null, look: svg?.getAttribute('class') ?? null, text: [...b.querySelectorAll('text')].map((t) => t.textContent).join(' | ') }; })()`);
+  // Start by hand: the shared helper drops the sign, and this branch is here to watch it.
+  await key('Enter', 'Enter');
+  check(await until(`__game.banner?.up`, 8000), 'no sign came up after the coin');
+  const day = await read();
+  console.log('day sign', day);
+  check(day.show && !day.hidden && day.kind === 'day', `day sign not showing: ${JSON.stringify(day)}`);
+  check(day.text.includes('DAY 1'), `day sign reads ${JSON.stringify(day.text)}`);
+  // Input during the hold goes nowhere.
+  await key('ArrowUp'); await sleep(350);
+  const held = await evaluate(`__game.mode.players[0].row`);
+  console.log('row under the sign', held);
+  check(held === 0, `a hop under the sign moved the player to row ${held}`);
+  // Enter after the skip window drops it; the next hop lands.
+  await sleep(500); await key('Enter', 'Enter'); await sleep(450);
+  const gone = await read();
+  console.log('after enter', gone);
+  check(!gone.up && gone.hidden, `Enter did not drop the sign: ${JSON.stringify(gone)}`);
+  await key('ArrowUp'); await sleep(500);
+  const hopped = await evaluate(`__game.mode.players[0].row`);
+  console.log('row after the sign', hopped);
+  check(hopped === 1, `hop after the sign left the player on row ${hopped}`);
+  // A retry into a minefield gauntlet: the striped board with its red plaque, short and quiet.
+  await evaluate(`__game.debug.god = true; __game.run.gauntlet = 'mines'; __game.restartStage()`); await sleep(300);
+  const mines = await read();
+  console.log('gauntlet sign', mines);
+  check(mines.up && mines.kind === 'gauntlet' && (mines.look ?? '').includes('mines'), `gauntlet sign not up: ${JSON.stringify(mines)}`);
+  check(mines.text.includes('DANGER') && mines.text.includes('MINES GAUNTLET'), `gauntlet sign reads ${JSON.stringify(mines.text)}`);
+  check(await until(`!__game.banner.up`, 2200), 'the retry sign did not clear within its 1400 ms');
+  // Rain hangs the weather placard under the day sign.
+  await evaluate(`__game.run.gauntlet = null; __game.debug.sky = 'rain'; __game.setLevel(3); __game.setMode(new __game.mode.constructor(__game))`); await sleep(300);
+  const rain = await read();
+  console.log('rain sign', rain);
+  check(rain.kind === 'day' && rain.text.includes('RAIN') && rain.text.includes('ADVISORY: SLIPPERY'), `rain sign reads ${JSON.stringify(rain.text)}`);
+  await sleep(500); await evaluate(`__game.banner.skip()`); await sleep(400);
+  // The hearing: its plaque names the department in full and the day being served.
+  await evaluate(`__game.debug.sky = null; __game.mode.finished = true`);
+  check(await until(`__game.summary.ready`, 25000), 'the tally never offered ENTER');
+  await key('Enter', 'Enter'); await sleep(400);
+  const hearing = await read();
+  console.log('hearing sign', hearing);
+  check(await evaluate(`__game.mode.constructor.name`) === 'BattleMode', 'not at the hearing after the tally');
+  check(hearing.up && hearing.kind === 'hearing', `hearing sign not up: ${JSON.stringify(hearing)}`);
+  check(hearing.text.includes('DEPARTMENT OF PEDESTRIAN GRIEVANCES') && hearing.text.includes('NOW SERVING · DAY 3'), `hearing sign reads ${JSON.stringify(hearing.text)}`);
+  check(hearing.text.split('GRIEVANCES').length >= 3, 'the department name is only on the seal, not engraved on the plaque');
+  const clock = [await evaluate(`__game.mode.timeLeft`)]; await sleep(500); clock.push(await evaluate(`__game.mode.timeLeft`));
+  console.log('office clock under the sign', clock);
+  check(clock[0] === clock[1], `the hearing clock ran under the sign: ${clock}`);
+  check(await until(`!__game.banner.up`, 3500), 'the hearing sign did not clear within its 2600 ms');
+  await sleep(600);
+  const running = await evaluate(`__game.mode.timeLeft`);
+  console.log('clock after the sign', running);
+  check(running < clock[1], `the hearing clock did not resume after the sign: ${running}`);
 }
 if (script === 'maze') {
   await start();

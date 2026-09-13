@@ -50,7 +50,7 @@ let weather = null;
 // steps of this bar get a ping.
 const fig = { rainIdx: 0, rainLeft: 0, rainRest: 0, snowIdx: 0, pings: [] };
 
-let ctx, master, bus, delayBus, hiBus, filter;
+let ctx, master, bus, delayBus, hiBus, stingBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
 const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
@@ -89,7 +89,33 @@ function setup() {
   hiBus = ctx.createGain();
   hiBus.connect(comp);
   hiBus.connect(d);
+  // Bumpers skip the mood bus so they play at full voice while it ducks under them.
+  stingBus = ctx.createGain();
+  stingBus.connect(comp);
 }
+
+// ---------- bumpers ----------
+// Stage stings: a race-start figure for the board (three beats on one pitch,
+// the fourth longer and a fifth up), the gauntlet's a semitone darker with a
+// snare on each beat, the hearing's a two-note office chime. Each entry:
+// duration, then [offset, note, length, voice] beats.
+const BUMPERS = {
+  day:      { dur: 2.4, beats: [[0, 69, 0.14, 'lead'], [0.5, 69, 0.14, 'lead'], [1.0, 69, 0.14, 'lead'], [1.5, 76, 0.75, 'lead']] },
+  gauntlet: { dur: 2.4, beats: [[0, 68, 0.14, 'lead'], [0.5, 68, 0.14, 'lead'], [1.0, 68, 0.14, 'lead'], [1.5, 75, 0.75, 'lead']], snare: true },
+  hearing:  { dur: 1.8, beats: [[0, 76, 0.9, 'chime'], [0.45, 72, 1.1, 'chime']] },
+};
+const DUCK = 0.18;   // mood gain under a bumper
+function stingVoice(kind, note, t, dur) {
+  if (kind === 'chime') {
+    osc('sine', N(note), t, dur, 0.16, stingBus, { attack: 0.004 });
+    osc('sine', N(note), t, dur * 0.8, 0.07, stingBus, { attack: 0.004, detune: 7 });
+    osc('triangle', N(note + 12), t, dur * 0.25, 0.04, stingBus, { attack: 0.002 });
+    return;
+  }
+  osc('square', N(note), t, dur, 0.11, stingBus, { attack: 0.003 });
+  osc('square', N(note - 12), t, dur, 0.05, stingBus, { attack: 0.003 });
+}
+
 
 // ---------- voices ----------
 function osc(type, freq, t, dur, vol, dest = bus, { attack = 0.005, slideTo = null, detune = 0 } = {}) {
@@ -335,6 +361,23 @@ export const music = {
   // 'rain' or 'snow' colours the board moods; anything else clears it.
   setWeather(name) { weather = Object.hasOwn(WEATHER, name) ? name : null; },
   get weather() { return weather; },
+  // One stage sting, now. The mood bus ducks for its length and comes back at the end.
+  bumper(kind) {
+    if (!ctx) return;
+    const fig = BUMPERS[kind] ?? BUMPERS.day;
+    const t0 = ctx.currentTime + 0.03;
+    const g = bus.gain;
+    g.cancelScheduledValues(t0);
+    g.setValueAtTime(g.value, t0);
+    g.linearRampToValueAtTime(DUCK, t0 + 0.08);
+    g.setValueAtTime(DUCK, t0 + fig.dur - 0.35);
+    g.linearRampToValueAtTime(1, t0 + fig.dur);
+    for (const [at, note, len, voice] of fig.beats ?? []) {
+      stingVoice(voice, note, t0 + at, len);
+      if (fig.snare) snare(t0 + at, 0.3);
+      else kick(t0 + at, 0.35);
+    }
+  },
   toggleMute() {
     muted = !muted;
     if (master) master.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.05);
