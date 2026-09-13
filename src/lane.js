@@ -160,6 +160,24 @@ export class Lane {
     return crate.id;
   }
 
+  // Cover for a cell: one cell of the row's scenery with its mass overhead and
+  // the ground left open, so a player walks under it and whatever lies on the
+  // cell cannot be seen from straight above.
+  //
+  // Deliberately does not set `data.hidden`. That flag blinks the TILT placard
+  // as you come within two rows, and a placard over every awning would be the
+  // giveaway the crate's brown box used to be — worse, since most awnings have
+  // nothing under them. An awning is its own invitation to look; the three-wide
+  // shelters keep the placard and teach what a roof is for.
+  // Returns the piece, or null where the scenery has no overhang to give.
+  cover(c) {
+    const piece = this.scenery?.overhang?.(this);
+    if (!piece) return null;
+    this.add(piece, c);
+    (this.data.covers ??= []).push(c);
+    return piece;
+  }
+
   // A crate in this cell or one either side of it, on this row or its neighbours.
   crateNear(c) {
     for (const r of [this.r - 1, this.r, this.r + 1]) {
@@ -362,7 +380,11 @@ export class Lane {
       m.mesh.position.x = m.x;
     }
     // Held movers (slid off by the tilt powerup) trail back in from beyond
-    // the ring at row speed, out of everyone's way, and rejoin at the edge.
+    // the ring at row speed and rejoin at the edge. They keep their distance
+    // on the way: the tilt puts the whole row back at once, a staller among
+    // the ones already inside can come to a halt a moment later, and a held
+    // mover marching at full row speed with no clearance walks into its
+    // bumper and both are wrecked the frame it is released.
     for (const m of this.movers) {
       if (!m.held) continue;
       m.x += this.dir * this.speed * dt;

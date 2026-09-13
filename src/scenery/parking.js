@@ -1,5 +1,5 @@
 // Asphalt lot: painted bays, a fence line, and parked cars on both sides.
-import { makeFence, makeParkedCar, makeParkingStripe, makeCanopy, makePlanter } from '../meshes.js';
+import { makeFence, makeParkedCar, makeParkingStripe, makeCanopy, makePlanter, makeCarport } from '../meshes.js';
 import { W, DETAIL_W } from '../lane.js';
 
 export default {
@@ -16,4 +16,5 @@ export default {
   },
   obstacle: () => (Math.random() < 0.8 ? makeParkedCar() : makePlanter()),
   shelter: () => makeCanopy(makeParkedCar(), 0x2f3f6a),
+  overhang: () => makeCarport(0x2f3f6a),
 };

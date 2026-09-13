@@ -17,7 +17,7 @@ const hazards = Object.values(SCENARIOS).filter((s) => s.danger).map((s) => s.id
 const forceable = Object.keys(SCENARIOS).filter((k) => k !== 'finish');
 const BLURB = {
   meadow: 'open strip, interstitial', grass: 'hunting maze with shelters, coins and eggs', road: 'cars, trucks, flatbeds; stallers at higher levels',
-  river: 'logs, boats, subs, gators; divers', runway: 'planes taxiing, taking off, landing; ridable wings', rail: 'trains with ridable cars and crossing gates',
+  river: 'logs, boats, subs, gators; divers, gator rows come about', runway: 'planes taxiing, taking off, landing; ridable wings', rail: 'trains with ridable cars and crossing gates',
   freight: 'endless slow train, one gate always down; cross through open box cars or over flat cars',
   hedge: 'barrier: hedge wall, a tunnel under one cell', trees: 'barrier: touching canopies, one trunk missing', busStop: 'barrier: shelters and buses, one shelter with no back wall',
   picket: 'barrier: white pickets, one loose board (chicken hops any)', chainlink: 'barrier: chain-link run, a hole cut low (chicken hops any)', wall: 'barrier: brick wall, a culvert under one cell',

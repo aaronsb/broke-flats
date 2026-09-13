@@ -139,10 +139,28 @@ if (script === 'tally') {
 }
 if (script === 'river') {
   await start();
-  await evaluate(`__game.debug.on = true; __game.debug.force = 'river'; __game.debug.god = true; __game.restartStage()`); await sleep(500);
+  // Level 4: every kind is in play. Gators are gated to level 3 (tuning.js), so
+  // a level 1 river never builds one and the gator checks below see nothing.
+  await evaluate(`__game.debug.on = true; __game.debug.force = 'river'; __game.debug.god = true; __game.run.level = 4; __game.restartStage()`); await sleep(500);
   for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(180); }
   await sleep(2000);
   console.log('river', await evaluate(`(() => { const rows = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'river'); const kinds = {}; for (const l of rows) for (const m of l.movers) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1; return [rows.length, kinds, rows.reduce((a, l) => a + l.movers.filter(m => m.diver).length, 0), __game.mode.players[0].row, !!__game.mode.players[0].carrier] })()`));
+  // Composition is a roll, so a board may hold no gator row at all. Rebuild
+  // until one turns up rather than let the checks pass on an empty set.
+  const gatorRows = `[...__game.mode.world.rows.values()].filter(l => l.data.turn)`;
+  let rows = 0;
+  for (let i = 0; i < 8 && !rows; i++) {
+    rows = await evaluate(`${gatorRows}.length`);
+    if (!rows) { await evaluate(`__game.restartStage()`); await sleep(400); }
+  }
+  // Jaws swap frames, and the row comes about. Elections are minutes apart at
+  // play speed, so the clock is wound forward instead of waited out.
+  await evaluate(`window.__g = { jaw: new Set(), dir: new Set(), every: ${gatorRows}[0]?.data.turn.every };
+    window.__gt = setInterval(() => { for (const l of ${gatorRows}) { __g.dir.add(l.dir); for (const m of l.movers) if (m.gape) __g.jaw.add(m.mesh.frames.findIndex(f => f.visible)); l.data.turn.t = 0; } }, 100)`);
+  await sleep(2500);
+  await evaluate(`clearInterval(__gt)`);
+  console.log('gators', await evaluate(`(() => { const l = ${gatorRows}[0]; const heads = l ? l.movers.filter(m => m.gape).length : 0;
+    return [${gatorRows}.length, heads, [...__g.jaw].sort(), [...__g.dir].sort(), Math.round(__g.every), l ? l.movers.every(m => Math.abs(m.mesh.rotation.y - (l.dir < 0 ? Math.PI : 0)) < 1e-6) : null] })()`));
 }
 if (script === 'runway') {
   await start();
@@ -794,10 +812,20 @@ if (script === 'shots') {
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(400); await shot('snow-top');
   await key('Space', ' '); await sleep(1500); await shot('snow-iso');
-  await evaluate(`__game.debug.force = 'river'; __game.debug.sky = 'day'; __game.run.level = 1; __game.restartStage()`); await sleep(500);
+  await evaluate(`__game.debug.force = 'river'; __game.debug.sky = 'day'; __game.run.level = 4; __game.restartStage()`); await sleep(500);   // level 4: gators and subs are in play
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(300); await shot('river-top');
   await key('Space', ' '); await sleep(1500); await shot('river-iso');
+  await key('Space', ' '); await sleep(300);
+  // A powerup crate under cover: nothing to see straight down, the crate and
+  // its item plain the moment the board tilts.
+  await evaluate(`__game.debug.force = 'grass'; __game.debug.sky = 'day'; __game.debug.scenery = 'city'; __game.run.level = 5; __game.restartStage()`); await sleep(600);
+  for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
+  await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row + 1);
+    for (const c of [...lane.crates.keys()]) lane.takeCrate(c);
+    lane.cover(p.col); lane.crate(p.col, 'star'); })()`); await sleep(500);
+  await shot('cover-top');
+  await key('Space', ' '); await sleep(1500); await shot('cover-iso');
   await key('Space', ' '); await sleep(300);
   await evaluate(`__game.debug.force = null; __game.run.gauntlet = 'mines'; __game.debug.sky = 'day'; __game.debug.scenery = 'residential'; __game.run.level = 1; __game.restartStage()`); await sleep(800);
   for (let i = 0; i < 6; i++) { await key('ArrowUp'); await sleep(200); }
@@ -998,6 +1026,78 @@ if (script === 'perks2') {
   const chickenHonk = await evaluate(`(() => { const p = __game.mode.players[0]; p.honk = false; return __game.mode.honk(p); })()`);
   if (chickenHonk !== 0) errors.push('perks2: a non-goose honked');
 }
+if (script === 'cover') {
+  // Crates under cover (src/powerups.js rollCrate, Lane.cover). The point of
+  // the change is that a crate cannot be seen from straight above, so the check
+  // is geometric rather than a look at a picture: for each crate, is there a
+  // static mesh in the row whose world box spans the crate in x and z and sits
+  // entirely above it? That is what "hidden from above" means on a board of
+  // axis-aligned boxes, and no screenshot can tell you it holds for every crate.
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  const check = (ok, msg) => { if (!ok) errors.push(`cover: ${msg}`); };
+
+  // Rows scroll out of the world as the player climbs, so the tally is kept in
+  // the page and added to as we go rather than read once at the end.
+  //
+  // Coverage is sampled rather than matched against one mesh: a striped awning
+  // is five separate strips and no one of them spans the crate, though together
+  // they roof it completely. Every point on a 5x5 grid over the crate's own
+  // footprint must have some static mesh of the row above it.
+  const TALLY = `(() => {
+    const t = (window.__cover ??= { crates: new Map(), covers: new Map() });
+    for (const lane of __game.mode.world.rows.values()) {
+      for (const c of lane.data.covers ?? []) t.covers.set(lane.r + ':' + c, true);
+      if (!lane.crates.size) continue;
+      const skip = new Set(); for (const c of lane.crates.values()) c.mesh.traverse((o) => skip.add(o));
+      lane.group.updateMatrixWorld(true);
+      const roofs = [];
+      lane.group.traverse((o) => { if (o.isMesh && !skip.has(o)) roofs.push(new THREE.Box3().setFromObject(o)); });
+      for (const [c, crate] of lane.crates) {
+        const cb = new THREE.Box3().setFromObject(crate.mesh);
+        const over = roofs.filter((b) => b.min.y >= cb.max.y - 0.05);
+        let open = 0, lowest = null;
+        for (let i = 0; i < 5; i++) for (let k = 0; k < 5; k++) {
+          const x = cb.min.x + (cb.max.x - cb.min.x) * (i + 0.5) / 5;
+          const z = cb.min.z + (cb.max.z - cb.min.z) * (k + 0.5) / 5;
+          const hit = over.filter((b) => b.min.x <= x && b.max.x >= x && b.min.z <= z && b.max.z >= z);
+          if (!hit.length) open++;
+          else { const y = Math.min(...hit.map((b) => b.min.y)); lowest = lowest === null ? y : Math.min(lowest, y); }
+        }
+        t.crates.set(lane.r + ':' + c, { r: lane.r, c, open, roof: open ? null : +lowest.toFixed(2) });
+      }
+    }
+    return { crates: [...t.crates.values()], covers: t.covers.size };
+  })()`;
+
+  // Walk a long way through each scenery so the roll has rows enough to place
+  // crates on, measuring the board every few hops before the rows scroll off.
+  for (const theme of ['forest', 'residential', 'city', 'parking']) {
+    await send('Page.navigate', { url: `${BASE}?start&force=grass&sky=day&scenery=${theme}&level=5&god&coins=60` }); await sleep(3200);
+    let seen = null;
+    for (let b = 0; b < 8; b++) {
+      for (let i = 0; i < 8; i++) { await key('ArrowUp'); await sleep(90); }
+      seen = await evaluate(TALLY);
+    }
+    const bare = seen.crates.filter((c) => c.roof === null);
+    console.log(`cover ${theme}`, { crates: seen.crates.length, covers: seen.covers, bare: bare.length, roofs: [...new Set(seen.crates.map((c) => c.roof))].sort() });
+    check(seen.crates.length > 0, `${theme}: no crate appeared in 64 rows, so nothing was checked`);
+    check(bare.length === 0, `${theme}: ${bare.length} crate(s) with open sky over part of them: ${JSON.stringify(bare.slice(0, 3))} (open = sample points of 25 with nothing above)`);
+    // Empty bays have to outnumber full ones or the cover is the brown box again.
+    check(seen.covers >= seen.crates.length * 1.5, `${theme}: ${seen.covers} covers for ${seen.crates.length} crates — too many roofs pay out, so the roof is the tell`);
+  }
+
+  // And the pair of pictures: a crate under city cover, straight down and tilted.
+  await send('Page.navigate', { url: BASE + '?start&force=grass&sky=day&scenery=city&level=5&coins=60' }); await sleep(3200);
+  await evaluate(`(() => { const p = __game.mode.players[0]; const lane = __game.mode.world.laneAt(p.row + 1);
+    window.__cover = null; lane.cover(p.col); lane.crate(p.col, 'star'); })()`); await sleep(500);
+  await shot('cover-top');
+  const planted = await evaluate(TALLY);
+  console.log('planted crate', planted.crates);
+  check(planted.crates.length >= 1 && planted.crates.every((c) => c.roof !== null), `the planted crate was not roofed (${JSON.stringify(planted.crates)})`);
+  await key('Space', ' '); await sleep(1600); await shot('cover-iso');
+}
+
 if (script === 'powerups') {
   // Crates and the powerup registry (src/powerups.js). A crate placed in front
   // of the player is a plain box top-down and shows its item tilted; hopping
@@ -1182,9 +1282,25 @@ if (script === 'powerups2') {
   check(spent === 0 && !gone[0] && !gone[1] && gone[2], `the chili did not end after its last shot (${JSON.stringify(gone)})`);
 
   // Tilt: the camera rides into the rolled iso view, every road within range slides off within 1.5 s, and traffic is back after 5 s.
+  // Count wrecks over the tilt window. Road traffic crashes by design: the
+  // player stands still for five seconds here, the queue halts for them, and a
+  // follower now and then rear-ends a staller that stopped inside its reaction
+  // time (Lane.advance, CRASH_DV) — the same mechanic the halt-crash scenario
+  // exists to test. So the count coming back has to allow for wrecks rather
+  // than demand the row be whole, or this reads as a tilt failure two runs in
+  // ten. What it still catches is a mover that leaves a row without one.
+  await evaluate(`(() => { const proto = Object.getPrototypeOf(__p2.roads()[0]);
+    const snap = (m) => m && { x: +m.x.toFixed(1), v: +(m.v ?? 1).toFixed(2), len: m.len, held: !!m.held, slid: !!m.__slid, staller: m.staller?.phase ?? null, vis: m.mesh.visible };
+    if (!proto.__countsWrecks) {
+      const crash = proto.crash; proto.crash = function (a, b) { (window.__wrecks ??= []).push({ r: this.r, why: 'crash', gapMin: this.gapMin, a: snap(a), b: snap(b), gap: +((b.x - a.x) * this.dir - (a.len + b.len) / 2).toFixed(2) }); return crash.call(this, a, b); };
+      const orig = proto.wreck; proto.wreck = function (m, k) { (window.__wrecks ??= []).push({ r: this.r, why: 'wreck', m: snap(m) }); return orig.call(this, m, k); };
+      proto.__countsWrecks = true;
+    }
+    window.__wrecks = []; })()`);
   const tilt = await evaluate(`(() => { const p = __p2.p(); p.clearPowers(); for (const l of __p2.roads()) l.frozen = false; const l0 = __p2.roads()[0]; __p2.put(0, l0.r - 2);
     const lanes = __p2.roads().filter((l) => Math.abs(l.r - p.row) <= 14); window.__tilt = { lanes, n: lanes.map((l) => l.movers.length), row: p.row };
     p.grant('tilt'); return { lanes: lanes.length, movers: __tilt.n.reduce((a, b) => a + b, 0), goal: __game.camera.goalName, forced: __game.mode.forceTilt, tilted: __game.mode.tilted, coins: __game.run.coins }; })()`);
+  await evaluate(`(() => { const e = __p2.p().powers.get('tilt'); for (const s of e?.ctx?.sliding ?? []) s.m.__slid = true; })()`);
   await sleep(600);
   await shot('tilt');
   await sleep(900);
@@ -1197,11 +1313,12 @@ if (script === 'powerups2') {
   check(mid.row === mid.row0, 'the player moved during the tilt');
   await sleep(3800);
   const back = await evaluate(`(() => { const lanes = __tilt.lanes; return { goal: __game.camera.goalName, forced: __game.mode.forceTilt, frozen: lanes.some((l) => l.frozen),
-    counts: lanes.map((l) => l.movers.length), same: lanes.every((l, i) => l.movers.length === __tilt.n[i]),
-    showing: lanes.map((l) => l.movers.filter((m) => !m.held && m.mesh.visible && Math.abs(m.x) <= 35).length), stray: lanes.some((l) => l.movers.some((m) => m.held && m.mesh.visible)) }; })()`);
+    counts: lanes.map((l) => l.movers.length), lost: lanes.map((l, i) => __tilt.n[i] - l.movers.length - (window.__wrecks ?? []).filter((w) => w.why === 'wreck' && w.r === l.r).length),
+    showing: lanes.map((l) => l.movers.filter((m) => !m.held && m.mesh.visible && Math.abs(m.x) <= 35).length), stray: lanes.some((l) => l.movers.some((m) => m.held && m.mesh.visible)),
+    wrecks: window.__wrecks ?? [] }; })()`);
   console.log('tilt after 5 s', back);
   check(back.goal === 'top' && !back.forced && !back.frozen, `the board did not come back after the tilt (${JSON.stringify(back)})`);
-  check(back.same && back.showing.every((n) => n > 0) && !back.stray, `traffic did not drift back in (${JSON.stringify(back)})`);
+  check(back.lost.every((n) => n === 0) && back.showing.every((n) => n > 0) && !back.stray, `traffic did not drift back in (${JSON.stringify(back)}); lost counts a mover gone from a row with no wreck to account for it`);
   console.log('powerup shots written to', OUT);
 }
 if (script === 'freight') {

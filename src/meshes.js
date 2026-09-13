@@ -312,14 +312,22 @@ const HOUSE_COLORS = [0xf3e2c5, 0xd7e6f2, 0xf2d2c9, 0xe6f0cf, 0xf9e6a8];
 const ROOF_COLORS = [0x8b3a2f, 0x4a4a55, 0x6b4a2f];
 
 // One 1x1 column of a footprint building. `side` is which x face looks at
-// the playable strip (-1 or +1); windows go on that face.
-export function makeBuildingCell({ h, color, roof, windows, lit }, side) {
+// the playable strip (-1 or +1); windows go on that face. `lift` cuts the
+// ground floor away and stands the rest on a pillar, so the block reads as a
+// tetromino resting on fewer squares than it covers.
+export function makeBuildingCell({ h, color, roof, windows, lit, lift }, side) {
   const g = new THREE.Group();
-  g.add(box(1, h, 1, color));
+  const raised = lift && h > OVERHANG_Y + 1.2;      // a bungalow has no storeys to spare
+  const y0 = raised ? OVERHANG_Y : 0;
+  if (raised) {
+    g.add(box(0.3, OVERHANG_Y, 0.3, darker(color, 0.8), -side * 0.28, 0, -0.28));
+    g.add(box(1.04, 0.14, 1.04, darker(color), 0, OVERHANG_Y - 0.14));
+  }
+  g.add(box(1, h - y0, 1, color, 0, y0));
   if (roof) g.add(box(1.08, 0.22, 1.08, roof, 0, h));
   if (windows) {
     const mat = lit ? WINDOW_LIT : WINDOW_DARK;
-    for (let y = 0.5; y < h - 0.5; y += 1) {
+    for (let y = y0 + 0.5; y < h - 0.5; y += 1) {
       for (const z of [-0.25, 0.25]) { const w = box(0.06, 0.4, 0.3, mat, side * 0.5, y, z, false); w.userData.window = true; g.add(w); }
     }
   }
@@ -385,6 +393,109 @@ export function makeCanopy(centre, roofColor = 0x5a5a62) {
   return g;
 }
 
+// ---- overhangs: one cell of cover, the ground left open ----
+// Each of these occupies a cell without blocking it: the mass sits at
+// OVERHANG_Y or above on a pillar, a back wall or a trunk, so a player walks
+// underneath and whatever lies on the cell is invisible from straight above.
+// That is where powerup crates live now (see rollCrate) — a crate on open
+// ground was a brown square announcing itself. Most overhangs have nothing
+// under them, which is what keeps the ones that do worth a peek.
+// The underside clears a player's head with room to spare: a crate's powerup
+// item floats at y 1.1 and stands about half a unit tall, and it has to hang
+// under the roof rather than through it once the camera tilts.
+export const OVERHANG_Y = 2.0;
+const darker = (c, k = 0.72) => new THREE.Color(c).multiplyScalar(k).getHex();
+const AWNINGS = [[0xd94f43, 0xf6efe2], [0x2f7ab5, 0xf6efe2], [0x3f8f5a, 0xf6efe2], [0xe0a02f, 0x4a3a2a]];
+const SHOP_SIGNS = [0x2f7ab5, 0xd94f43, 0x3f8f5a, 0xe0a02f, 0x7a4fb5];
+
+// A striped awning right across the cell, hung off the back wall. Nothing
+// holds up its front edge, so the bay under it stays open on three sides.
+function awning(g, y, [a, b]) {
+  for (let i = 0; i < 5; i++) g.add(box(0.2, 0.13, 0.96, i % 2 ? b : a, -0.4 + i * 0.2, y, 0.03));
+  g.add(box(1.02, 0.16, 0.1, darker(a, 0.85), 0, y - 0.05, 0.5));      // the valance along the front
+}
+
+// Shop: a glazed front wall at the back of the cell under a striped awning,
+// with the shop's own sign over it. The bay beneath is the pavement.
+export function makeShopfront(lit = false) {
+  const g = new THREE.Group();
+  const wall = pick(...BUILDING_COLORS), stripe = pick(...AWNINGS);
+  g.add(box(1, OVERHANG_Y + 0.9, 0.14, wall, 0, 0, -0.43));             // the face
+  g.add(box(0.62, 0.8, 0.06, lit ? WINDOW_LIT : WINDOW_DARK, -0.14, 0.5, -0.34, false));
+  g.add(box(0.24, 1.2, 0.06, darker(wall, 0.55), 0.33, 0, -0.34, false));   // door
+  g.add(box(0.06, 0.06, 0.06, 0xd8d2c4, 0.24, 0.62, -0.32, false));         // handle
+  awning(g, OVERHANG_Y, stripe);
+  g.add(box(0.8, 0.3, 0.08, pick(...SHOP_SIGNS), 0, OVERHANG_Y + 0.35, -0.36, false));
+  return g;
+}
+
+// Market stall: a canopy on four posts with the produce racked along the back,
+// leaving the front of the cell clear to walk into.
+const PRODUCE = [0xe0452f, 0xe89a2f, 0x6fbf3f, 0xd4c33a, 0x8a4fb5];
+export function makeStand() {
+  const g = new THREE.Group();
+  const stripe = pick(...AWNINGS);
+  for (const x of [-0.42, 0.42]) for (const z of [-0.42, 0.42]) g.add(box(0.07, OVERHANG_Y, 0.07, 0x6b5a44, x, 0, z));
+  for (let i = 0; i < 5; i++) g.add(box(0.2, 0.14, 1.0, i % 2 ? stripe[1] : stripe[0], -0.4 + i * 0.2, OVERHANG_Y, 0));
+  g.add(box(0.92, 0.1, 0.34, 0x8a6a4a, 0, 0.62, -0.3));                 // the trestle at the back
+  for (const x of [-0.3, 0, 0.3]) {                                      // crates of produce on it
+    g.add(box(0.26, 0.14, 0.28, 0x9a6a3a, x, 0.72, -0.3, false));
+    for (const dx of [-0.06, 0.06]) g.add(box(0.1, 0.1, 0.1, pick(...PRODUCE), x + dx, 0.86, -0.3, false));
+  }
+  return g;
+}
+
+// The corner of a building carried over the pavement on one pillar: a cell of
+// the footprint whose ground floor was cut away. Footprint buildings out in
+// the edge strip do the same thing (see Footprints.plan); this is the version
+// standing where a player can walk under it.
+export function makeBuildingOverhang(lit = false) {
+  const g = new THREE.Group();
+  const color = pick(...BUILDING_COLORS), h = OVERHANG_Y + rand(1.4, 3.0);
+  g.add(box(0.26, OVERHANG_Y, 0.26, darker(color, 0.8), -0.34, 0, -0.34));   // the pillar
+  g.add(box(1.04, 0.14, 1.04, darker(color), 0, OVERHANG_Y - 0.14));         // soffit
+  g.add(box(1, h - OVERHANG_Y, 1, color, 0, OVERHANG_Y));
+  const mat = lit ? WINDOW_LIT : WINDOW_DARK;
+  for (let y = OVERHANG_Y + 0.55; y < h - 0.4; y += 1) {
+    for (const x of [-0.26, 0.26]) g.add(box(0.34, 0.42, 0.06, mat, x, y, 0.5, false));
+  }
+  return g;
+}
+
+// Flat roof on two back posts: a carport, a lean-to, a yard shelter. Open to
+// the front and both sides.
+export function makeCarport(roofColor = 0x5a5a62) {
+  const g = new THREE.Group();
+  for (const x of [-0.4, 0.4]) g.add(box(0.09, OVERHANG_Y, 0.09, 0x6a6a72, x, 0, -0.4));
+  g.add(box(1.06, 0.16, 1.06, roofColor, 0, OVERHANG_Y));
+  g.add(box(0.86, 0.08, 0.86, darker(roofColor, 0.8), 0, OVERHANG_Y + 0.16, 0, false));
+  return g;
+}
+
+// House porch: the front wall of a home with a roof out over the step.
+export function makePorch() {
+  const g = new THREE.Group();
+  const wall = pick(...HOUSE_COLORS), roof = pick(...ROOF_COLORS);
+  g.add(box(1, OVERHANG_Y + 0.7, 0.14, wall, 0, 0, -0.43));
+  g.add(box(0.3, 0.95, 0.06, darker(wall, 0.6), -0.2, 0, -0.34, false));     // door
+  g.add(box(0.34, 0.34, 0.06, 0xd7e6f2, 0.28, 1.1, -0.34, false));           // window
+  for (const x of [-0.42, 0.42]) g.add(box(0.09, OVERHANG_Y, 0.09, 0xf4efe4, x, 0, 0.4));
+  g.add(box(1.08, 0.14, 1.02, roof, 0, OVERHANG_Y, 0.02));
+  g.add(box(0.1, 0.22, 0.9, 0xf4efe4, -0.45, 0.6, 0.04, false));             // rail down one side
+  return g;
+}
+
+// A tree with its trunk against the back of the cell, so the bough reaches
+// right across it rather than standing in the middle of it.
+export function makeBoughTree() {
+  const g = new THREE.Group();
+  const c1 = pick(...GREENS), c2 = pick(...GREENS);
+  g.add(box(0.3, OVERHANG_Y + 0.4, 0.3, 0x7a4a1f, -0.28, 0, -0.3));
+  g.add(box(1.2, 0.55, 1.2, c1, 0, OVERHANG_Y));
+  g.add(box(0.8, 0.4, 0.8, c2, 0.05, OVERHANG_Y + 0.55));
+  return g;
+}
+
 export function makeBench() {
   const g = new THREE.Group();
   g.add(box(0.8, 0.08, 0.35, 0x8a5a2b, 0, 0.4));
@@ -421,18 +532,45 @@ export function makeSub(len = 2.6) {
   return { mesh: g, len, bed: [-len / 2 + 0.3, len / 2 - 0.1], rideY: 0.11, offCause: 'water' };
 }
 
-// Alligator: ride the back, never the head.
+// Alligator: ride the back, never the head. The jaws are two frames like a
+// character's poses (`frames[0]` shut, `frames[1]` gaping) and setFrame swaps
+// them; the body is built once and shared by both.
+const GATOR_HIDE = 0x3f7a3a, GATOR_MAW = 0xb04a52;
+const gatorTeeth = (jaw, x, y, h) => { for (const z of [-0.25, -0.08, 0.08, 0.25]) jaw.add(box(0.08, h, 0.08, 0xffffff, x, y, z)); };
+
 export function makeGator(len = 3.2) {
   const g = new THREE.Group();
-  const hide = 0x3f7a3a, belly = 0x5a9a4a;
-  const body = len - 1.1;
+  const hide = GATOR_HIDE, belly = 0x5a9a4a;
+  const body = len - 1.1, snout = len / 2 - 0.5;
   g.add(box(body, 0.35, 0.8, hide, -0.45, -0.3));                     // body
   for (let x = -body / 2 - 0.3; x < body / 2 - 0.4; x += 0.4) g.add(box(0.2, 0.12, 0.3, belly, x, 0.05));  // ridges
   g.add(box(0.7, 0.2, 0.4, hide, -len / 2 + 0.2, -0.25));            // tail
-  g.add(box(0.95, 0.3, 0.7, hide, len / 2 - 0.5, -0.28));            // head
   g.add(box(0.15, 0.15, 0.15, 0xffe36b, len / 2 - 0.75, 0.02, 0.25)); // eyes
   g.add(box(0.15, 0.15, 0.15, 0xffe36b, len / 2 - 0.75, 0.02, -0.25));
-  for (const z of [-0.25, -0.08, 0.08, 0.25]) g.add(box(0.08, 0.1, 0.08, 0xffffff, len / 2 - 0.08, -0.22, z)); // teeth
+
+  const shut = new THREE.Group();
+  shut.add(box(0.95, 0.3, 0.7, hide, snout, -0.28));                  // one solid head
+  gatorTeeth(shut, len / 2 - 0.08, -0.22, 0.1);
+
+  const gape = new THREE.Group();
+  gape.add(box(0.95, 0.12, 0.7, hide, snout, -0.28));                 // lower jaw, flat on the water
+  gape.add(box(0.85, 0.04, 0.55, GATOR_MAW, snout + 0.02, -0.16));    // the maw, open to the sky
+  gatorTeeth(gape, len / 2 - 0.1, -0.16, 0.09);
+  // The jaw swings well past vertical-looking, because the game is played from
+  // straight above: at a shallow angle the raised jaw still covers the maw in
+  // plan and the gape reads only from the tilted peek. cos(1.15) leaves about
+  // 0.6 of the head's length of open red showing from directly overhead.
+  const upper = new THREE.Group();                                     // hinged at the back of the head
+  upper.position.set(snout - 0.45, -0.16, 0);
+  upper.rotation.z = 1.15;
+  upper.add(box(0.95, 0.16, 0.7, hide, 0.475, 0));
+  gatorTeeth(upper, 0.85, -0.09, 0.09);
+  gape.add(upper);
+
+  for (const f of [shut, gape]) g.add(f);
+  gape.visible = false;
+  g.frames = [shut, gape];
+
   return { mesh: g, len, bed: [-len / 2 + 0.2, len / 2 - 1.0], head: [len / 2 - 1.0, len / 2 + 0.1], rideY: 0.05, offCause: 'water' };
 }
 

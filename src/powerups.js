@@ -1,5 +1,6 @@
-// Powerups. Each sits in a crate on the board (see Lane.crate); top-down the
-// crate is a plain box and the item shows only while the camera is tilted.
+// Powerups. Each sits in a crate on the board (see Lane.crate), tucked under
+// a one-cell overhang (Lane.cover) so nothing shows from straight above; the
+// item floats over the crate and shows only while the camera is tilted.
 // The registry mirrors registerDeath in deaths.js: scenarios or later passes
 // add entries with registerPowerup.
 //
@@ -34,16 +35,32 @@ export function rollPowerup() {
   return all[all.length - 1]?.id;
 }
 
-// Crate rolls on safe rows. The chance rises with the level: 0.06 on level 1
-// to about 0.14 by level 5. Never on the intro rows, never on a gauntlet
-// (those keep their own drops), never next to another crate or on a coin.
+// Crates never sit in the open. A safe row grows an overhang — a shop awning,
+// a porch, a bough, the corner of a building on its pillar — at COVER_CHANCE,
+// and only then is it rolled for what is underneath. Left on bare ground a
+// crate was a brown square from above, visible a dozen rows off and worth
+// walking to; under cover it is a peek away and most of the peeks come up
+// empty, which is what makes the full ones worth taking.
+//
+// The rate a crate actually appears is unchanged at 0.06 on level 1 rising to
+// about 0.14 by level 5, so the roll under the roof is scaled by how rarely
+// the roof comes. Never on the intro rows, never on a gauntlet (those keep
+// their own drops), never next to another crate or on a coin.
+// Set well above the crate rate on purpose: at level 5 about a third of the
+// overhangs on a board have anything under them, and on level 1 nearer a
+// sixth. A roof that usually pays out is the brown box wearing a hat.
+const COVER_CHANCE = 0.4;
 const CRATE_BASE = 0.06, CRATE_STEP = 0.02, CRATE_MAX = 0.14;
-export function rollCrate(lane, { level = 1, gauntlet = false } = {}) {
+export function rollCrate(lane, { level = 1, gauntlet = false, avoid = null } = {}) {
   if (lane.r < 4 || gauntlet || !Object.keys(POWERUPS).length) return null;
-  if (Math.random() > clamp(CRATE_BASE + (level - 1) * CRATE_STEP, CRATE_BASE, CRATE_MAX)) return null;
+  if (Math.random() > COVER_CHANCE) return null;
   for (let tries = 0; tries < 6; tries++) {
     const c = randInt(-W + 1, W - 1);
     if (lane.blocked.has(c) || lane.coins.has(c) || lane.eggs.has(c) || lane.crateNear(c)) continue;
+    if (avoid?.includes(c)) continue;                        // a bay under a shelter is roofed already
+    lane.cover(c);
+    const per = clamp(CRATE_BASE + (level - 1) * CRATE_STEP, CRATE_BASE, CRATE_MAX);
+    if (Math.random() > per / COVER_CHANCE) return null;     // an empty bay
     const id = rollPowerup();
     lane.crate(c, id);
     return id;
