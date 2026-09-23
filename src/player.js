@@ -56,6 +56,7 @@ export class Player {
 
   reset() {
     this.onIce = null;
+    this.throwReady = 0; this.throws = [];   // the rock's cooldown runs on this.time, which a reset zeroes
     this.clearPowers();
     POSES[this.deathAnim]?.exit?.(this);
     this.restore?.();

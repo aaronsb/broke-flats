@@ -93,7 +93,7 @@ export default {
     if (fog) {
       fog.t -= dt;
       fog.mesh.userData.material.opacity = 0.75 * Math.min(1, fog.t / 1.2);
-      if (fog.t <= 0) { lane.group.remove(fog.mesh); lane.data.fog = null; }
+      if (fog.t <= 0) { lane.group.remove(fog.mesh); fog.mesh.userData.material.dispose(); lane.data.fog = null; }
     }
     // No overrunning on the ground: a plane closing on the one ahead matches its
     // speed. Anything airborne may pass over.
