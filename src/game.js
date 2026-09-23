@@ -235,7 +235,8 @@ export class Game {
   setMode(mode) {
     this.summary.clear();
     this.banner.clear();
-    this.mode?.exit();
+    // A mode's clean-up never holds up the next one: a failure there is logged and the switch goes on.
+    try { this.mode?.exit(); } catch (err) { console.error('mode exit failed', err); }
     this.mode = mode;
     music.reset(mode.mood ?? {});
     mode.enter();
