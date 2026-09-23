@@ -1492,6 +1492,71 @@ if (script === 'snake') {
   console.log('beat the clock', beat);
   check(beat.some((l) => l.startsWith('TIME LEFT')) && beat.some((l) => l.startsWith('PHEW')) && beat.some((l) => l.startsWith('LEFT BEHIND')), `finishing early lacks TIME LEFT, PHEW or LEFT BEHIND: ${JSON.stringify(beat)}`);
 }
+// The town map: seeded per run, kept through a retry, walked by leaving the
+// hearing through a door, turning a page past the top row.
+if (script === 'map') {
+  const check = (ok, msg) => { if (!ok) errors.push(`map: ${msg}`); };
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  const page = `JSON.stringify(__game.run.map.page.rows.map((row) => row.map((s) => [s.p, s.district, s.gauntlet, s.exits])))`;
+  await send('Page.navigate', { url: BASE + '?start&god&seed=12345' }); await sleep(4500);
+  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`);
+  const a = await evaluate(page);
+  const shown = await evaluate(`(() => { const m = document.getElementById('minimap'); return { hidden: m.hidden, spots: m.querySelectorAll('.spot').length, here: m.querySelectorAll('.here').length }; })()`);
+  console.log('minimap', shown, 'seed', await evaluate(`__game.run.map.seed`));
+  check(!shown.hidden && shown.spots > 10 && shown.here === 1, `the minimap is not up: ${JSON.stringify(shown)}`);
+  // The generator: every spot below the top has a way on to a spot that exists; a seed is a map.
+  await evaluate(`window.__gen = null; import('/src/townmap.js').then((T) => { let bad = 0, differ = 0; for (let s = 1; s <= 300; s++) { const pg = T.makePage(s * 7777, 0);
+    for (const row of pg.rows) for (const sp of row) { if (!sp.exits.length) bad++; if (sp.r < T.MAP_ROWS - 1 && sp.exits.some((p) => !T.spotAt(pg, sp.r + 1, p))) bad++; }
+    if (JSON.stringify(T.makePage(s * 7777, 0)) !== JSON.stringify(pg)) differ++; } window.__gen = { bad, differ, first: T.makePage(1, 0).rows[0][0].district }; })`);
+  for (let i = 0; i < 40 && !(await evaluate(`!!window.__gen`)); i++) await sleep(50);
+  const gen = await evaluate(`window.__gen`);
+  console.log('generator', gen);
+  check(gen.bad === 0 && gen.differ === 0 && gen.first === 0, `generator: ${JSON.stringify(gen)}`);
+  await send('Page.navigate', { url: BASE + '?start&god&seed=12345' }); await sleep(4500);
+  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`);
+  check((await evaluate(page)) === a, 'the same seed dealt a different map');
+  // Seed 7's first spot has one way on (left), so its right door must stay closed.
+  await send('Page.navigate', { url: BASE + '?start&god&seed=7' }); await sleep(4500);
+  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`);
+  check((await evaluate(page)) !== a, 'a different seed dealt the same map');
+  // A retry keeps the map and the spot.
+  const before = await evaluate(`JSON.stringify([__game.run.map.seed, __game.run.map.at])`);
+  await evaluate(`__game.restartStage()`); await sleep(500);
+  check((await evaluate(`JSON.stringify([__game.run.map.seed, __game.run.map.at])`)) === before, 'a retry changed the map');
+  // To the hearing, close the case, and leave by an open door.
+  await evaluate(`__game.mode.finished = true`);
+  for (let i = 0; i < 500 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+  await key('Enter', 'Enter'); await sleep(800);
+  await evaluate(`__game.mode.timeLeft = 0.1`);
+  for (let i = 0; i < 500 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+  await key('Enter', 'Enter');
+  for (let i = 0; i < 200 && !(await evaluate(`!!__game.mode.doors`)); i++) await sleep(50);
+  const doors = await evaluate(`__game.mode.doors?.map((d) => d && { p: d.p, district: d.spot.district, gauntlet: d.spot.gauntlet })`);
+  const offer = await evaluate(`document.querySelectorAll('#minimap .offer').length`);
+  console.log('doors', doors, 'offered on the map', offer, 'card', await evaluate(`document.getElementById('card').textContent`));
+  check(Array.isArray(doors) && doors.some(Boolean), `no doors opened after the case closed: ${JSON.stringify(doors)}`);
+  check(offer === doors.filter(Boolean).length, `the minimap offers ${offer} ways for ${doors.filter(Boolean).length} doors`);
+  await shot('map-doors');
+  const side = doors[1] ? 1 : 0, closed = doors[1 - side] ? null : 1 - side;
+  check(closed === 1, `seed 7 should close the right door: ${JSON.stringify(doors)}`);
+  if (closed !== null) {
+    await key(closed ? 'ArrowRight' : 'ArrowLeft', undefined, 2500); await sleep(300);
+    const still = await evaluate(`[__game.mode.constructor.name, __game.mode.pilots[0].cx]`);
+    console.log('against the closed door', still);
+    check(still[0] === 'BattleMode', 'a closed door let the pilot out');
+  }
+  await key(side ? 'ArrowRight' : 'ArrowLeft', undefined, 5000); await sleep(800);
+  const after = await evaluate(`(() => { const m = __game.run.map, s = m.page.rows[m.at.r].find((x) => x.p === m.at.p); return { mode: __game.mode.constructor.name, level: __game.run.level, at: m.at, path: m.path.length, district: __game.level.district.name, want: s && __game.level.district.name, gauntlet: __game.run.gauntlet, spotGauntlet: s?.gauntlet ?? null }; })()`);
+  console.log('through the door', after);
+  check(after.mode === 'CrossingMode' && after.level === 2 && after.at.r === 1 && after.at.p === doors[side].p && after.path === 2, `leaving by the door did not walk the map: ${JSON.stringify(after)}`);
+  check(after.gauntlet === after.spotGauntlet, `the day's gauntlet ${after.gauntlet} is not the spot's ${after.spotGauntlet}`);
+  await shot('map-next');
+  // Past the top row the run turns a page, entering where it left.
+  const turned = await evaluate(`(() => { const m = __game.run.map; m.at = { r: 5, p: m.page.rows[5][0].p }; const p = m.page.rows[5][0].exits[0]; __game.advance(p); return { page: m.page.page, at: m.at, entry: m.page.entry, path: m.path.length, p }; })()`);
+  console.log('page turn', turned);
+  check(turned.page === 1 && turned.at.r === 0 && turned.at.p === turned.p && turned.entry === turned.p && turned.path === 1, `the page did not turn: ${JSON.stringify(turned)}`);
+}
 if (script === 'banner') {
   const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };
   const until = async (expr, ms) => { for (let i = 0; i < ms / 50; i++) { if (await evaluate(expr)) return true; await sleep(50); } return false; };

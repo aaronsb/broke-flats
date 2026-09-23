@@ -22,9 +22,10 @@ export const LEVELS = [
 ];
 
 // The first pass through the table introduces crossing types one level at a
-// time; every later loop uses the full mix from the last entry.
-export function levelFor(n) {
-  const base = LEVELS[(n - 1) % LEVELS.length];
+// time; every later loop uses the full mix from the last entry. A town map
+// spot names its own district; the level number still sets the difficulty.
+export function levelFor(n, district = null) {
+  const base = LEVELS[district ?? (n - 1) % LEVELS.length];
   const loop = Math.floor((n - 1) / LEVELS.length);
   const weights = loop > 0 ? LEVELS[LEVELS.length - 1].weights : base.weights;
   return { ...base, weights, number: n, difficulty: (n - 1) * 0.6 + loop * 1.5 };

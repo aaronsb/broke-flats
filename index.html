@@ -24,6 +24,19 @@
     @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
     #card  { position: absolute; top: 58px; left: 0; right: 0; text-align: center; }
     #hint  { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; opacity: .85; }
+    /* The town map (src/minimap.js): the run's page of districts and the route walked. */
+    #minimap { position: absolute; left: 10px; bottom: 40px; width: 112px; padding: 4px; border-radius: 6px; background: rgba(8, 16, 32, .6); pointer-events: none; }
+    #minimap[hidden] { display: none; }
+    #minimap svg { display: block; width: 100%; height: auto; }
+    #minimap .way { stroke: #9fb3c8; stroke-width: 1; opacity: .45; }
+    #minimap .walked { stroke: #f5c518; stroke-width: 2.5; stroke-linecap: round; }
+    #minimap .spot { stroke: #141208; stroke-width: .8; opacity: .55; }
+    #minimap .spot.walked { opacity: 1; }
+    #minimap .here { fill: none; stroke: #fff; stroke-width: 1.6; }
+    #minimap .offer { fill: none; stroke: #f5c518; stroke-width: 1.4; animation: offer .7s ease-in-out infinite alternate; }
+    @keyframes offer { from { opacity: .3; } to { opacity: 1; } }
+    /* With the touch pad along the bottom, the map moves to the top-left under the score bar. */
+    body.touch #minimap { bottom: auto; top: 64px; left: 8px; width: 84px; }
     #hud #view { position: absolute; bottom: 44px; right: 16px; font-size: var(--ui-big); border-width: 4px; padding: 14px 20px; }
     /* Fullscreen sits under the status bar, top right, in every mode. */
     #full { position: absolute; top: 46px; right: 10px; }
@@ -225,6 +238,7 @@
     </div>
     <div id="debug" hidden></div>
     <div id="card" hidden></div>
+    <div id="minimap" hidden></div>
     <div id="summary"><h2 id="summary-title"></h2><div id="summary-body"></div></div>
     <div id="hint">arrows / WASD hop &nbsp;·&nbsp; SPACE peek in 3D (burns coins) &nbsp;·&nbsp; P pixel size &nbsp;·&nbsp; M mute &nbsp;·&nbsp; ` debug</div>
     <button id="view">TILT</button>
