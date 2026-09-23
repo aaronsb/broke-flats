@@ -1437,7 +1437,8 @@ if (script === 'snake') {
   const fs = await import('node:fs');
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
   await send('Page.navigate', { url: BASE + '?start&gauntlet=snake&god&coins=40' }); await sleep(4500);
-  await evaluate(`__game.banner.skip()`); await sleep(300);
+  // Come in with a flock of three: they go on to the next day, the line collected here does not.
+  await evaluate(`__game.run.flock[0] = { count: 3, waiting: 0 }; __game.debug.quickBanner = true; __game.restartStage()`); await sleep(600);
   const board = await evaluate(`(() => { const w = __game.mode.world; w.ensure(80); const s = w.data.snake; if (!s) return null;
     let corridors = 0, eggs = 0; for (const l of w.rows.values()) if (l.scenario.id === 'snake') { corridors += s.grid[l.r - s.firstRow].filter((v) => v === 1).length; eggs += l.eggs.size; }
     return { rows: s.rows, placed: s.placed, corridors, eggs, clock: s.clock, hunted: [...w.rows.values()].some((l) => l.scenario.id === 'snake' && l.movers.length) }; })()`);
@@ -1458,7 +1459,7 @@ if (script === 'snake') {
   await sleep(400);
   const after = await evaluate(`(() => { const s = __game.mode.world.data.snake; return { line: __game.mode.train.count, streak: s.streak[0] ?? 0, bonus: s.bonus[0] ?? 0, touches: s.touches }; })()`);
   console.log('after walk', after);
-  check(after.line === walk.length && after.streak === walk.length && after.bonus === walk.length * 10, `walking ${walk.length} new cells gave ${JSON.stringify(after)}`);
+  check(after.line === 3 + walk.length && after.streak === walk.length && after.bonus === walk.length * 10, `walking ${walk.length} new cells after a flock of 3 gave ${JSON.stringify(after)}`);
   await sleep(300); await shot('snake-top');
   await key('Space', ' '); await sleep(1500); await shot('snake-iso'); await key('Space', ' '); await sleep(300);
   // Back the way we came: onto the first follower in the line.
@@ -1466,7 +1467,7 @@ if (script === 'snake') {
   await key(back); await sleep(500);
   const touched = await evaluate(`(() => { const s = __game.mode.world.data.snake; return { line: __game.mode.train.count, bonus: s.bonus[0] ?? 0, touches: s.touches }; })()`);
   console.log('stepped on the line', touched);
-  check(touched.bonus === 0 && touched.touches === 1 && touched.line === walk.length, `stepping on the line did not reset the streak: ${JSON.stringify(touched)}`);
+  check(touched.bonus === 0 && touched.touches === 1 && touched.line === 3 + walk.length, `stepping on the line did not reset the streak: ${JSON.stringify(touched)}`);
   // The clock runs out: the maze closes and the day tallies.
   const coins0 = await evaluate(`__game.run.coins`);
   await evaluate(`__game.mode.world.data.snake.clock = 0.05`);
@@ -1479,7 +1480,17 @@ if (script === 'snake') {
   await key('Enter', 'Enter'); await sleep(1500);
   const next = await evaluate(`[__game.run.flock[0]?.count ?? 0, __game.mode.constructor.name]`);
   console.log('after the tally', next);
-  check(next[0] === 0, `the snake line carried over into the next day: ${next[0]}`);
+  check(next[0] === 3, `the next day should start with the flock of 3, not ${next[0]}`);
+  // Beat the clock: step onto the finish with time left.
+  await send('Page.navigate', { url: BASE + '?start&gauntlet=snake&god' }); await sleep(4500);
+  await evaluate(`__game.banner.skip()`); await sleep(300);
+  const fin = await evaluate(`(() => { __game.mode.world.ensure(120); return [...__game.mode.world.rows.values()].find((l) => l.scenario.id === 'finish')?.r ?? null; })()`);
+  await evaluate(`(() => { const p = __game.mode.player, row = ${fin} - 1; p.row = row; p.col = 0; p.x = 0; p.z = -row; p.mesh.position.set(0, 0, -row); })()`);
+  await sleep(300); await key('ArrowUp'); 
+  for (let i = 0; i < 400 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+  const beat = await evaluate(`[...document.querySelectorAll('#summary .row .label')].map((e) => e.textContent)`);
+  console.log('beat the clock', beat);
+  check(beat.some((l) => l.startsWith('TIME LEFT')) && beat.some((l) => l.startsWith('PHEW')) && beat.some((l) => l.startsWith('LEFT BEHIND')), `finishing early lacks TIME LEFT, PHEW or LEFT BEHIND: ${JSON.stringify(beat)}`);
 }
 if (script === 'banner') {
   const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };

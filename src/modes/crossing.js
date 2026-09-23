@@ -57,7 +57,8 @@ export class CrossingMode {
       scenery: this.game.scenery(),
       level: level.number,
       district: level.district,
-      // The snake maze lays the first player's young on every corridor cell.
+      // The snake maze lays the first player's young on every corridor cell;
+      // whoever collects one gets a young of their own kind in their line.
       young: () => this.game.roster[0].young(this.game.run.variants[0]),
       fx: this.fx,
       ignoreGaps: !!this.game.debug.force || !!this.game.run.gauntlet,
@@ -191,6 +192,8 @@ export class CrossingMode {
 
   // A hop is refused into another player's cell, another player's follower,
   // or too far ahead of a living partner. Your own followers swap with you.
+  // In the snake maze a partner's line is walked through: in corridors one
+  // cell wide, two lines would otherwise wall each other in.
   blocked(me, col, row) {
     for (const p of this.players) {
       if (p === me || !p.alive) continue;
@@ -198,7 +201,7 @@ export class CrossingMode {
       if (pc === col && pr === row) return true;
       if (row > p.row + LEASH) return true;
     }
-    return this.trains.some((t) => t.player !== me && t.occupies(col, row));
+    return !this.snake && this.trains.some((t) => t.player !== me && t.occupies(col, row));
   }
 
   setTilt(on) {
@@ -389,7 +392,12 @@ export class CrossingMode {
     // The snake maze's clock runs while the board is in play; at zero the maze closes and the day tallies.
     if (snake && !this.tally && !this.finished && !game.banner.up && snake.clock > 0) {
       snake.clock -= dt;
-      if (snake.clock <= 0) { snake.clock = 0; snake.timedOut = true; this.finished = true; game.card('TIME'); setTimeout(() => game.card(''), 1400); }
+      if (snake.clock <= 0) {
+        snake.clock = 0; snake.timedOut = true; this.finished = true;
+        game.card('TIME'); setTimeout(() => game.card(''), 1400);
+        // The maze closes: whoever is still waiting stays put, and can no longer be collected.
+        for (const l of world.rows.values()) if (l.scenario.id === 'snake') { (l.data.left ??= new Map()); for (const [c, m] of l.eggs) l.data.left.set(c, m); l.eggs.clear(); }
+      }
     }
 
     if (this.mined) {
@@ -507,8 +515,9 @@ export class CrossingMode {
     if (T.summaryDone) {
       if (T.gauntlet) game.run.gauntlet = null;
       game.run.lastCause = null;       // the next day's grievance is its own
-      // Everyone carries over, gathered or not. The snake maze's line disbands: only the flock it started with goes on.
-      this.trains.forEach((t, i) => { game.run.flock[i] = { count: this.snake ? (this.flockAtStart[i] ?? 0) + t.waiting : t.total, waiting: 0 }; });
+      // Everyone carries over, gathered or not. The snake maze's line disbands:
+      // only the flock it came in with (as counted at the line) goes on.
+      this.trains.forEach((t, i) => { game.run.flock[i] = { count: this.snake ? T.per[i] : t.total, waiting: 0 }; });
       game.card('');
       game.stageClear();
     }

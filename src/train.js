@@ -9,6 +9,7 @@ import { sfx } from './sfx.js';
 import { lerp, randInt } from './util.js';
 
 const HOP = 0.16;
+const CHATTER_GAP = 1.8;   // the whole line calls at most this often, however long it grows
 
 export class Train {
   constructor(scene, world, player, makeYoung, voice = null, fx = null) {
@@ -23,6 +24,7 @@ export class Train {
     this.waiting = 0;     // followers already at the finish line
     this.waitingMeshes = null;
     this.hatched = 0;     // eggs found this stage
+    this.hush = 0;        // seconds until any follower may call again
     player.onLanded = () => this.onLeaderLanded();
   }
 
@@ -42,10 +44,12 @@ export class Train {
 
   resolveX(rec) { return rec.carrier ? rec.carrier.x + rec.offset : rec.x; }
 
+  // A new follower joins at the tail: on the cell the line just left when
+  // there is one, so it does not have to run the length of the line to its place.
   hatch(quiet = false) {
     const mesh = this.makeYoung();
     this.scene.add(mesh);
-    const rec = this.record();
+    const rec = this.trail[this.chicks.length + 1] ?? this.record();
     mesh.position.set(this.resolveX(rec), rec.rideY, -rec.row);
     this.chicks.push({ mesh, rec, moving: false, t: 0, from: null, facing: this.player.facing, chatter: randInt(6, 18) });
     if (!quiet) { sfx.hatch(); this.hatched++; }
@@ -115,7 +119,8 @@ export class Train {
       return;
     }
     this.trail.unshift(rec);
-    if (this.trail.length > this.chicks.length + 1) this.trail.length = this.chicks.length + 1;
+    // One spare entry past the tail: the cell the line just left, where a new follower joins.
+    if (this.trail.length > this.chicks.length + 2) this.trail.length = this.chicks.length + 2;
     this.chicks.forEach((k, i) => {
       const target = this.trail[i + 1];
       if (!target || target === k.rec) return;
@@ -158,10 +163,14 @@ export class Train {
     this.showWaiting();
     if (this.waitingMeshes) for (const w of this.waitingMeshes) w.mesh.position.y = Math.abs(Math.sin(time * 6 + w.phase)) * 0.2;
 
+    this.hush -= dt;
     for (const k of [...this.chicks]) {
-      // Followers chatter now and then, always pitched above the player.
+      // Followers chatter now and then, always pitched above the player; a long line takes turns.
       k.chatter -= dt;
-      if (k.chatter < 0) { k.chatter = randInt(10, 25); this.voice?.(1.5 + Math.random() * 0.4); }
+      if (k.chatter < 0) {
+        k.chatter = randInt(10, 25);
+        if (this.hush <= 0) { this.hush = CHATTER_GAP; this.voice?.(1.5 + Math.random() * 0.4); }
+      }
       const tx = this.resolveX(k.rec), tz = -k.rec.row, ty = this.restY(k.rec);
       let sy = 1;
       if (k.moving) {
