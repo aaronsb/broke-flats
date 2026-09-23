@@ -20,6 +20,7 @@ import { grievanceFor } from '../grievances.js';
 import { POWERUPS } from '../powerups.js';
 import { SKIES } from '../sky.js';
 
+const STUCK_AFTER = 1;   // seconds a stuck summary panel is given before the watchdog moves the day on
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
 const LED_BONUS = 50;    // per follower led across the line
@@ -183,10 +184,11 @@ export class CrossingMode {
   }
 
   exit() {
+    // Players first: their powers expire against a board that is still there.
+    for (const p of this.players) p.dispose();
+    for (const t of this.trains) t.dispose();
     this.fx.dispose();
     this.world.dispose();
-    for (const t of this.trains) t.dispose();
-    for (const p of this.players) p.dispose();
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
     document.body.classList.remove('mines', 'honk', 'chili');
@@ -517,6 +519,12 @@ export class CrossingMode {
     T.t += dt;
     for (const t of this.trains) t.gather();
     if (!T.opened && T.t > (T.mines ? 2.6 : 0.6)) { T.opened = true; this.openSummary(); }
+    // Watchdog: the panel is the only way on from here. If it can no longer
+    // close by itself for a whole second, the day moves on without it.
+    if (T.opened && !T.summaryDone) {
+      T.stuck = game.summary.stuck() ? (T.stuck ?? 0) + dt : 0;
+      if (T.stuck > STUCK_AFTER) { console.warn('tally watchdog: the summary never closed; on to the hearing'); T.summaryDone = true; }
+    }
     if (T.summaryDone) {
       if (T.gauntlet) game.run.gauntlet = null;
       game.run.lastCause = null;       // the next day's grievance is its own

@@ -6,6 +6,7 @@
 import { sfx } from './sfx.js';
 import { makeSeal, mountSign } from './logo.js';
 
+const STUCK_GRACE = 8000;   // ms past the end of the count before a panel that never offered ENTER counts as stuck
 const STEP_MS = 55;      // per count tick
 const LINE_GAP = 350;    // pause after a line lands
 const STAMP_MS = 190;    // per witness stamp
@@ -126,6 +127,7 @@ export class Summary {
     totalRow.className = 'row total';
     this.ready = false;
     this.done = done;
+    this.shownAt = performance.now();
     let scaled = 0;
     let totalValue = null;
     at += 200;
@@ -176,7 +178,16 @@ export class Summary {
       body.appendChild(go);
       this.ready = true;
     });
+    this.expectMs = at;
     return at;
+  }
+
+  // For a mode waiting on the panel: true when the wait can no longer end on
+  // its own. The panel was cleared without being confirmed (nothing will call
+  // done), or it never offered ENTER well past the end of its count.
+  stuck(now = performance.now()) {
+    if (!this.done) return true;
+    return !this.ready && now - (this.shownAt ?? now) > (this.expectMs ?? 0) + STUCK_GRACE;
   }
 
   // A rubber stamp comes down on the panel and the desk thumps under it.

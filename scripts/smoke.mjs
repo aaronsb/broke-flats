@@ -1637,6 +1637,55 @@ if (script === 'ice') {
   await send('Page.navigate', { url: BASE + '?start&sky=rain&force=river' }); await sleep(4000);
   check(await evaluate(`![...__game.mode.world.rows.values()].some((l) => l.data.ice)`), 'a rainy river grew ice');
 }
+// The tally keeps the board live: a powerup picked up after the line must not
+// stop the day moving on to the hearing.
+if (script === 'tallyflow') {
+  const check = (ok, msg) => { if (!ok) errors.push(`tallyflow: ${msg}`); };
+  for (const power of (process.env.POWERS ?? 'mushroom,acorn,star,tilt,hourglass,magnet,whistle,chili,goldenEgg').split(',')) {
+    await send('Page.navigate', { url: BASE + '?start&god&coins=40&chars=goose' }); await sleep(4500);
+    await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`); await sleep(300);
+    await evaluate(`__game.mode.finished = true`); await sleep(400);
+    // A crate with the power on the cell ahead, and the player hops onto it mid-tally.
+    const got = await evaluate(`(() => { const m = __game.mode, p = m.player, l = m.world.laneAt(p.row + 1); if (!l) return 'no row'; l.blocked.delete(p.col); l.crate(p.col, '${power}'); p.hop(0, 1); return 'ok'; })()`);
+    await sleep(1200);
+    const took = await evaluate(`[...__game.mode.players[0].powers.keys()].join(',')`);
+    // Run around the finish while the tally counts: back over the line, sideways, up again.
+    for (const k of ['ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowRight', 'ArrowUp', 'KeyH']) { await key(k); await sleep(350); }
+    for (let i = 0; i < 400 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+    await key('Enter', 'Enter');
+    let mode = '';
+    for (let i = 0; i < 60 && mode !== 'BattleMode'; i++) { await sleep(100); mode = await evaluate(`__game.mode.constructor.name`); }
+    console.log(power, got, 'took', took, '->', mode, await evaluate(`JSON.stringify({ tally: !!__game.mode.tally, opened: __game.mode.tally?.opened, done: __game.mode.tally?.summaryDone, ready: __game.summary.ready, t: __game.mode.tally?.t, over: __game.over, alive: __game.mode.players?.map((p) => p.alive) })`), errors.slice(-2));
+    check(mode === 'BattleMode', `after taking ${power} during the tally the day never reached the hearing (${mode})`);
+  }
+  const toHearing = async () => { let mode = ''; for (let i = 0; i < 120 && mode !== 'BattleMode'; i++) { await sleep(100); mode = await evaluate(`__game.mode.constructor.name`); } return mode; };
+  // The watchdog: the panel vanishes mid-tally without being confirmed.
+  await send('Page.navigate', { url: BASE + '?start&god' }); await sleep(4500);
+  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true; __game.mode.finished = true`);
+  for (let i = 0; i < 200 && !(await evaluate(`!!__game.mode.tally?.opened`)); i++) await sleep(50);
+  await sleep(500); await evaluate(`__game.summary.clear()`);
+  const cleared = await toHearing();
+  console.log('panel cleared mid-tally ->', cleared);
+  check(cleared === 'BattleMode', `a summary cleared mid-tally left the day stuck (${cleared})`);
+  // The watchdog on the hearing: its panel vanishes too, and the doors still open.
+  await evaluate(`__game.banner.skip(); __game.mode.timeLeft = 0.1`);
+  for (let i = 0; i < 200 && !(await evaluate(`__game.mode.ending > 0.5`)); i++) await sleep(50);
+  await evaluate(`__game.summary.clear()`);
+  let doors = false;
+  for (let i = 0; i < 80 && !doors; i++) { await sleep(100); doors = await evaluate(`!!__game.mode.doors || __game.mode.constructor.name === 'CrossingMode'`); }
+  console.log('hearing panel cleared -> doors', doors);
+  check(doors, 'a summary cleared at the hearing left the doors shut');
+  // A crossing whose clean-up throws still hands over to the hearing.
+  await send('Page.navigate', { url: BASE + '?start&god' }); await sleep(4500);
+  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true; const m = __game.mode; const exit = m.exit.bind(m); m.exit = () => { exit(); throw new Error('boom in exit'); }; m.finished = true`);
+  for (let i = 0; i < 400 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+  await key('Enter', 'Enter');
+  const thrown = await toHearing();
+  const before = errors.length;
+  for (let i = errors.length - 1; i >= 0; i--) if (/mode exit failed|boom in exit/.test(errors[i])) errors.splice(i, 1);
+  console.log('exit threw ->', thrown, `(${before - errors.length} expected error lines dropped)`);
+  check(thrown === 'BattleMode', `a throwing exit() kept the day on the board (${thrown})`);
+}
 if (script === 'banner') {
   const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };
   const until = async (expr, ms) => { for (let i = 0; i < ms / 50; i++) { if (await evaluate(expr)) return true; await sleep(50); } return false; };
