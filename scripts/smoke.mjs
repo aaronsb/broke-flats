@@ -689,6 +689,9 @@ if (script === 'skid') {
   const fast = `(() => { ${PARK} const puffs = __game.mode.fx.puffs.length; for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); }
     return { slip: w.config.sky.slip, row: p.row - r0, alive: p.alive, spray: __game.mode.fx.puffs.length - puffs, ground: w.laneAt(5).group.children[0].material.color.getHexString() }; })()`;
   const slow = `(() => { ${PARK} for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); step(30); } return { row: p.row - r0 }; })()`;
+  // Up, up, then along the row: the skid slides along the row, not up and across.
+  const turn = `(() => { ${PARK} const l = w.laneAt(r0 + 2); for (let c = 0; c <= 4; c++) { l.blocked.delete(c); l.kinds.delete(c); l.crates.delete(c); }
+    p.hop(0, 1); run(); p.hop(0, 1); run(); p.hop(1, 0); run(); return { row: p.row - r0, col: p.col, alive: p.alive }; })()`;
   const blocked = `(() => { ${PARK} w.laneAt(r0 + 4).block(0); for (let i = 0; i < 3; i++) { p.hop(0, 1); run(); } return { row: p.row - r0, bump: p.bump > 0, skids: p.skids, skidding: p.skidding, alive: p.alive }; })()`;
   const puddles = `[...__game.mode.world.rows.values()].reduce((a, l) => a + l.group.children.filter(o => o.userData.puddle).length, 0)`;
 
@@ -714,6 +717,9 @@ if (script === 'skid') {
   console.log('snow fast', snow);
   check(snow.slip === 2, `snow slip is ${snow.slip}`);
   check(snow.row === 5 && snow.alive, `three fast hops on snow landed +${snow.row}, not +5`);
+  const snowTurn = await evaluate(turn);
+  console.log('snow turn', snowTurn);
+  check(snowTurn.row === 2 && snowTurn.col === 3 && snowTurn.alive, `up, up, right on snow slid to +${snowTurn.row} rows, column ${snowTurn.col}; it should stay on its row at column 3`);
   check(snow.ground === '9ad24a' || snow.ground === '8fca43', `snow tinted the grass (${snow.ground}); it should settle on top instead`);
   console.log('snow look', await evaluate(`[__game.sky.name, __game.sky.snow, !!__game.sky.flakes, !!__game.sky.rain, __game.sky.headlights]`));
   check(await evaluate(`!!__game.sky.flakes && !__game.sky.rain`), 'snow did not put up flakes (or left the rain on)');
