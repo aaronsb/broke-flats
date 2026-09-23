@@ -2,7 +2,7 @@
 // columns, the signal blinks and a horn sounds, then a train crosses. Steam
 // trains are slow and puff, diesels are middling, bullet trains are fast.
 // Flat cars and box-car doorways can be ridden; everything else is fatal.
-import { box, makeTrain, makeRailSignal, makeGate, makeHeadlightCone } from '../meshes.js';
+import { box, makeTrain, makeRailSignal, makeGate, makeHeadlightCone, makePenny } from '../meshes.js';
 import { W, SPAN, GW, DETAIL_W } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
@@ -112,6 +112,25 @@ export default {
       g.lamps.forEach((l, i) => l.material.color.set(down && (Math.sin(time * 14) > 0) === (i % 2 === 0) ? 0xff2a1a : 0x3a0a0a));
     }
     d.down = down;
+
+    // Pennies: a train over one marks it, and once the train has gone it is a coin to pick up.
+    for (const [c, penny] of d.pennies ?? []) {
+      if (d.state === 'run' && Math.abs(t.x - c) < t.len / 2 + 0.3) { penny.run = true; continue; }
+      if (!penny.run) continue;
+      lane.group.remove(penny.mesh);
+      d.pennies.delete(c);
+      lane.coin(c);
+      sfx.plink();
+    }
+  },
+
+  // A thrown rock puts a penny on the track. It does not slow the train.
+  onThrow(lane, c) {
+    const d = lane.data, t = d.train;
+    if ((d.state === 'run' && Math.abs(t.x - c) < t.len / 2 + 0.3) || d.pennies?.has(c) || lane.coins.has(c)) return false;
+    (d.pennies ??= new Map()).set(c, { mesh: lane.add(makePenny(), c), run: false });
+    sfx.plink();
+    return true;
   },
 
   // Columns under the near-side arm (guards entry from below) and the far-side arm.

@@ -6,7 +6,6 @@ import { W, OFF_EDGE } from './lane.js';
 import { setFrame } from './characters.js';
 import { SWIM_Y } from './scenarios/river.js';
 import { sfx } from './sfx.js';
-import { iced } from './snow.js';
 import { lerp, randInt } from './util.js';
 
 const HOP = 0.16;
@@ -102,7 +101,7 @@ export class Train {
   restY(rec) {
     if (rec.carrier) return rec.carrier.wing ? rec.carrier.y + 0.4 : rec.rideY;
     const lane = this.world.laneAt(rec.row);
-    if (lane?.scenario.id === 'river' && iced(lane, Math.round(rec.x))) return rec.y ?? 0;   // ice holds the young where it held the leader
+    if (lane?.scenario.footing?.(lane, Math.round(rec.x))) return rec.y ?? 0;   // ice or a lily pad holds the young where it held the leader
     return this.player.swims && lane?.scenario.id === 'river' ? SWIM_Y : rec.y ?? 0;
   }
 
@@ -205,7 +204,7 @@ export class Train {
       if (k.moving && k.t < 0.5) continue;
       const lane = this.world.laneAt(k.rec.row);
       // A swimmer's young afloat: logs and gator backs pick it up, boats run it down.
-      if (this.player.swims && !k.moving && !k.rec.carrier && lane?.scenario.id === 'river' && !iced(lane, Math.round(k.rec.x))) {
+      if (this.player.swims && !k.moving && !k.rec.carrier && lane?.scenario.id === 'river' && !lane.scenario.footing(lane, Math.round(k.rec.x))) {
         const m = lane.moverAt(k.mesh.position.x, 0.3);
         if (m && !m.submerged) {
           const x = k.mesh.position.x;

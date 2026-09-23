@@ -189,6 +189,10 @@ export const sfx = {
   // "Dee-doo" confirmation chime.
   confirm: () => { voice({ wave: 'square', freq: N(76), attack: 0.003, decay: 0.03, sustain: 0.7, hold: 0.08, release: 0.06, vol: 0.07 });
                    setTimeout(() => voice({ wave: 'square', freq: N(83), attack: 0.003, decay: 0.03, sustain: 0.7, hold: 0.16, release: 0.12, vol: 0.07 }), 130); },
+  // A lily pad pops up: a low round note that bends up and away.
+  bloop: () => voice({ wave: 'sine', freq: vary(220, 0.05), slideTo: 520, attack: 0.005, decay: 0.05, sustain: 0.7, hold: 0.06, release: 0.12, vol: 0.12 }),
+  // A rock leaves the hand.
+  toss: () => voice({ wave: 'noise', freq: 1800, slideTo: 3200, filter: 'bandpass', attack: 0.01, decay: 0.03, sustain: 0.5, hold: 0.04, release: 0.05, vol: 0.05 }),
   plink: () => voice({ wave: 'triangle', freq: vary(1500, 0.12), slideTo: 650, attack: 0.001, decay: 0.03, sustain: 0.3, hold: 0.01, release: 0.05, vol: 0.06 }),
   hop: () => voice({ wave: 'square', freq: vary(N(72), 0.03), slideTo: N(79), attack: 0.002, decay: 0.03, sustain: 0.4, hold: 0.01, release: 0.05, vol: 0.06 }),
   bump: () => voice({ wave: 'square', freq: N(45), slideTo: N(40), attack: 0.002, decay: 0.05, sustain: 0.3, hold: 0.02, release: 0.06, vol: 0.07 }),
