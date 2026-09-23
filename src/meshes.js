@@ -900,14 +900,15 @@ export function makeBus(len = 3) {
 
 const PICKET = 0xf4efe4;
 // White picket fence along x. `loose`: three boards are gone and one hangs
-// from the top rail by a nail. The rails hide all of it from above, and the
-// boards cast no shadow, so the shadow band has no notch where they are gone.
+// from the top rail by a nail. A header rail carries the missing boards' tips,
+// so from above the line of tips runs unbroken and only the tilted view shows
+// the way through. The boards cast no shadow, so the shadow band has no notch.
 export function makePicket(loose = false) {
   const g = new THREE.Group();
   for (const y of [0.3, 0.65]) g.add(box(1, 0.07, 0.06, PICKET, 0, y));
+  if (loose) g.add(box(1, 0.05, 0.06, PICKET, 0, 0.85, 0, false));
   for (const x of [-0.4, -0.2, 0, 0.2, 0.4]) {
-    if (loose && Math.abs(x) < 0.3) continue;
-    g.add(box(0.12, 0.9, 0.05, PICKET, x, 0, 0, false));
+    if (!(loose && Math.abs(x) < 0.3)) g.add(box(0.12, 0.9, 0.05, PICKET, x, 0, 0, false));
     g.add(box(0.12, 0.08, 0.05, 0xd9d2c2, x, 0.9, 0, false));
   }
   if (loose) {

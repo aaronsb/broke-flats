@@ -723,13 +723,14 @@ if (script === 'skid') {
   check(snow.ground === '9ad24a' || snow.ground === '8fca43', `snow tinted the grass (${snow.ground}); it should settle on top instead`);
   console.log('snow look', await evaluate(`[__game.sky.name, __game.sky.snow, !!__game.sky.flakes, !!__game.sky.rain, __game.sky.headlights]`));
   check(await evaluate(`!!__game.sky.flakes && !__game.sky.rain`), 'snow did not put up flakes (or left the rain on)');
-  // Snow accumulates: the first grass row's splats are one InstancedMesh whose drawn count grows.
-  const snowRow = `(() => { const l = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'grass').sort((a, b) => a.r - b.r)[0]; const s = l.data.snow; const im = l.group.children.find(o => o.isInstancedMesh);
-    return { row: l.r, has: !!s && s.mesh === im, total: s?.total ?? 0, count: im?.count ?? -1, t: +(__game.mode.world.data.snowT ?? 0).toFixed(2), movers: l.movers.length }; })()`;
+  // Snow accumulates: the first grass row's surfaces are one merged mesh of a
+  // handful of quads, and the depth the shader carves them to grows.
+  const snowRow = `(() => { const l = [...__game.mode.world.rows.values()].filter(l => l.scenario.id === 'grass').sort((a, b) => a.r - b.r)[0]; const s = l.data.snow; const m = l.group.children.find(o => o.isMesh && o.geometry.getAttribute('aSnow'));
+    return { row: l.r, has: !!s && s.mesh === m, quads: s?.quads ?? 0, f: +(m?.material.userData.uSnowF.value ?? -1).toFixed(4), t: +(__game.mode.world.data.snowT ?? 0).toFixed(2), movers: l.movers.length }; })()`;
   const s0 = await evaluate(snowRow); await sleep(3000); const s1 = await evaluate(snowRow);
   console.log('snow piles', s0, s1);
-  check(s0.has && s0.total > 0 && s0.total <= 6000, `the grass row has no snow instances: ${JSON.stringify(s0)}`);
-  check(s1.count > s0.count && s1.count <= s1.total, `the snow did not deepen over 3 s: ${s0.count} -> ${s1.count} of ${s1.total}`);
+  check(s0.has && s0.quads > 0 && s0.quads <= 400, `the grass row has no merged snow: ${JSON.stringify(s0)}`);
+  check(s1.f > s0.f && s1.f <= 1, `the snow did not deepen over 3 s: ${s0.f} -> ${s1.f}`);
   const snowSlow = await evaluate(slow);
   console.log('snow slow', snowSlow);
   check(snowSlow.row === 3, `three slow hops on snow landed +${snowSlow.row}, not +3`);
@@ -743,9 +744,9 @@ if (script === 'skid') {
   // Roads under snow: the row is snowed, the traffic is not.
   await load('?start&sky=snow&force=road&god');
   const roadSnow = await evaluate(`(() => { const l = [...__game.mode.world.rows.values()].find(l => l.scenario.id === 'road' && l.movers.length); if (!l) return null;
-    return { row: l.r, movers: l.movers.length, total: l.data.snow?.total ?? 0, snowed: l.movers.some(m => { let hit = false; m.mesh.traverse(o => { if (o.isInstancedMesh) hit = true; }); return hit; }) }; })()`);
+    return { row: l.r, movers: l.movers.length, quads: l.data.snow?.quads ?? 0, snowed: l.movers.some(m => { let hit = false; m.mesh.traverse(o => { if (o.geometry?.getAttribute('aSnow')) hit = true; }); return hit; }) }; })()`);
   console.log('road under snow', roadSnow);
-  check(roadSnow && roadSnow.total > 0 && !roadSnow.snowed, `a snowed road row is wrong: ${JSON.stringify(roadSnow)}`);
+  check(roadSnow && roadSnow.quads > 0 && !roadSnow.snowed, `a snowed road row is wrong: ${JSON.stringify(roadSnow)}`);
   // Perks: the robot is heavy and skids one cell less; a frog's long jump is one hop.
   await load('?start&sky=snow&force=grass&chars=robot');
   const robot = await evaluate(fast);
@@ -814,7 +815,7 @@ if (script === 'shots') {
   await sleep(400); await shot('rain-top');
   await key('Space', ' '); await sleep(1500); await shot('rain-iso');
   await evaluate(`__game.run.level = 4; __game.nextLevel()`); await sleep(500);
-  await evaluate(`__game.mode.world.data.snowT = 60`);   // two thirds settled: the splats read as a fall in progress
+  await evaluate(`__game.mode.world.data.snowT = 60`);   // two thirds settled: the patches read as a fall in progress
   for (let i = 0; i < 5; i++) { await key('ArrowUp'); await sleep(200); }
   await sleep(400); await shot('snow-top');
   await key('Space', ' '); await sleep(1500); await shot('snow-iso');
