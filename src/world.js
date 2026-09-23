@@ -2,15 +2,19 @@ import { Lane } from './lane.js';
 import { SCENARIOS, INTRO } from './scenarios/index.js';
 import { randInt } from './util.js';
 import { snowLane, snowTick } from './snow.js';
+import { makeDistrictSign } from './meshes.js';
 
 export { W, SPAN } from './lane.js';
 
 const FOLLOW_CHANCE = 0.4;   // a band with followers (a road, for the barriers) gets one this often
+// The welcome sign stands this many rows behind the start and this far left of
+// the path: in view from above, and clear of the tilted camera's line to the player.
+const WELCOME_ROW = 2, WELCOME_X = -4.5;
 
 // The board: owns the rows, sequences scenario bands, and dispatches the
 // per-row hooks. Scenario-specific behaviour lives in src/scenarios/.
 export class World {
-  // config: { weights, bands, difficulty, sky, scenery, onFinish }
+  // config: { weights, bands, difficulty, sky, scenery, district, onFinish }
   constructor(scene, config) {
     this.scene = scene;
     this.config = config;
@@ -32,7 +36,13 @@ export class World {
   }
 
   ensure(upTo) {
-    if (!this.backfilled) { this.backfilled = true; for (let r = -1; r >= -12; r--) this.addRow(r, SCENARIOS[INTRO]); }
+    if (!this.backfilled) {
+      this.backfilled = true;
+      for (let r = -1; r >= -12; r--) this.addRow(r, SCENARIOS[INTRO]);
+      // The district's welcome sign stands in the meadow behind the start.
+      const d = this.config.district;
+      if (d) this.rows.get(-WELCOME_ROW).add(makeDistrictSign(['WELCOME TO', d.name, d.motto]), WELCOME_X);
+    }
     while (this.nextRow <= upTo) this.addRow(this.nextRow++);
   }
 
@@ -91,7 +101,9 @@ export class World {
   // After the level's danger-band quota, lay the finish line and then only meadow.
   queueFinish() {
     const pad = { scenario: SCENARIOS[INTRO], index: 0, count: 1 };
-    this.queue.push(pad, { scenario: SCENARIOS.finish, index: 0, count: 1 }, { ...pad }, { ...pad });
+    // The two rows past the finish carry the leaving sign and the lean of its
+    // board: bare, so no crate stands in front of it or hides under it.
+    this.queue.push(pad, { scenario: SCENARIOS.finish, index: 0, count: 1 }, { ...pad, bare: true }, { ...pad, bare: true });
     this.done = true;
   }
 
@@ -132,7 +144,7 @@ export class World {
     const spec = filler ? { scenario: filler, index: 0, count: 1 } : this.nextSpec(r);
     const lane = new Lane(r, spec.scenario, this);
     spec.scenario.build(lane, {
-      world: this, index: spec.index, count: spec.count, prev: this.rows.get(r - 1),
+      world: this, index: spec.index, count: spec.count, bare: !!spec.bare, prev: this.rows.get(r - 1),
       sky: this.config.sky, difficulty: this.config.difficulty, gauntlet: !!this.config.gauntlet, level: this.config.level ?? 1,
     });
     if (this.config.sky?.snow) snowLane(lane, this);

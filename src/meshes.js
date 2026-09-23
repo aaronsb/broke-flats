@@ -270,6 +270,60 @@ export function makeCheckerTile(c) {
   return box(1, 0.06, 1, c % 2 ? 0xf2f2f2 : 0x222222, 0, 0, 0, false);
 }
 
+// A district's roadside sign: a green board in the town sign's livery on two
+// wooden posts, the whole thing leaning back so its face reads from straight
+// above. lines: [small top line, the name, small bottom line]. One face per
+// wording is drawn to a canvas and cached; it redraws once the arcade font
+// has loaded, in case the first stage raced it. The board casts no shadow:
+// leaning back, it would lay a slab of dark over the rows in front of it.
+const SIGN_W = 6, SIGN_H = 1.9, SIGN_LEAN = 0.6;
+const signFaces = new Map();
+function signFace(lines) {
+  const key = lines.join('|');
+  let m = signFaces.get(key);
+  if (m) return m;
+  const cv = document.createElement('canvas');
+  cv.width = 768; cv.height = Math.round(768 * SIGN_H / SIGN_W);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const draw = () => {
+    const g = cv.getContext('2d'), w = cv.width, h = cv.height;
+    g.fillStyle = '#ded9c4'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2f6b41'; g.fillRect(12, 12, w - 24, h - 24);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    // Press Start is one em per glyph: size each line to fit the board.
+    const line = (text, y, max, color) => {
+      g.font = `${Math.min(max, (w - 70) / Math.max(1, text.length))}px Arcade, monospace`;
+      g.fillStyle = color;
+      g.fillText(text, w / 2, y);
+    };
+    const [top, name, bottom] = lines;
+    line(top, h * 0.19, 34, '#e3ecd9');
+    line(name, h * 0.5, 64, '#f4f2e4');
+    line(bottom, h * 0.81, 34, '#e3ecd9');
+    tex.needsUpdate = true;
+  };
+  draw();
+  document.fonts?.load('32px Arcade').then(draw, () => {});
+  const edge = mat(0xded9c4);
+  m = [edge, edge, edge, edge, new THREE.MeshLambertMaterial({ map: tex }), mat(0x8a9097)];
+  signFaces.set(key, m);
+  return m;
+}
+export function makeDistrictSign(lines) {
+  const g = new THREE.Group();
+  g.userData.sign = lines;
+  const lean = new THREE.Group();
+  lean.rotation.x = -SIGN_LEAN;
+  for (const x of [-SIGN_W * 0.32, SIGN_W * 0.32]) lean.add(box(0.16, 0.5 + SIGN_H, 0.12, 0x7a5636, x, 0, -0.08));
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(SIGN_W, SIGN_H, 0.08), signFace(lines));
+  plate.position.y = 0.5 + SIGN_H / 2;
+  lean.add(plate);
+  g.add(lean);
+  return g;
+}
+
 // Flatbed truck: the cab kills, the low bed behind it carries you like a log.
 // Modeled driving toward +x; bed spans local x in [-1.55, 0.55].
 export function makeFlatbed() {

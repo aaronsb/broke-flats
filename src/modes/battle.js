@@ -102,7 +102,7 @@ export class BattleMode {
     this.aim = 'land';
     this.showAim();
     this.game.camera.snap(0, -VIEW.land[1], VIEW.land[0]);
-    if (!this.game.debug.quickBanner) this.game.banner.show('hearing', { title: HEADER, sub: `NOW SERVING · DAY ${level.number}` });
+    if (!this.game.debug.quickBanner) this.game.banner.show('hearing', { title: HEADER, sub: `RE: ${level.district.name} · DAY ${level.number}` });
   }
 
   // Grid the field and fill it in one theme's style. Target rows and the
