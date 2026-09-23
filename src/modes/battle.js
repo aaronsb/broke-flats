@@ -533,6 +533,11 @@ export class BattleMode {
 
     if (this.ending) {
       this.ending += dt;
+      // Watchdog: a case-closed panel that can no longer close by itself for a second lets the doors open anyway.
+      if (!this.summaryDone) {
+        this.stuck = game.summary.stuck() ? (this.stuck ?? 0) + dt : 0;
+        if (this.stuck > 1) { console.warn('hearing watchdog: the summary never closed; opening the doors'); this.summaryDone = true; }
+      }
       if (this.summaryDone && !this.doors) this.openDoors();
       if (this.doors) this.walkOut();
       return;
