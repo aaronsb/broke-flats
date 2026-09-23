@@ -8,6 +8,7 @@ import { ac } from './sfx.js';
 
 const N = (n) => 440 * Math.pow(2, (n - 69) / 12);
 const LOOKAHEAD = 0.12;
+const CUTOFF_MAX = 6500;   // snow's brightening stops here so the song's pulses do not turn brittle
 const STEPS = 16;
 
 // Chords as MIDI note arrays; four bars per progression.
@@ -223,15 +224,20 @@ const SONG_BASS = { 0: 0, 2: 12, 4: 0, 6: 12, 8: 0, 10: 12, 11: 0, 12: 12, 14: 0
 const ECHO_STEPS = 3;
 
 function parseBar(src) {
-  const tokens = src.split(/\s+/);
+  const tokens = src.trim().split(/\s+/);
   if (tokens.length !== STEPS) throw new Error(`song bar needs ${STEPS} steps: ${src}`);
   const out = new Array(STEPS).fill(null);
   let open = null;
   tokens.forEach((tok, i) => {
-    if (tok === '-') { if (open) open[1]++; return; }
+    if (tok === '-') {
+      if (!open) throw new Error(`song hold with no note before it: ${src}`);
+      open[1]++;
+      return;
+    }
     open = null;
     if (tok === '.') return;
     const m = /^([A-G])(#?)(\d)$/.exec(tok);
+    if (!m) throw new Error(`bad song token '${tok}' in: ${src}`);
     const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0);
     out[i] = open = [12 * (+m[3] + 1) + pc, 1];
   });
@@ -301,7 +307,9 @@ function songStep(s, t, sixteenth, chord) {
   if (n) {
     const dur = n[1] * sixteenth * 0.95;
     pulse(0.25, n[0], t, dur, 0.085, { vib: 18 });
-    pulse(0.125, n[0], t + ECHO_STEPS * sixteenth, dur, 0.03, { vib: 18 });
+    // The echo is dropped where it would spill onto the next bar's different chord.
+    const spills = s + ECHO_STEPS >= STEPS && SONG_CHORDS[(at + 1) % SONG_CHORDS.length] !== chord;
+    if (!spills) pulse(0.125, n[0], t + ECHO_STEPS * sixteenth, dur, 0.03, { vib: 18 });
   }
   if (s === STEPS - 1) songBar++;
 }
@@ -333,7 +341,7 @@ function scheduleStep(s, t) {
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
 
-  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff * (wx ? wx.cutoff : 1), t, 0.2);
+  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : Math.min(CUTOFF_MAX, target.cutoff * (wx ? wx.cutoff : 1)), t, 0.2);
 
   if (mood.dead) {
     if (s === 0) pad(chord, t, beat * 4);
@@ -401,7 +409,9 @@ function scheduleStep(s, t) {
     // Falling phrases: four to six drops stepping down the scale one per sixteenth,
     // each phrase starting from a random height, then a rest of a few steps.
     if (fig.rainLeft > 0 && fig.rainIdx >= 0) {
-      drop(RAIN_SCALE[fig.rainIdx % RAIN_SCALE.length], t, sixteenth, danger ? 0.022 : 0.03);
+      // Over the song's E major bars a G drop is sharpened to G#.
+      const d = RAIN_SCALE[fig.rainIdx % RAIN_SCALE.length];
+      drop(onSong && d % 12 === 7 && chord.some((n) => n % 12 === 8) ? d + 1 : d, t, sixteenth, danger ? 0.022 : 0.03);
       fig.rainIdx--; fig.rainLeft--;
       if (fig.rainLeft === 0 || fig.rainIdx < 0) { fig.rainLeft = 0; fig.rainRest = 2 + Math.floor(Math.random() * 6); }
     } else if (fig.rainRest > 0) {
@@ -433,7 +443,8 @@ function scheduleStep(s, t) {
   if (mood.tilted || mood.star) {
     // Peek overlay: high sparkle arp cycling the chord two octaves up. A star gets it too.
     const tone = chord[(s + bar) % chord.length] + 24;
-    if (s % 2 === 0 || danger) sparkle(tone, t, sixteenth * 2.5);
+    // Under the song it thins to the beats, clear of the lead, echo and arpeggios.
+    if (onSong ? s % 4 === 0 : s % 2 === 0 || danger) sparkle(tone, t, sixteenth * 2.5);
     if (s % 4 === 0) shaker(t, 0.05);
   }
 }
