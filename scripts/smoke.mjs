@@ -885,7 +885,14 @@ if (script === 'battle') {
   await sleep(4000);
   console.log('battle summary', await evaluate(`[...document.querySelectorAll('#summary .row')].map(r => r.textContent).join(' | ')`));
   await sleep(5000); await key('Enter', 'Enter'); await sleep(800);
-  console.log('next level', await state());
+  // The case is closed: leave by whichever door is open.
+  const doors = await evaluate(`__game.mode.doors?.map(Boolean)`);
+  console.log('doors', doors);
+  if (doors?.[1] || doors?.[0]) await key(doors[1] ? 'ArrowRight' : 'ArrowLeft', undefined, 5000);
+  await sleep(800);
+  const next = await evaluate(`[__game.mode.constructor.name, __game.run.level]`);
+  console.log('next level', next, await state());
+  if (next[0] !== 'CrossingMode' || next[1] !== 2) errors.push(`battle: leaving the hearing did not start day 2: ${JSON.stringify(next)}`);
   for (let i = 0; i < 4; i++) { await key('ArrowUp'); await sleep(220); }
   console.log('level 2 hops', await state());
 }
@@ -1505,9 +1512,10 @@ if (script === 'map') {
   const shown = await evaluate(`(() => { const m = document.getElementById('minimap'); return { hidden: m.hidden, spots: m.querySelectorAll('.spot').length, here: m.querySelectorAll('.here').length }; })()`);
   console.log('minimap', shown, 'seed', await evaluate(`__game.run.map.seed`));
   check(!shown.hidden && shown.spots > 10 && shown.here === 1, `the minimap is not up: ${JSON.stringify(shown)}`);
-  // The generator: every spot below the top has a way on to a spot that exists; a seed is a map.
+  // The generator: every spot is reached from the entry and has a way on to a spot that exists; a seed is a map.
   await evaluate(`window.__gen = null; import('/src/townmap.js').then((T) => { let bad = 0, differ = 0; for (let s = 1; s <= 300; s++) { const pg = T.makePage(s * 7777, 0);
-    for (const row of pg.rows) for (const sp of row) { if (!sp.exits.length) bad++; if (sp.r < T.MAP_ROWS - 1 && sp.exits.some((p) => !T.spotAt(pg, sp.r + 1, p))) bad++; }
+    const reached = new Set(['0,' + pg.entry]);
+    for (const row of pg.rows) for (const sp of row) { if (!sp.exits.length || !reached.has(sp.r + ',' + sp.p)) bad++; for (const p of sp.exits) reached.add((sp.r + 1) + ',' + p); if (sp.r < T.MAP_ROWS - 1 && sp.exits.some((p) => !T.spotAt(pg, sp.r + 1, p))) bad++; }
     if (JSON.stringify(T.makePage(s * 7777, 0)) !== JSON.stringify(pg)) differ++; } window.__gen = { bad, differ, first: T.makePage(1, 0).rows[0][0].district }; })`);
   for (let i = 0; i < 40 && !(await evaluate(`!!window.__gen`)); i++) await sleep(50);
   const gen = await evaluate(`window.__gen`);

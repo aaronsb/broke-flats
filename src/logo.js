@@ -153,7 +153,7 @@ const chicken = (fill = TAR) => `
   </g>`;
 
 // An escaped text node: the titles come from level data, so no markup rides along.
-const esc = (t) => String(t ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+export const esc = (t) => String(t ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
 // Font size that fits `text` into `width` units: the arcade face is monospaced
 // at one em per glyph, capped at `max`.

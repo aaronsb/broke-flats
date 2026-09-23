@@ -163,8 +163,8 @@ export class BattleMode {
 
   // The case is closed: a door opens at each end of the row the map offers a
   // way through, a sign over it names where it leads, and a way the map
-  // closes gets a barrier. With no map spot to leave from (a hearing opened
-  // straight from a playtest URL) the day just moves on.
+  // closes gets a barrier. With no map spot to leave from (a level reached
+  // by number: a debug jump, or ?battle&level=N past the first) the day just moves on.
   openDoors() {
     const { game } = this;
     this.doors = game.exits();
@@ -292,7 +292,7 @@ export class BattleMode {
   onSwipe(dx, dy) {
     const p = this.pilots[0];
     if (Math.hypot(dx, dy) < 20) this.fire(p);
-    else if (Math.abs(dx) > Math.abs(dy)) p.cx = clamp(p.cx + Math.sign(dx) * 2, -W, W);
+    else if (Math.abs(dx) > Math.abs(dy)) p.cx = clamp(p.cx + Math.sign(dx) * 2, this.reach[0], this.reach[1]);   // an open door is in reach
     else this.cycleAim();
   }
   onViewButton() { this.cycleAim(); }

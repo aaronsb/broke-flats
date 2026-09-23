@@ -11,7 +11,7 @@ import { LEVELS } from './levels.js';
 export const MAP_W = 7;          // spot positions across
 export const MAP_ROWS = 6;       // rows per page
 const ONE_WAY = 0.35;            // spots that keep only one of their two exits
-const GAUNTLET_SHARE = 0.25;     // spots above the first row that are gauntlets
+const GAUNTLET_SHARE = 0.15;     // spots above the first row that are gauntlets
 // The gauntlets a spot can be, weighted by repetition.
 const GAUNTLETS = ['snake', 'snake', 'maze', 'mines', 'road', 'river', 'runway', 'rail'];
 
@@ -61,6 +61,11 @@ export function makePage(seed, page = 0, entry = (MAP_W - 1) / 2) {
       s.exits = exits;
     }
   }
+  // Only spots a route reaches stay on the board: the edges of the lower rows
+  // and the spots one-way exits pass by are dropped.
+  const reached = new Set([`0,${entry}`]);
+  for (let r = 0; r < MAP_ROWS - 1; r++) for (const s of rows[r]) if (reached.has(`${r},${s.p}`)) for (const p of s.exits) reached.add(`${r + 1},${p}`);
+  for (let r = 0; r < MAP_ROWS; r++) rows[r] = rows[r].filter((s) => reached.has(`${r},${s.p}`));
   return { seed, page, entry, rows };
 }
 

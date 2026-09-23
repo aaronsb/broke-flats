@@ -151,7 +151,6 @@ export class Game {
     this.ui.over.classList.remove('show');
     this.setLevel(1);
     this.setMode(new CrossingMode(this));
-    this.showMap();
     sfx.start();
   }
 
@@ -197,11 +196,12 @@ export class Game {
   showMap(offer = null) {
     const m = this.run.map;
     if (!m) { if (this.ui.minimap) this.ui.minimap.hidden = true; return; }
-    drawMinimap(this.ui.minimap, { map: m.page, at: m.at, path: m.path, offer });
+    drawMinimap(this.ui.minimap, { map: m.page, at: this.spot() ? m.at : null, path: m.path, offer });
   }
 
   setLevel(n) {
     this.level = levelFor(n, this.spot(n)?.district ?? null);
+    this.showMap();
     if (n !== this.run.level) this.run.freeDeathUsed = false;   // a cat's free death comes back with each new level
     this.run.level = n;
     const skyName = this.debug.sky ?? (n === 1 ? this.run.oddSky : null) ?? this.level.sky;
@@ -252,7 +252,6 @@ export class Game {
     this.rollGauntlet(this.run.level + 1);
     this.setLevel(this.run.level + 1);
     this.setMode(new CrossingMode(this));
-    this.showMap();
   }
 
   // Nine lives: a cat's first death on each level costs nothing. True, and
