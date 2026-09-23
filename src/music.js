@@ -18,9 +18,9 @@ const LYDIAN = [57, 59, 61, 63, 64, 66, 68, 69, 71, 73, 75, 76]; // A lydian
 
 const MOODS = {
   calm: { bpm: 92, cutoff: 700 },
-  danger: { bpm: 150, cutoff: 1800 },
+  danger: { bpm: 156, cutoff: 5200 },
   hearing: { bpm: 96, cutoff: 1400 },
-  gauntlet: { bpm: 184, cutoff: 3200 },
+  gauntlet: { bpm: 184, cutoff: 6500 },
   attract: { bpm: 112, cutoff: 1600 },
   epilogue: { bpm: 74, cutoff: 1200 },
   tally: { bpm: 132, cutoff: 2400 },
@@ -53,6 +53,9 @@ const fig = { rainIdx: 0, rainLeft: 0, rainRest: 0, snowIdx: 0, pings: [] };
 let ctx, master, bus, delayBus, hiBus, stingBus, filter;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 92;
+// Where the traffic song is. It advances only through bars played in danger,
+// so each road picks the tune up where the last one left it.
+let songBar = 0;
 const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
 const TALLY_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55]]; // C F G C
 const EPILOGUE_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [53, 57, 60, 64], [55, 59, 62, 65]]; // Cmaj7 Am7 Fmaj7 G7
@@ -186,6 +189,123 @@ function ping(note, t, dur, vol = 0.028) {
   osc('sine', N(note), t, dur * 0.8, vol * 0.6, hiBus, { attack: 0.002, detune: detune + 11 });
 }
 
+
+// ---------- the traffic song ----------
+// A sixteen-bar tune in A minor for the road, written for an NES-style band:
+// a 25% pulse lead with delayed vibrato on held notes, a thinner 12.5% copy
+// of it three sixteenths behind (the chip-era echo), a triangle bass bouncing
+// octaves, chord stabs in the A section and 32nd-note arpeggios in the B.
+// Each bar is sixteen tokens: a note name starts a note, '-' holds it, '.' rests.
+const CHORD = { Am: [57, 60, 64], G: [55, 59, 62], F: [53, 57, 60], E: [52, 56, 59], Em: [52, 55, 59] };
+const SONG_CHORDS = 'Am G F G Am G F E F G Am Am F G E E'.split(' ').map((c) => CHORD[c]);
+const SONG_LEAD = [
+  // A: a figure sequenced down a step, a run up, then the answer in dotted eighths.
+  'E5 - - A5 - - B5 - C6 - B5 - A5 - E5 -',
+  'D5 - - G5 - - A5 - B5 - A5 - G5 - D5 -',
+  'C5 - - F5 - - G5 - A5 - - - C6 - A5 -',
+  'B5 - - - - - - - G5 - A5 - B5 - D6 -',
+  'E6 - - D6 - - C6 - B5 - C6 - - A5 - -',
+  'D6 - - C6 - - B5 - A5 - B5 - - G5 - -',
+  'C6 - - B5 - - A5 - G5 - A5 - C6 - F6 -',
+  'E6 - - - - - - - D6 C6 B5 A5 G#5 A5 B5 G#5',
+  // B: stabbed repeats, a climb, and a turnaround on E.
+  'A5 - . A5 - . A5 - G5 - A5 - C6 - . .',
+  'B5 - . B5 - . B5 - A5 - B5 - D6 - . .',
+  'C6 - - - B5 - - - A5 - - - E5 - - -',
+  'E5 - A5 - C6 - E6 - D6 C6 B5 A5 G5 A5 B5 C6',
+  'D6 - - C6 - - A5 - - - - - C6 - D6 -',
+  'D6 - - B5 - - G5 - - - - - B5 - D6 -',
+  'E6 - - - D6 - - - B5 - - - G#5 - - -',
+  'B5 - - - - - - - E5 - G#5 - B5 - D6 -',
+].map(parseBar);
+// Triangle bass: octave bounce on the eighths with a gallop into the last beat.
+const SONG_BASS = { 0: 0, 2: 12, 4: 0, 6: 12, 8: 0, 10: 12, 11: 0, 12: 12, 14: 0, 15: 12 };
+const ECHO_STEPS = 3;
+
+function parseBar(src) {
+  const tokens = src.split(/\s+/);
+  if (tokens.length !== STEPS) throw new Error(`song bar needs ${STEPS} steps: ${src}`);
+  const out = new Array(STEPS).fill(null);
+  let open = null;
+  tokens.forEach((tok, i) => {
+    if (tok === '-') { if (open) open[1]++; return; }
+    open = null;
+    if (tok === '.') return;
+    const m = /^([A-G])(#?)(\d)$/.exec(tok);
+    const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0);
+    out[i] = open = [12 * (+m[3] + 1) + pc, 1];
+  });
+  return out;
+}
+
+// Pulse waves at NES duty cycles, built once per duty.
+const pulseWaves = {};
+function pulseWave(duty) {
+  if (pulseWaves[duty]) return pulseWaves[duty];
+  const H = 48, real = new Float32Array(H), imag = new Float32Array(H);
+  for (let n = 1; n < H; n++) real[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * duty);
+  return (pulseWaves[duty] = ctx.createPeriodicWave(real, imag));
+}
+// A chip voice: quick attack, a small decay to a held level, a short release.
+// `vib` (cents) wobbles held notes once they have sounded for a moment.
+function pulse(duty, note, t, dur, vol, { vib = 0 } = {}) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.setPeriodicWave(pulseWave(duty));
+  o.frequency.value = N(note);
+  const rel = Math.min(0.05, dur * 0.3), hold = Math.max(0.006, dur - rel), dec = Math.min(0.06, hold);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + Math.min(0.004, dec));
+  g.gain.linearRampToValueAtTime(vol * 0.7, t + dec);
+  g.gain.setValueAtTime(vol * 0.7, t + hold);
+  g.gain.linearRampToValueAtTime(0.0001, t + dur);
+  if (vib && dur > 0.3) {
+    const lfo = ctx.createOscillator(), depth = ctx.createGain();
+    lfo.frequency.value = 5.5;
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.setValueAtTime(0, t + 0.16);
+    depth.gain.linearRampToValueAtTime(vib, t + 0.32);
+    lfo.connect(depth).connect(o.detune);
+    lfo.start(t); lfo.stop(t + dur + 0.02);
+  }
+  o.connect(g).connect(bus);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+function songStep(s, t, sixteenth, chord) {
+  const at = songBar % SONG_LEAD.length;
+  const bSection = at >= 8;
+  const turn = at % 8 === 7;
+
+  // Drums: rock beat, a crash into each section, a snare roll on the turnaround.
+  if (s === 0 || s === 8 || s === 10 || (s === 7 && at % 2)) kick(t, 0.45);
+  if (s === 4 || s === 12) snare(t, 0.26);
+  if (turn && s > 12) snare(t, 0.12 + (s - 12) * 0.05);
+  if (s === 0 && at % 8 === 0) noise(t, 0.6, 0.1, 'highpass', 4000);
+  else if (s % 2 === 0) hat(t, false, s % 4 === 2 ? 0.1 : 0.06);
+
+  const b = SONG_BASS[s];
+  if (b !== undefined) osc('triangle', N(chord[0] - 12 + b), t, sixteenth * (s === 11 || s === 15 ? 0.9 : 1.7), 0.3, bus, { attack: 0.003 });
+
+  // Harmony: stabs on the off-beats in A, arpeggios in B (and all the way through the gauntlet).
+  if (bSection || mood.gauntlet) {
+    for (let h = 0; h < 2; h++) {
+      const i = s * 2 + h;
+      pulse(0.125, chord[i % chord.length] + 12 * (1 + ((i / chord.length) | 0) % 2), t + h * sixteenth / 2, sixteenth / 2, 0.022);
+    }
+  } else if (s % 4 === 2) {
+    for (const n of chord) pulse(0.5, n, t, sixteenth * 0.9, 0.022);
+  }
+
+  const n = SONG_LEAD[at][s];
+  if (n) {
+    const dur = n[1] * sixteenth * 0.95;
+    pulse(0.25, n[0], t, dur, 0.085, { vib: 18 });
+    pulse(0.125, n[0], t + ECHO_STEPS * sixteenth, dur, 0.03, { vib: 18 });
+  }
+  if (s === STEPS - 1) songBar++;
+}
+
 // ---------- step sequencer ----------
 const BOARD = { calm: true, danger: true, gauntlet: true };
 function moodName(m) {
@@ -207,10 +327,11 @@ function scheduleStep(s, t) {
   bpm += (goalBpm - bpm) * 0.12;
   const beat = 60 / bpm, sixteenth = beat / 4;
   const prog = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : mood.tilted ? PEEK_PROG : wx ? wx.prog : CALM_PROG;
-  const chord = prog[bar % prog.length];
+  const danger = (mood.danger || mood.gauntlet || mood.star) && !mood.dead;   // a star drives like danger
+  const onSong = danger && !mood.tally && !mood.epilogue && !mood.hearing && !mood.attract;
+  const chord = onSong ? SONG_CHORDS[songBar % SONG_CHORDS.length] : prog[bar % prog.length];
   const root = chord[0];
   const scale = mood.tilted ? LYDIAN : PENTA;
-  const danger = (mood.danger || mood.gauntlet || mood.star) && !mood.dead;   // a star drives like danger
 
   filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : target.cutoff * (wx ? wx.cutoff : 1), t, 0.2);
 
@@ -259,19 +380,7 @@ function scheduleStep(s, t) {
   }
 
   if (danger) {
-    // Driving: four-on-the-floor, backbeat snare, 8th-note hats, syncopated bass, arp lead.
-    if (s % 4 === 0 || (s === 10 && bar % 2 === 1)) kick(t);
-    if (s === 4 || s === 12) snare(t);
-    if (s % 2 === 0) hat(t, s === 14);
-    if (s % 2 === 0) {
-      const seq = [0, 0, 12, 0, 7, 0, 12, 7];
-      bass(root + seq[(s / 2) | 0], t, sixteenth * 1.8, true);
-    }
-    const arpPat = [0, 1, 2, 1, 0, 2, 1, 2];
-    if (s % 2 === 0 || s === 7 || s === 15) {
-      const tone = chord[arpPat[((s / 2) | 0) % arpPat.length] % chord.length] + 12;
-      lead(tone, t, sixteenth * 1.5, 0.07);
-    }
+    songStep(s, t, sixteenth, chord);
   } else {
     // Calm: pad, slow bass, sparse pentatonic wandering. Snow rests the bass
     // every other bar and thins the lead so the bells carry the tune.
@@ -353,7 +462,7 @@ export const music = {
   reset(m = {}) {
     mood = { ...QUIET, ...m };
     bpm = tempoFor(moodName(mood));
-    step = 0; bar = 0;
+    step = 0; bar = 0; songBar = 0;
     fig.rainLeft = 0; fig.rainRest = 0; fig.snowIdx = 0; fig.pings = [];
     if (ctx) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   },
