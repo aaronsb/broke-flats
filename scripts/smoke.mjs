@@ -1640,15 +1640,18 @@ if (script === 'ice') {
 // A thrown rock at the cell ahead: a lily pad on open water, broken ice, a
 // tire that stops a car until it is run over, fog that slows planes, a penny
 // a train turns into a coin, nothing on grass; the cooldown and its follower discount.
-if (script === 'throw') {
+if (script === 'throw') await (async () => {   // a function, so a section can return early on a board with no clear cell
   const check = (ok, msg) => { if (!ok) errors.push(`throw: ${msg}`); };
   const fs = await import('node:fs');
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
-  const board = async (q, freeze = true) => {
+  // Boards are random: deal a few until one has a clear cell over a bank.
+  const board = async (q, freeze = true) => { for (let n = 0; n < 4; n++) { const b = await deal(q, freeze); if (b) return b; } check(false, `no ${q} board with a clear cell over a bank`); return null; };
+  const deal = async (q, freeze) => {
     await send('Page.navigate', { url: BASE + '?start&lives=9&coins=40&' + q }); await sleep(4500);
     await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`); await sleep(300);
     return evaluate(`(() => { const w = __game.mode.world; w.frozen = ${freeze}; w.ensure(40);
       for (let r = 1; r < 36; r++) { const l = w.laneAt(r), b = w.laneAt(r - 1); if (l?.scenario.id !== '${q.match(/force=(\w+)/)[1]}' || b?.scenario.id === l.scenario.id) continue;
+        if (${q.includes('road')} && l.movers.length < 2) continue;   // a tire needs traffic to hold
         for (let c = -5; c <= 5; c++) if (!b.blocked.has(c) && !l.moverAt(c, 1.5)) return { r, c }; }
       return null; })()`);
   };
@@ -1658,7 +1661,7 @@ if (script === 'throw') {
 
   // River: a lily pad, standing on it, the cooldown, and it sinking.
   let s = await board('force=river&sky=day');
-  check(s, 'no river row with a clear column');
+  if (!s) return;
   await put(s.r - 1, s.c); await sleep(200);
   await key('KeyF', 'f'); await sleep(900);
   const pad = await evaluate(`(() => { const l = __game.mode.world.laneAt(${s.r}); return { pad: !!l.data.pads?.has(${s.c}), n: l.data.pads?.size ?? 0 }; })()`);
@@ -1676,8 +1679,27 @@ if (script === 'throw') {
   await evaluate(`__game.mode.world.laneAt(${s.r}).data.pads.get(${s.c}).life = 0.05`); await sleep(1500);
   check((await evaluate(`__game.run.lastCause ?? null`)) === 'water', 'the lily pad sank and the player stayed dry');
 
+  // A reset (a respawn) clears the cooldown: it runs on the player's clock, which a reset zeroes.
+  const afterReset = await evaluate(`(() => { const p = __game.mode.player; p.throwReady = 999; p.throws = [1, 2, 3]; p.reset(); return [p.throwReady, p.throws.length]; })()`);
+  console.log('cooldown after a reset', afterReset);
+  check(afterReset[0] === 0 && afterReset[1] === 0, `a reset left the rock cooling down: ${JSON.stringify(afterReset)}`);
+
+  // A follower on a pad when it sinks is off to the finish, not left standing on the water.
+  s = await board('force=river&sky=day');
+  if (!s) return;
+  await put(s.r - 1, s.c); await sleep(200);
+  await evaluate(`__game.mode.train.hatch(true)`);
+  await key('KeyF', 'f'); await sleep(900);
+  // The follower stands on the pad; the leader waits on the bank.
+  await evaluate(`(() => { const k = __game.mode.train.chicks[0]; k.rec = { row: ${s.r}, x: ${s.c}, carrier: null, offset: 0, rideY: 0, y: -0.27 }; k.moving = false; k.mesh.position.set(${s.c}, -0.27, -${s.r}); })()`);
+  await evaluate(`__game.mode.world.laneAt(${s.r}).data.pads.get(${s.c}).life = 0.05`); await sleep(800);
+  const sunk = await evaluate(`(() => { const t = __game.mode.train; return { count: t.count, waiting: t.waiting, alive: __game.mode.player.alive }; })()`);
+  console.log('follower on a sinking pad ->', sunk);
+  check(sunk.alive && sunk.count === 0 && sunk.waiting === 1, `the follower on the sinking pad was not sent off: ${JSON.stringify(sunk)}`);
+
   // Followers shorten the cooldown.
   s = await board('force=river&sky=day');
+  if (!s) return;
   await put(s.r - 1, s.c); await sleep(200);
   await evaluate(`for (let i = 0; i < 10; i++) __game.mode.train.hatch(true)`);
   await key('KeyF', 'f'); await sleep(900);
@@ -1687,7 +1709,9 @@ if (script === 'throw') {
 
   // Grass: the rock lands and nothing is spent.
   s = await board('force=grass&sky=day');
-  await evaluate(`(() => { const p = __game.mode.player; p.facing = 0; p.throwReady = 0; p.throws = []; })()`);
+  if (!s) return;
+  await put(s.r - 1, s.c); await sleep(200);
+  check(await evaluate(`__game.mode.world.laneAt(${s.r}).scenario.id === 'grass'`), 'the grass throw is not aimed at a grass row');
   await key('KeyF', 'f'); await sleep(900);
   const grass = await cd();
   console.log('cooldown after a rock on grass', grass);
@@ -1695,6 +1719,7 @@ if (script === 'throw') {
 
   // Ice: a throw breaks it.
   s = await board('force=river&sky=snow');
+  if (!s) return;
   await evaluate(`__game.mode.world.data.snowT = 50; window.__iced = null; import('/src/snow.js').then((m) => { window.__iced = m.iced; })`); await sleep(300);
   await put(s.r - 1, s.c); await sleep(200);
   const before = await evaluate(`window.__iced(__game.mode.world.laneAt(${s.r}), ${s.c})`);
@@ -1705,29 +1730,46 @@ if (script === 'throw') {
 
   // Road: a tire holds a car, then the car runs it over.
   s = await board('force=road&sky=day', false);
+  if (!s) return;
   await put(s.r - 1, s.c); await sleep(200);
-  await key('KeyF', 'f'); await sleep(900);
-  const tire = await evaluate(`__game.mode.world.laneAt(${s.r}).data.tires?.has(${s.c}) ?? false`);
+  // Traffic is moving, so a car can be on the cell when the rock lands (that throw is refunded): try again.
+  let tire = false;
+  for (let n = 0; n < 6 && !tire; n++) {
+    await evaluate(`__game.mode.player.throwReady = 0`);
+    await key('KeyF', 'f'); await sleep(900);
+    tire = await evaluate(`__game.mode.world.laneAt(${s.r}).data.tires?.has(${s.c}) ?? false`);
+  }
   check(tire, 'no tire in the lane ahead');
-  await sleep(700); await shot('throw-tire');
-  const held = await evaluate(`(() => { const l = __game.mode.world.laneAt(${s.r}); return l.movers.filter((m) => (m.v ?? 1) < 0.2).length; })()`);
-  console.log('tire', tire, 'vehicles braking or stopped', held);
-  let gone = false;
-  for (let i = 0; i < 80 && !gone; i++) { await sleep(150); gone = await evaluate(`!__game.mode.world.laneAt(${s.r}).data.tires?.has(${s.c})`); }
+  // Watch the lane until the tire is gone: something must brake for it first.
+  let gone = false, held = 0;
+  for (let i = 0; i < 120 && !gone; i++) {
+    await sleep(150);
+    [gone, held] = await evaluate(`(() => { const l = __game.mode.world.laneAt(${s.r}); return [!l.data.tires?.has(${s.c}), Math.max(${held}, l.movers.filter((m) => (m.v ?? 1) < 0.2).length)]; })()`);
+    if (i === 4) await shot('throw-tire');
+  }
+  console.log('tire', tire, 'most vehicles braking or stopped at once', held);
+  check(held > 0, 'nothing braked for the tire');
   console.log('tire run over', gone);
   check(gone, 'no vehicle ran the tire over');
 
   // Runway: fog, then it lifts.
   s = await board('force=runway&sky=day', false);
+  if (!s) return;
   await put(s.r - 1, s.c); await sleep(200);
   await key('KeyF', 'f'); await sleep(900);
   check(await evaluate(`!!__game.mode.world.laneAt(${s.r}).data.fog`), 'no fog on the runway ahead');
+  // A plane taxiing into the fog slows; the same plane out of it does not.
+  const fogged = await evaluate(`(() => { const l = __game.mode.world.laneAt(${s.r}), m = l.movers[0]; if (!m) return null;
+    const run = (x) => { m.x = x; l.scenario.update(l, 0.001); return m.v; }; const inFog = run(l.data.fog.x), clear = run(l.data.fog.x + 9); return { inFog: +inFog.toFixed(2), clear: +clear.toFixed(2), y: +m.y.toFixed(2) }; })()`);
+  console.log('plane in and out of the fog', fogged);
+  check(!fogged || fogged.y > 1.5 || fogged.inFog < fogged.clear, `the fog did not slow a plane: ${JSON.stringify(fogged)}`);
   await shot('throw-fog');
   await evaluate(`__game.mode.world.laneAt(${s.r}).data.fog.t = 0.05`); await sleep(600);
   check(await evaluate(`!__game.mode.world.laneAt(${s.r}).data.fog`), 'the fog never lifted');
 
   // Rail: a penny, a train over it, a coin.
   s = await board('force=rail&sky=day', false);
+  if (!s) return;
   await put(s.r - 1, s.c); await sleep(200);
   await key('KeyF', 'f'); await sleep(900);
   check(await evaluate(`__game.mode.world.laneAt(${s.r}).data.pennies?.has(${s.c}) ?? false`), 'no penny on the track ahead');
@@ -1736,7 +1778,7 @@ if (script === 'throw') {
   const coin = await evaluate(`(() => { const l = __game.mode.world.laneAt(${s.r}); return { penny: l.data.pennies?.has(${s.c}) ?? false, coin: l.coins.has(${s.c}) }; })()`);
   console.log('after the train', coin);
   check(!coin.penny && coin.coin, `the penny did not turn into a coin: ${JSON.stringify(coin)}`);
-}
+})();
 // The tally keeps the board live: a powerup picked up after the line must not
 // stop the day moving on to the hearing.
 if (script === 'tallyflow') {

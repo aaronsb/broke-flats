@@ -118,12 +118,7 @@ export default {
       lane.group.remove(pad.mesh);
       lane.data.pads.delete(c);
       sfx.bloop();
-      if (iced(lane, c)) continue;
-      for (const p of lane.world.players?.() ?? []) {
-        if (p.onIce?.lane !== lane || p.onIce.c !== c) continue;
-        p.onIce = null;
-        if (p.swims) p.y = SWIM_Y; else p.die('water');
-      }
+      if (!iced(lane, c)) this.dropInto(lane, c);
     }
     // A cracked ice tile goes back to water once no player or follower stands on it.
     if (lane.data.cracked?.size) {
@@ -194,10 +189,21 @@ export default {
   // Stepping off an ice tile breaks it, once the whole procession is off it. A lily pad stays.
   leftIce(lane, c) { if (iced(lane, c)) (lane.data.cracked ??= new Set()).add(c); },
 
-  // A thrown rock: it breaks ice, and on open water a lily pad pops up. A log
-  // or a pad already there takes the rock with nothing to show for it.
+  // Whoever stands on column c when its footing goes: players into the water
+  // (a swimmer just swims), a non-swimmer's followers off to the finish.
+  dropInto(lane, c) {
+    for (const p of lane.world.players?.() ?? []) {
+      if (p.onIce?.lane === lane && p.onIce.c === c) { p.onIce = null; if (p.swims) p.y = SWIM_Y; else p.die('water'); }
+      const train = p.powerCtx?.().train;
+      const k = train?.chickAt(c, lane.r);
+      if (k && !k.rec.carrier && !p.swims) train.lose(k, true);
+    }
+  },
+
+  // A thrown rock: it breaks ice (under whoever is on it), and on open water a
+  // lily pad pops up. A log or a pad already there takes the rock with nothing to show for it.
   onThrow(lane, c) {
-    if (iced(lane, c)) { thaw(lane, c); sfx.crack(); return true; }
+    if (iced(lane, c)) { thaw(lane, c); lane.data.cracked?.delete(c); sfx.crack(); this.dropInto(lane, c); return true; }
     if (lane.moverAt(c, 0.6) || lane.data.pads?.has(c)) return false;
     const mesh = lane.add(makeLilyPad(), c);
     (lane.data.pads ??= new Map()).set(c, { mesh, life: PAD_LIFE });

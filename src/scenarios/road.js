@@ -47,7 +47,7 @@ export default {
     // A thrown tire holds the traffic for TIRE_HOLD (the mode lists it as a
     // blocker, like a procession), then the next vehicle to reach it runs it over.
     for (const [c, tire] of lane.data.tires ?? []) {
-      tire.hold -= dt;
+      if (!lane.frozen) tire.hold -= dt;   // held traffic stays held while the lane is frozen
       if (tire.hold > 0 || !lane.moverAt(c, 0.45)) continue;
       lane.group.remove(tire.mesh);
       lane.data.tires.delete(c);

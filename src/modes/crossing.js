@@ -53,7 +53,7 @@ export class CrossingMode {
   constructor(game, { retry = false } = {}) {
     this.game = game;
     this.retry = retry;   // the same board again after a death: a short sign, no tune
-    this.hint = 'arrows / WASD hop · SPACE peek in 3D (burns coins) · F throw a rock · M mute';
+    this.hint = 'arrows / WASD hop · SPACE peek in 3D (burns coins) · F throw a rock · M mute · P pixels';
   }
 
   get mood() { return { gauntlet: !!this.game.run.gauntlet }; }
@@ -88,7 +88,6 @@ export class CrossingMode {
     this.tilted = false;
     this.energy = 0;             // how busy the players are, 0..1: the grass music follows it
     this.rocks = [];             // thrown rocks in the air
-    document.body.classList.add('board');
     this.forceTilt = false;      // the tilt powerup holds the iso view without a coin cost
     this.sinceTilt = 0;
     this.hinted = new Set();     // rows already dinged for
@@ -104,6 +103,7 @@ export class CrossingMode {
     this.maze = this.game.run.gauntlet === 'maze' || this.game.debug.force === 'maze';
     if (this.maze) this.hint = 'arrows hop · four vehicles hunt the maze · eat every coin for the bonus · SPACE peek finds the gaps';
     this.snake = this.game.run.gauntlet === 'snake' || this.game.debug.force === 'snake';
+    document.body.classList.toggle('board', !this.maze && !this.snake);   // the throw button: the mazes have nothing to throw at
     if (this.snake) this.hint = 'arrows hop · collect them all before the clock · stepping on your own line resets the streak';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows, F throw · P2 WASD, R throw · SPACE peek in 3D (burns coins)';
     const geese = this.players.filter((p) => p.honk);
@@ -484,9 +484,11 @@ export class CrossingMode {
       const name = spec?.name ?? id.toUpperCase();
       parts.push(spec?.label?.(e) ?? (Number.isFinite(e.left) ? `${name} <b>${Math.ceil(e.left)}s</b>` : name));
     }
-    // The rock's cooldown, while it runs.
-    const p = this.players[0], wait = (p.throwReady ?? 0) - p.time;
-    if (wait > THROW_FLIGHT) parts.push(`ROCK <b>${Math.ceil(wait)}s</b>`);
+    // Each player's rock cooldown, while it runs.
+    for (const p of this.players) {
+      const wait = (p.throwReady ?? 0) - p.time;
+      if (wait > THROW_FLIGHT) parts.push(`${this.players.length > 1 ? `P${p.index + 1} ` : ''}ROCK <b>${Math.ceil(wait)}s</b>`);
+    }
     const html = parts.join(' · ');
     if (html !== this.powerHtml) { this.powerHtml = html; el.innerHTML = html; }
     el.hidden = !parts.length;
@@ -495,6 +497,7 @@ export class CrossingMode {
   // Crossing the line freezes the score tiers, then leaves a few seconds to
   // run around and collect the followers waiting there before the battle.
   startTally(front) {
+    document.body.classList.remove('board');   // no throwing once the line is crossed
     const { game } = this;
     // The snake maze's line is cashed out, not led home: only the flock each player came in with counts as led.
     const base = (t, i) => (this.snake ? Math.min(t.count, this.flockAtStart[i] ?? 0) : t.count);
