@@ -3,6 +3,7 @@ import { makeChicken, setFrame } from './characters.js';
 import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { SWIM_Y } from './scenarios/river.js';
+import { iced, ICE_Y } from './snow.js';
 import { DEATHS } from './deaths.js';
 import { POWERUPS } from './powerups.js';
 import { POSES, pickPose } from './poses.js';
@@ -193,6 +194,7 @@ export class Player {
   restY(c, r) {
     const lane = this.world.laneAt(r);
     if (this.fences && lane.blockKind(c) === 'fence') return PERCH_Y;
+    if (lane?.scenario.id === 'river' && iced(lane, c)) return ICE_Y;
     if (this.swims && lane?.scenario.id === 'river') return SWIM_Y;
     return 0;
   }
@@ -216,6 +218,7 @@ export class Player {
       return;
     }
     if (!this.skidding) { this.recent.push({ dir: [dc, dr], t: this.time }); if (this.recent.length > SKID_HOPS) this.recent.shift(); }
+    if (this.onIce) { this.onIce.lane.scenario.leftIce?.(this.onIce.lane, this.onIce.c); this.onIce = null; }   // the tile left behind cracks
     this.from = { x: this.x, z: this.z, y: this.y };
     // A hop that starts on a carrier moves with it (a sideways hop along a deck
     // lands on the deck, not where the deck used to be).
@@ -370,6 +373,7 @@ export class Player {
     // A wing over this cell catches you before whatever is below can.
     const wing = this.world.wingAt(this.x, this.row);
     if (wing) { this.mount(wing); this.onLanded?.(); this.onLandedHint?.(); return; }
+    this.onIce = null;                  // the river's onLand sets it again on a frozen tile
     let cause = lane.scenario.onLand?.(lane, this);
     // A giant coming down on a river crushes the boat or the gator, then meets the water.
     if (cause && cause !== 'water' && this.giant && lane.scenario.id === 'river') { this.starSave(cause); cause = this.swims ? null : 'water'; }
@@ -503,7 +507,7 @@ export class Player {
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
       // A swimmer afloat sits low, paddles rather than flaps, and takes whatever drifts onto it.
       const here = this.world.laneAt(this.row);
-      if (!this.carrier && this.swims && here?.scenario.id === 'river') {
+      if (!this.carrier && !this.onIce && this.swims && here?.scenario.id === 'river') {
         this.y = SWIM_Y;
         setFrame(m, 0);
         const cause = here.scenario.swimContact?.(here, this);
