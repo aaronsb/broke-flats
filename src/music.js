@@ -76,7 +76,7 @@ function setup() {
   bus = ctx.createGain();
   bus.connect(filter).connect(comp).connect(master).connect(ctx.destination);
 
-  // Feedback delay for the tally, epilogue and hold-music leads.
+  // Feedback delay for the tally, epilogue and hold-music leads, and for the clear bus's echoes.
   delayBus = ctx.createGain();
   const d = ctx.createDelay(1);
   d.delayTime.value = 0.28;
@@ -224,17 +224,17 @@ function pulse(wave, note, t, dur, vol, { vib = 0, dest = bus } = {}) {
   o.stop(t + dur + 0.02);
 }
 const rim = (t, vol = 0.07) => noise(t, 0.025, vol, 'highpass', 3200);
-const meter = (t) => pulse(0.125, 96, t, 0.018, 0.02, { dest: hiBus });   // the peek's coin meter
+const meter = (note, t) => pulse(0.125, note, t, 0.018, 0.02, { dest: hiBus });   // the peek's coin meter, on the chord's root
 
 // ---------- the board band ----------
 // One step of a song. full: the whole band (a road, a river, the gauntlet, a
 // star, the continue countdown). Otherwise the stroll. `chord` is this bar's.
-function songStep(song, s, t, sixteenth, chord, full) {
+function songStep(song, s, t, sixteenth, chord, full, wx) {
   const at = songBar % song.lead.length;
   const half = song.lead.length / 2;
   const bSection = at >= half;
   const turn = at % half === half - 1;
-  const rain = boardWeather() === WEATHER.rain, snow = boardWeather() === WEATHER.snow;
+  const rain = wx === WEATHER.rain, snow = wx === WEATHER.snow;
   const peek = mood.tilted && !mood.attract;
 
   // Drums. Full: rock beat, a crash into each section, a snare roll on the
@@ -278,14 +278,19 @@ function songStep(song, s, t, sixteenth, chord, full) {
   const n = song.lead[at][s];
   if (n) {
     const dur = n[1] * sixteenth * 0.95;
-    // An echo is dropped where it would spill onto the next bar's different chord.
-    const clear = (k) => s + k < STEPS || song.chords[(at + 1) % song.chords.length] === chord;
+    // An echo stops at the bar line when the next bar changes chord, and is
+    // dropped if it would start there.
+    const same = song.chords[(at + 1) % song.chords.length] === chord;
+    const echo = (k, vol, vib) => {
+      const steps = same ? n[1] : Math.min(n[1], STEPS - s - k);
+      if (steps > 0) pulse(0.125, n[0], t + k * sixteenth, steps * sixteenth * 0.95, vol, { vib });
+    };
     if (full) {
       pulse(rain ? 0.125 : 0.25, n[0], t, dur, rain ? 0.075 : 0.085, { vib: 18 });
-      if (clear(ECHO_STEPS)) pulse(0.125, n[0], t + ECHO_STEPS * sixteenth, dur, 0.03, { vib: 18 });
-      if (rain && clear(ECHO_STEPS * 2)) pulse(0.125, n[0], t + ECHO_STEPS * 2 * sixteenth, dur, 0.016);
+      echo(ECHO_STEPS, 0.03, 18);
+      if (rain) echo(ECHO_STEPS * 2, 0.016, 0);
     } else {
-      pulse('triangle', n[0] - 12, t, dur, 0.13, { vib: 12 });
+      pulse('triangle', n[0] - 12, t, dur, 0.1, { vib: 12 });
     }
     if (snow && n[1] >= 3) bell(n[0] + 12, t, Math.min(dur * 1.5, 1.2), full ? 0.03 : 0.04);
   }
@@ -297,7 +302,7 @@ function songStep(song, s, t, sixteenth, chord, full) {
   if (peek || mood.star) {
     const tone = chord[(s + at) % chord.length] + 24 + (s % 8 >= 4 ? 12 : 0);
     if (peek ? s % 2 === 0 : true) pulse(0.125, tone, t, sixteenth * 1.2, peek ? 0.03 : 0.022, { dest: hiBus });
-    if (peek && s % 4 === 0) meter(t);
+    if (peek && s % 4 === 0) meter(chord[0] + 36, t);
   }
 
   if (s === STEPS - 1) songBar++;
@@ -352,7 +357,7 @@ function scheduleStep(s, t) {
     // End-credits feel: slow pad, a sine bass every two beats, a sparse lead drifting up the chord.
     if (s === 0) pad(chord, t, beat * 4);
     if (s === 0 || s === 8) osc('sine', N(root - 12), t, beat * 1.9, 0.3, bus, { attack: 0.05 });
-    if (s % 4 === 2 && Math.random() < 0.75) lead(chord[((s / 4) | 0 + bar) % chord.length] + 12, t, sixteenth * 5, 0.05);
+    if (s % 4 === 2 && Math.random() < 0.75) lead(chord[(((s / 4) | 0) + bar) % chord.length] + 12, t, sixteenth * 5, 0.05);
     return;
   }
 
@@ -369,15 +374,17 @@ function scheduleStep(s, t) {
   }
 
   // The title plays its theme on the full band; the board plays the stage song.
-  songStep(song, s, t, sixteenth, chord, full || mood.attract);
+  songStep(song, s, t, sixteenth, chord, full || mood.attract, wx);
 
   if (wx === WEATHER.rain) {
     // Falling phrases: four to six drops stepping down the scale one per sixteenth,
     // each phrase starting from a random height, then a rest of a few steps.
-    // Over the song's E major bars a G drop is sharpened to G#.
+    // Over the song's E major bars a G drop is sharpened to G# and a C drop
+    // falls to B.
     if (fig.rainLeft > 0 && fig.rainIdx >= 0) {
       const d = RAIN_SCALE[fig.rainIdx % RAIN_SCALE.length];
-      drop(d % 12 === 7 && chord.some((n) => n % 12 === 8) ? d + 1 : d, t, sixteenth, full ? 0.022 : 0.03);
+      const major = chord.some((n) => n % 12 === 8);
+      drop(major && d % 12 === 7 ? d + 1 : major && d % 12 === 0 ? d - 1 : d, t, sixteenth, full ? 0.022 : 0.03);
       fig.rainIdx--; fig.rainLeft--;
       if (fig.rainLeft === 0 || fig.rainIdx < 0) { fig.rainLeft = 0; fig.rainRest = 2 + Math.floor(Math.random() * 6); }
     } else if (fig.rainRest > 0) {

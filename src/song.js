@@ -25,7 +25,7 @@ export function parseBar(src) {
   return out;
 }
 
-const CHORD = { C: [60, 64, 67], Am: [57, 60, 64], G: [55, 59, 62], F: [53, 57, 60], E: [52, 56, 59], Em: [52, 55, 59] };
+const CHORD = { C: [60, 64, 67], Am: [57, 60, 64], G: [55, 59, 62], F: [53, 57, 60], E: [52, 56, 59] };
 const song = (chords, lead) => ({ chords: chords.split(' ').map((c) => CHORD[c]), lead: lead.map(parseBar) });
 
 // The stage song: sixteen bars in A minor that run under the whole board.
