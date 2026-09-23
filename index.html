@@ -74,6 +74,8 @@
     body.chili #touchbar .act.a { display: none; }
     body.chili #touchbar .act.fire { display: block; }
     #touchbar .act.b { right: 14px; bottom: 100px; }
+    #touchbar .act.throw { display: none; right: 150px; bottom: 70px; }
+    body.board:not(.mines):not(.chili) #touchbar .act.throw { display: block; }
     #touchbar .act.c { right: 14px; bottom: 12px; }
     #touchbar .act.s { right: 150px; bottom: 12px; font-size: var(--ui); }
     body.touch #hud #view, body.touch #debug { bottom: 158px; }

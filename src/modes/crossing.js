@@ -8,6 +8,7 @@ import { sfx } from '../sfx.js';
 import { DEATHS } from '../deaths.js';
 import { music } from '../music.js';
 import { lerp, clamp } from '../util.js';
+import { makeRock } from '../meshes.js';
 import { W } from '../lane.js';
 import { FLAG_BONUS } from '../scenarios/mines.js';
 import { MAZE_CLEAR_BONUS } from '../scenarios/maze.js';
@@ -23,10 +24,16 @@ import { SKIES } from '../sky.js';
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
 const LED_BONUS = 50;    // per follower led across the line
-const FOUND_BONUS = 20;
+const FOUND_BONUS = 20;  // per follower that made its own way to the finish
 // Music energy: each hop adds HOP_ENERGY, and it drains at ENERGY_DRAIN a second,
 // so steady hopping keeps it up and ten idle seconds settle it back to the bed.
-const HOP_ENERGY = 0.14, ENERGY_DRAIN = 0.1;  // per follower that made its own way to the finish
+const HOP_ENERGY = 0.14, ENERGY_DRAIN = 0.1;
+// Throwing a rock at the cell ahead (throwAt). The cooldown is THROW_BASE
+// seconds, divided down by the followers led (to THROW_MIN at the least), and
+// stretched by THROW_BACKOFF for every throw in the last THROW_WINDOW seconds.
+const THROW_BASE = 10, THROW_MIN = 3, THROW_PER_FOLLOWER = 0.1;
+const THROW_BACKOFF = 0.35, THROW_WINDOW = 25;
+const THROW_FLIGHT = 0.3;   // seconds the rock is in the air
 const FOLLOWER_MUL = 0.5; // added to the score multiplier per follower carried over
 const UPHELD_BONUS = 250; // a clean day: every egg hatched, every follower led rather than found
 const TALLY_TIME = 6;    // seconds to run around while the score counts up
@@ -45,7 +52,7 @@ export class CrossingMode {
   constructor(game, { retry = false } = {}) {
     this.game = game;
     this.retry = retry;   // the same board again after a death: a short sign, no tune
-    this.hint = 'arrows / WASD hop · SPACE peek in 3D (burns coins) · M mute · P pixels';
+    this.hint = 'arrows / WASD hop · SPACE peek in 3D (burns coins) · F throw a rock · M mute';
   }
 
   get mood() { return { gauntlet: !!this.game.run.gauntlet }; }
@@ -79,6 +86,8 @@ export class CrossingMode {
     this.followerMul = null;     // a golden egg sets 1; otherwise FOLLOWER_MUL at the tally
     this.tilted = false;
     this.energy = 0;             // how busy the players are, 0..1: the grass music follows it
+    this.rocks = [];             // thrown rocks in the air
+    document.body.classList.add('board');
     this.forceTilt = false;      // the tilt powerup holds the iso view without a coin cost
     this.sinceTilt = 0;
     this.hinted = new Set();     // rows already dinged for
@@ -95,7 +104,7 @@ export class CrossingMode {
     if (this.maze) this.hint = 'arrows hop · four vehicles hunt the maze · eat every coin for the bonus · SPACE peek finds the gaps';
     this.snake = this.game.run.gauntlet === 'snake' || this.game.debug.force === 'snake';
     if (this.snake) this.hint = 'arrows hop · collect them all before the clock · stepping on your own line resets the streak';
-    if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
+    if (this.game.roster.length > 1) this.hint = 'P1 arrows, F throw · P2 WASD, R throw · SPACE peek in 3D (burns coins)';
     const geese = this.players.filter((p) => p.honk);
     document.body.classList.toggle('honk', geese.length > 0);
     if (geese.length) this.hint += this.game.roster.length > 1 ? ` · ${geese.map((p) => (p.index ? 'G' : 'H')).join('/')} honk` : ' · H honk';
@@ -189,7 +198,8 @@ export class CrossingMode {
     for (const p of this.players) p.dispose();
     this.game.ui.view.hidden = true;
     this.game.ui.view.classList.remove('on');
-    document.body.classList.remove('mines', 'honk', 'chili');
+    document.body.classList.remove('mines', 'honk', 'chili', 'board');
+    for (const r of this.rocks ?? []) this.game.scene.remove(r.mesh);
   }
 
   alive() { return this.players.filter((p) => p.alive); }
@@ -229,7 +239,8 @@ export class CrossingMode {
     if (e.code === 'Space') { this.setTilt(!this.tilted); return true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { this.setTilt(true); return true; }
     if (e.code === 'KeyQ' || e.code === 'KeyE') { this.players[0].turn(e.code === 'KeyQ' ? 1 : -1); return true; }
-    if (e.code === 'KeyF') { const p = this.players[0]; if (p.hasPower('chili')) this.fire(p); else this.plantFlag(p); return true; }
+    if (e.code === 'KeyF') { const p = this.players[0]; if (p.hasPower('chili')) this.fire(p); else if (this.mines) this.plantFlag(p); else this.throwAt(p); return true; }
+    if (e.code === 'KeyR') { this.throwAt(this.players[this.players.length > 1 ? 1 : 0]); return true; }
     const solo = this.players.length === 1;
     if (e.code === 'KeyH' || e.code === 'KeyG') { this.honk(this.players[solo || e.code === 'KeyH' ? 0 : 1]); return true; }
     for (let i = 0; i < KEYMAPS.length; i++) {
@@ -240,6 +251,46 @@ export class CrossingMode {
       return true;
     }
     return false;
+  }
+
+  // Throw a rock at the cell ahead. It arcs there over THROW_FLIGHT and the
+  // row's scenario decides what it does (onThrow): a lily pad, a tire, fog, a
+  // penny, broken ice. A rock that does nothing costs nothing; one that does
+  // starts the cooldown. Game time, from the player's own clock.
+  throwAt(p) {
+    if (!p?.alive || p.moving || this.tally) return;
+    if (p.time < (p.throwReady ?? 0)) { sfx.bump(); return; }
+    const [c, r] = p.ahead();
+    if (Math.abs(c) > W) { sfx.bump(); return; }
+    const mesh = makeRock();
+    this.game.scene.add(mesh);
+    this.rocks.push({ mesh, p, c, r, t: 0, from: { x: p.x, y: p.y + 0.6, z: p.z } });
+    p.throwReady = p.time + THROW_FLIGHT;   // no second rock while this one flies
+    sfx.toss();
+  }
+
+  // The rock lands: the scenario's say, then the cooldown if it did anything.
+  landRock(rock) {
+    const { p, c, r } = rock;
+    const lane = this.world.laneAt(r);
+    const did = !!lane?.scenario.onThrow?.(lane, c, { player: p, world: this.world, fx: this.fx });
+    if (!did) { sfx.bump(); p.throwReady = p.time; return; }
+    const led = this.trains[p.index ?? 0]?.count ?? 0;
+    p.throws = (p.throws ?? []).filter((t) => p.time - t < THROW_WINDOW);
+    const base = Math.max(THROW_MIN, THROW_BASE / (1 + THROW_PER_FOLLOWER * led));
+    p.throwReady = p.time + base * (1 + THROW_BACKOFF * p.throws.length);
+    p.throws.push(p.time);
+  }
+
+  updateRocks(dt) {
+    for (const rock of this.rocks) {
+      rock.t += dt / THROW_FLIGHT;
+      const k = Math.min(1, rock.t);
+      rock.mesh.position.set(lerp(rock.from.x, rock.c, k), lerp(rock.from.y, 0.2, k) + Math.sin(Math.PI * k) * 0.9, lerp(rock.from.z, -rock.r, k));
+      rock.mesh.rotation.x += dt * 12;
+      if (rock.t >= 1) { this.game.scene.remove(rock.mesh); this.landRock(rock); }
+    }
+    this.rocks = this.rocks.filter((rock) => rock.t < 1);
   }
 
   // A goose honks: stalled traffic on the road rows around it pulls away.
@@ -327,6 +378,8 @@ export class CrossingMode {
       if (!lane.blockers) { lane.blockers = []; this.held.push(lane); }
       lane.blockers.push({ x, n });
     };
+    // A thrown tire holds its lane's traffic like a follower would, until its hold runs out.
+    for (const lane of this.world.rows.values()) for (const [c, tire] of lane.data.tires ?? []) if (tire.hold > 0) mark(c, lane.r, 1);
     for (const t of this.trains) {
       const p = t.player, n = t.count;
       if (!n || !p.alive) continue;
@@ -340,6 +393,7 @@ export class CrossingMode {
     for (const p of this.players) p.update(dt);
     for (const t of this.trains) t.update(dt, time);
     this.fx.update(dt);
+    this.updateRocks(dt);
     this.setBlockers();
     world.update(dt, time);
 
@@ -428,6 +482,9 @@ export class CrossingMode {
       const name = spec?.name ?? id.toUpperCase();
       parts.push(spec?.label?.(e) ?? (Number.isFinite(e.left) ? `${name} <b>${Math.ceil(e.left)}s</b>` : name));
     }
+    // The rock's cooldown, while it runs.
+    const p = this.players[0], wait = (p.throwReady ?? 0) - p.time;
+    if (wait > THROW_FLIGHT) parts.push(`ROCK <b>${Math.ceil(wait)}s</b>`);
     const html = parts.join(' · ');
     if (html !== this.powerHtml) { this.powerHtml = html; el.innerHTML = html; }
     el.hidden = !parts.length;

@@ -1,10 +1,13 @@
 // Traffic lanes. Cars and trucks wrap around; touching one is fatal.
-import { box, makeCar, makeTruck, makeFlatbed, makeHeadlightCone } from '../meshes.js';
+import { box, makeCar, makeTruck, makeFlatbed, makeHeadlightCone, makeTire } from '../meshes.js';
+import { sfx } from '../sfx.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { W, DETAIL_W } from '../lane.js';
 import { rand, randInt, pick } from '../util.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
+
+const TIRE_HOLD = 2.5;   // seconds traffic stops for a thrown tire before running it over
 
 registerDeath('hauled', { anim: 'flat', title: 'HAULED OFF', sfx: 'splat', squash: 2.4 });
 
@@ -39,7 +42,26 @@ export default {
     if (Math.random() < 0.3) lane.coin(randInt(-W + 1, W - 1));
     if (gauntlet) lane.bonusDrop();
   },
-  update(lane, dt) { lane.advance(dt); },
+  update(lane, dt) {
+    lane.advance(dt);
+    // A thrown tire holds the traffic for TIRE_HOLD (the mode lists it as a
+    // blocker, like a procession), then the next vehicle to reach it runs it over.
+    for (const [c, tire] of lane.data.tires ?? []) {
+      tire.hold -= dt;
+      if (tire.hold > 0 || !lane.moverAt(c, 0.45)) continue;
+      lane.group.remove(tire.mesh);
+      lane.data.tires.delete(c);
+      sfx.bump();
+    }
+  },
+
+  // A thrown rock lands a tire in the lane; a vehicle already on the cell takes the rock instead.
+  onThrow(lane, c) {
+    if (lane.moverAt(c, 0.8) || lane.data.tires?.has(c)) return false;
+    (lane.data.tires ??= new Map()).set(c, { mesh: lane.add(makeTire(), c), hold: TIRE_HOLD });
+    sfx.kathunk();
+    return true;
+  },
   lethalAt(lane, x, player) {
     const m = lane.moverAt(x, 0.35);
     if (!m || lane.onBed(m, x)) return null;

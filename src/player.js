@@ -3,7 +3,7 @@ import { makeChicken, setFrame } from './characters.js';
 import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { SWIM_Y } from './scenarios/river.js';
-import { iced, ICE_Y } from './snow.js';
+import { ICE_Y } from './snow.js';
 import { DEATHS } from './deaths.js';
 import { POWERUPS } from './powerups.js';
 import { POSES, pickPose } from './poses.js';
@@ -195,7 +195,7 @@ export class Player {
   restY(c, r) {
     const lane = this.world.laneAt(r);
     if (this.fences && lane.blockKind(c) === 'fence') return PERCH_Y;
-    if (lane?.scenario.id === 'river' && iced(lane, c)) return ICE_Y;
+    if (lane?.scenario.footing?.(lane, c)) return ICE_Y;
     if (this.swims && lane?.scenario.id === 'river') return SWIM_Y;
     return 0;
   }
@@ -382,7 +382,7 @@ export class Player {
     if (cause && cause !== 'water' && this.giant && lane.scenario.id === 'river') {
       this.starSave(cause);
       const c = Math.round(this.x);
-      cause = iced(lane, c) ? ((this.onIce = { lane, c }), null) : this.swims ? null : 'water';
+      cause = lane.scenario.footing?.(lane, c) ? ((this.onIce = { lane, c }), null) : this.swims ? null : 'water';
     }
     if (cause === 'bounce') {
       if (!this.heavy) { this.moving = true; this.t = 1; this.bounce(lane); return; }
@@ -512,7 +512,7 @@ export class Player {
         if (this.carrier.submerged) {
           // A diver going under over ice leaves its rider standing on the ice.
           const here = this.world.laneAt(this.row), c = Math.round(this.x);
-          if (iced(here, c)) { this.carrier = null; this.x = c; this.onIce = { lane: here, c }; this.y = ICE_Y; }
+          if (here?.scenario.footing?.(here, c)) { this.carrier = null; this.x = c; this.onIce = { lane: here, c }; this.y = ICE_Y; }
           else if (this.swims) { this.carrier = null; this.y = SWIM_Y; } else { this.die('water'); return; }
         }
         if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }

@@ -2,7 +2,8 @@
 // Divers (some logs, every sub, some gators) submerge on a cycle and drown
 // whoever is aboard. Gator heads bite, and gape between bites. A row holding
 // gators turns around now and then. Foam flecks drift on the surface.
-import { makeLog, makeRiverBoat, makeSub, makeGator, makeFirefly, makeFleck } from '../meshes.js';
+import { makeLog, makeRiverBoat, makeSub, makeGator, makeFirefly, makeFleck, makeLilyPad } from '../meshes.js';
+import { sfx } from '../sfx.js';
 import { setFrame } from '../characters.js';
 import { W, SPAN, VIEW } from '../lane.js';
 import { registerDeath } from '../deaths.js';
@@ -13,6 +14,8 @@ import { iced, thaw } from '../snow.js';
 registerDeath('chomped', { anim: 'flat', title: 'CHOMP', sfx: 'crack' });
 registerDeath('rundown', { anim: 'sink', title: 'RUN DOWN', sfx: 'splash' });
 export const SWIM_Y = -0.5;   // afloat: legs under the surface
+const PAD_LIFE = 7;           // seconds a thrown lily pad floats
+const PAD_BLINK = 1.8;        // it blinks for this long before it sinks
 
 // Lane compositions. One kind per lane is the norm; mixes are rarer.
 const KINDS = {
@@ -107,6 +110,21 @@ export default {
 
   update(lane, dt, time) {
     lane.advance(dt);
+    // Lily pads float for PAD_LIFE, blink, then sink; whoever stands on one then is in the water.
+    for (const [c, pad] of lane.data.pads ?? []) {
+      pad.life -= dt;
+      pad.mesh.visible = pad.life > PAD_BLINK || Math.sin(pad.life * 18) > 0;
+      if (pad.life > 0) continue;
+      lane.group.remove(pad.mesh);
+      lane.data.pads.delete(c);
+      sfx.bloop();
+      if (iced(lane, c)) continue;
+      for (const p of lane.world.players?.() ?? []) {
+        if (p.onIce?.lane !== lane || p.onIce.c !== c) continue;
+        p.onIce = null;
+        if (p.swims) p.y = SWIM_Y; else p.die('water');
+      }
+    }
     // A cracked ice tile goes back to water once no player or follower stands on it.
     if (lane.data.cracked?.size) {
       const players = lane.world.players?.() ?? [];
@@ -160,7 +178,7 @@ export default {
   // a hop that misses the log lands on the ice rather than bouncing off it.
   onLand(lane, player) {
     const c = Math.round(player.x);
-    const ice = iced(lane, c);
+    const ice = this.footing(lane, c);
     const open = () => { if (ice) { player.onIce = { lane, c }; return null; } return player.swims ? null : 'water'; };
     const m = lane.moverAt(player.x, 0.3);
     if (!m || m.submerged) return open();     // waterfowl just swim
@@ -170,8 +188,22 @@ export default {
     return null;
   },
 
-  // Stepping off an ice tile breaks it, once the whole procession is off it.
-  leftIce(lane, c) { (lane.data.cracked ??= new Set()).add(c); },
+  // Something to stand on at column c: ice, or a thrown lily pad.
+  footing(lane, c) { return iced(lane, c) || !!lane.data.pads?.has(c); },
+
+  // Stepping off an ice tile breaks it, once the whole procession is off it. A lily pad stays.
+  leftIce(lane, c) { if (iced(lane, c)) (lane.data.cracked ??= new Set()).add(c); },
+
+  // A thrown rock: it breaks ice, and on open water a lily pad pops up. A log
+  // or a pad already there takes the rock with nothing to show for it.
+  onThrow(lane, c) {
+    if (iced(lane, c)) { thaw(lane, c); sfx.crack(); return true; }
+    if (lane.moverAt(c, 0.6) || lane.data.pads?.has(c)) return false;
+    const mesh = lane.add(makeLilyPad(), c);
+    (lane.data.pads ??= new Map()).set(c, { mesh, life: PAD_LIFE });
+    sfx.bloop();
+    return true;
+  },
 
   // Standing on ice: the traffic passes over as over water. Logs and gator
   // backs slide by; a hull or a gator's head hits.

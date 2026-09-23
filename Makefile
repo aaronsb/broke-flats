@@ -11,7 +11,7 @@ help: ## Show this help
 	@echo
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo
-	@echo "  smoke takes S=<scenario>: hops (default), train, occupied, night, skies, skid, debug, battle, halt, halt-crash, perks, perks2, barrier, powerups, powerups2, cover, river, logo, poses, burn, phone, tablet, freight, maze, banner, districts, snake, map, ice, shots"
+	@echo "  smoke takes S=<scenario>: hops (default), train, occupied, night, skies, skid, debug, battle, halt, halt-crash, perks, perks2, barrier, powerups, powerups2, cover, river, logo, poses, burn, phone, tablet, freight, maze, banner, districts, snake, map, ice, throw, shots"
 
 dev: ## Start the Vite dev server on all interfaces, port 5173
 	npx vite --port $(PORT) --strictPort --host 0.0.0.0

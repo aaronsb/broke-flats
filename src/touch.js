@@ -18,6 +18,9 @@ const BUTTONS = [
   { code: 'KeyE', key: 'e', label: '↻', cls: 'mine e', title: 'turn right' },
   // Goose only: the honk that moves stalled traffic on.
   { code: 'KeyH', key: 'h', label: 'H', cls: 'perk honk', title: 'honk' },
+  // On the board: throw a rock at the cell you face. The minefield's flag and
+  // the chili's shot take the F key there instead.
+  { code: 'KeyF', key: 'f', label: '●', cls: 'act throw', title: 'throw a rock' },
   // Chili only: fires along the facing direction, in the A button's place.
   { code: 'KeyF', key: 'f', label: '✹', cls: 'act fire', title: 'fire' },
 ];

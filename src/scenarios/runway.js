@@ -2,13 +2,17 @@
 // take-offs accelerate and lift in the second half of the row, landings drop
 // in from height and roll out. A plane only kills while it is on or near the
 // ground, so a lifting or descending one passes overhead (watch its shadow).
-import { box, makePlane, makeHeadlightCone } from '../meshes.js';
+import { box, makePlane, makeHeadlightCone, makeFog } from '../meshes.js';
 import { W, VIEW, SPAN, DETAIL_W } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick } from '../util.js';
 import { sfx } from '../sfx.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
+
+const FOG_TIME = 3.5;    // seconds a thrown fog bank lasts
+const FOG_REACH = 2.2;   // a plane this close to its middle, low enough to be in it, slows
+const FOG_SLOW = 0.3;    // to this share of its speed
 
 registerDeath('plane', { anim: 'flat', title: 'FLATTENED', sfx: 'splat', squash: 3.0 });
 registerDeath('flown', { anim: 'launch', title: 'FLOWN OFF', sfx: 'splat' });
@@ -82,6 +86,14 @@ export default {
       m.prevP = p;
       m.y = y;
       m.v = speed;
+      if (lane.data.fog && m.y < 1.5 && Math.abs(m.x - lane.data.fog.x) < FOG_REACH + m.len / 2) m.v *= FOG_SLOW;
+    }
+    // The fog thins out over its life, then lifts.
+    const fog = lane.data.fog;
+    if (fog) {
+      fog.t -= dt;
+      fog.mesh.userData.material.opacity = 0.75 * Math.min(1, fog.t / 1.2);
+      if (fog.t <= 0) { lane.group.remove(fog.mesh); lane.data.fog = null; }
     }
     // No overrunning on the ground: a plane closing on the one ahead matches its
     // speed. Anything airborne may pass over.
@@ -102,6 +114,14 @@ export default {
       m.mesh.position.set(m.x, y, 0);
       m.mesh.rotation.z = lane.dir * (m.kind === 'takeoff' ? -0.25 : m.kind === 'landing' ? 0.18 : 0) * (y > 0.05 ? 1 : 0);
     }
+  },
+
+  // A thrown rock raises a fog bank over the cell: planes on the ground passing through it slow down.
+  onThrow(lane, c) {
+    if (lane.data.fog) return false;
+    lane.data.fog = { x: c, t: FOG_TIME, mesh: lane.add(makeFog(), c) };
+    sfx.puff();
+    return true;
   },
 
   lethalAt(lane, x) {

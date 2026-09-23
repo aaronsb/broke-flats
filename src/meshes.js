@@ -1057,3 +1057,42 @@ export function makePuddle() {
   return g;
 }
 
+
+// ---- things a thrown rock leaves (src/modes/crossing.js throwAt) ----
+// The rock in flight.
+export function makeRock() {
+  const g = new THREE.Group();
+  g.add(box(0.2, 0.16, 0.2, 0x8a857c, 0, -0.08), box(0.12, 0.08, 0.12, 0xa29d93, 0.03, 0.04, -0.02, false));
+  return g;
+}
+// A lily pad on open water: a flat round-ish leaf with a notch and a pink bud. Sits on the river's surface.
+export function makeLilyPad() {
+  const g = new THREE.Group();
+  const leaf = 0x3f9a3a, dark = 0x2f7a2c;
+  g.add(box(0.78, 0.04, 0.5, leaf, 0, 0, 0, false), box(0.5, 0.04, 0.78, leaf, 0, 0, 0, false), box(0.62, 0.04, 0.62, leaf, 0, 0, 0, false));
+  g.add(box(0.12, 0.05, 0.36, dark, 0.02, 0.005, 0.22, false));      // the notch, darker
+  g.add(box(0.14, 0.12, 0.14, 0xf08cc0, -0.16, 0.04, -0.12, false), box(0.06, 0.06, 0.06, 0xffe066, -0.16, 0.16, -0.12, false));
+  g.position.y = -0.29;
+  return g;
+}
+// A tire lying in the road: a black ring of boxes around a grey hub.
+export function makeTire() {
+  const g = new THREE.Group();
+  for (const [x, z, w, d] of [[0, 0.24, 0.56, 0.12], [0, -0.24, 0.56, 0.12], [0.24, 0, 0.12, 0.36], [-0.24, 0, 0.12, 0.36]]) g.add(box(w, 0.16, d, 0x1c1c1e, x, 0, z));
+  g.add(box(0.2, 0.1, 0.2, 0x8a8a90, 0, 0, 0, false));
+  return g;
+}
+// A fog bank on a runway: a few pale, translucent puffs. `material` is the group's own, so it can fade.
+export function makeFog() {
+  const g = new THREE.Group();
+  const m = new THREE.MeshLambertMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.75, depthWrite: false });
+  for (const [x, y, z, s] of [[0, 0.5, 0, 1.3], [-0.9, 0.35, 0.2, 0.9], [0.9, 0.4, -0.15, 1], [0.3, 0.9, 0.1, 0.8]]) g.add(box(s * 1.2, s * 0.7, s, m, x, y, z, false));
+  g.userData.material = m;
+  return g;
+}
+// A penny on the rail. Once a train has been over it, it is flattened (see rail.js).
+export function makePenny() {
+  const g = new THREE.Group();
+  g.add(box(0.2, 0.04, 0.2, 0xb8683a, 0, 0.06, 0, false), box(0.12, 0.045, 0.12, 0xd0844e, 0, 0.065, 0, false));
+  return g;
+}
