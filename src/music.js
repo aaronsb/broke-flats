@@ -1,68 +1,66 @@
 // Adaptive chiptune music. A lookahead scheduler walks 16th-note steps; every
 // step reads the current mood and picks voices from it, so the music reacts
-// within a beat. Moods: calm (safe row), danger (road or river), hearing
-// (hold music while the complaints get filed), and a "peek" overlay while
-// the camera is tilted. Weather (rain, snow) colours the board moods.
+// within a beat.
+//
+// The board plays one song, the stage song in song.js, and never stops it:
+// every board mood is an arrangement of the same bars at the same tempo, so
+// stepping on and off the road changes the band, not the tune. Grass is the
+// stroll (triangle melody an octave down, light drums, a ripple of arpeggio);
+// a road or river is the full band (pulse lead with its echo, rock beat,
+// driving bass, stabs and arpeggios). A peek muffles the band and lays a
+// bright arpeggio and a coin-meter tick over it. Rain and snow re-voice it.
+// The title has its own theme; the hearing, the tally and the epilogue keep
+// their own loops.
 
 import { ac } from './sfx.js';
+import { STEPS, STAGE, TITLE, BASS } from './song.js';
 
 const N = (n) => 440 * Math.pow(2, (n - 69) / 12);
 const LOOKAHEAD = 0.12;
-const CUTOFF_MAX = 6500;   // snow's brightening stops here so the song's pulses do not turn brittle
-const STEPS = 16;
+const CUTOFF_MAX = 6500;   // snow's brightening stops here so the pulses do not turn brittle
+const PEEK_CUTOFF = 1500;  // a peek hears the band through glass
+const ECHO_STEPS = 3;      // the chip-era echo: the lead again, thinner, three sixteenths late
 
-// Chords as MIDI note arrays; four bars per progression.
-const CALM_PROG = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];       // Am F C G
-const PEEK_PROG = [[53, 57, 60, 64], [55, 59, 62, 66], [57, 60, 64, 67], [50, 54, 57, 61]]; // Fmaj7 Gmaj7 Am7 D7
 const PENTA = [57, 60, 62, 64, 67, 69, 72, 74, 76, 79];  // A minor pentatonic
-const LYDIAN = [57, 59, 61, 63, 64, 66, 68, 69, 71, 73, 75, 76]; // A lydian
 
 const MOODS = {
-  calm: { bpm: 92, cutoff: 700 },
-  danger: { bpm: 156, cutoff: 5200 },
+  calm: { bpm: 150, cutoff: 3400 },
+  danger: { bpm: 150, cutoff: 5200 },
   hearing: { bpm: 96, cutoff: 1400 },
-  gauntlet: { bpm: 184, cutoff: 6500 },
-  attract: { bpm: 112, cutoff: 1600 },
+  gauntlet: { bpm: 172, cutoff: 6500 },
+  attract: { bpm: 132, cutoff: 4200 },
   epilogue: { bpm: 74, cutoff: 1200 },
   tally: { bpm: 132, cutoff: 2400 },
 };
 // Hold music: a soft bossa loop of sevenths. Cmaj7 Am7 Dm7 G7, the elevator's own.
 const HEARING_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [50, 53, 57, 60], [43, 47, 50, 53]];
+const TALLY_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55]]; // C F G C
+const EPILOGUE_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [53, 57, 60, 64], [55, 59, 62, 65]]; // Cmaj7 Am7 Fmaj7 G7
 
-// Weather colours the board moods (calm, danger, gauntlet) and nothing else.
-// Rain: the calm chords with the majors swapped for their relative minors,
-// slower, the lead under a lower cutoff, and soft triangle phrases that step
-// down the scale, each starting from a different height, so the tune falls.
-// Snow: sevenths, slower still in calm, a bell line stepping down the chord
-// every two bars, a few high pings scattered per bar, the bass resting every
-// other bar, a whisper of high pad.
-const RAIN_PROG = [[57, 60, 64], [53, 57, 60], [50, 53, 57], [52, 55, 59]];       // Am F Dm Em
-const SNOW_PROG = [[53, 57, 60, 64], [48, 52, 55, 59], [57, 60, 64, 67], [52, 55, 59, 62]]; // Fmaj7 Cmaj7 Am7 Em7
+// Weather re-voices the board song and nothing else. Rain: a little slower,
+// darker, the lead on the thinnest pulse with a second echo, a sixteenth
+// patter for hats, and soft phrases of drops stepping down the scale. Snow:
+// slower still, every held lead note doubled by a bell an octave up, the
+// grass bass resting every other bar, a few high pings per bar, a whisper of
+// high pad.
 const WEATHER = {
-  rain: { tempo: { calm: 0.88, danger: 0.88, gauntlet: 0.88 }, cutoff: 0.6, prog: RAIN_PROG },
-  snow: { tempo: { calm: 0.8, danger: 0.92, gauntlet: 0.92 }, cutoff: 1.5, prog: SNOW_PROG },
+  rain: { tempo: 0.9, cutoff: 0.6 },
+  snow: { tempo: 0.88, cutoff: 1.2 },
 };
-// Bell steps over the two-bar cycle: five on the even bar, one answer on the odd.
-const SNOW_BELL = [[0, 3, 6, 10, 13], [4]];
 const RAIN_SCALE = PENTA.map((n) => n + 12);
 let weather = null;
 // Phrase state for the weather figures: where the rain phrase is on its way
-// down and how long it rests; where the bell line is on its ladder; which
-// steps of this bar get a ping.
-const fig = { rainIdx: 0, rainLeft: 0, rainRest: 0, snowIdx: 0, pings: [] };
+// down and how long it rests; which steps of this bar get a snow ping.
+const fig = { rainIdx: 0, rainLeft: 0, rainRest: 0, pings: [] };
 
 let ctx, master, bus, delayBus, hiBus, stingBus, filter;
 let timer = null;
-let nextTime = 0, step = 0, bar = 0, bpm = 92;
-// Where the traffic song is. It advances only through bars played in danger,
-// so each road picks the tune up where the last one left it.
+let nextTime = 0, step = 0, bar = 0, bpm = 150;
+// Where the current song is, in bars. It runs on through every board mood and
+// goes back to bar one on a scene change.
 let songBar = 0;
 const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
-const TALLY_PROG = [[48, 52, 55], [53, 57, 60], [55, 59, 62], [48, 52, 55]]; // C F G C
-const EPILOGUE_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [53, 57, 60, 64], [55, 59, 62, 65]]; // Cmaj7 Am7 Fmaj7 G7
 let mood = { ...QUIET };
-// Attract-mode hook: a fixed motif over the calm chords so the title has a tune.
-const MOTIF = [0, 2, 4, 7, 4, 2, 0, -1, 0, 2, 4, 9, 7, 4, 2, 0];
 let muted = false;
 
 function setup() {
@@ -78,7 +76,7 @@ function setup() {
   bus = ctx.createGain();
   bus.connect(filter).connect(comp).connect(master).connect(ctx.destination);
 
-  // Feedback delay for the lead and sparkle voices.
+  // Feedback delay for the tally, epilogue and hold-music leads.
   delayBus = ctx.createGain();
   const d = ctx.createDelay(1);
   d.delayTime.value = 0.28;
@@ -164,7 +162,6 @@ const hat = (t, open = false, vol = 0.12) => noise(t, open ? 0.16 : 0.04, vol, '
 const shaker = (t, vol = 0.06) => noise(t, 0.09, vol, 'bandpass', 6000, 2);
 
 function bass(note, t, dur, driving) {
-  if (mood.tilted) { osc('sine', N(note - 12), t, dur, 0.35, bus, { attack: 0.02 }); return; }
   osc(driving ? 'sawtooth' : 'square', N(note - 12), t, dur, driving ? 0.22 : 0.18, bus, { attack: 0.004 });
 }
 function pad(chord, t, dur, vol = 0.05) {
@@ -174,7 +171,6 @@ function pad(chord, t, dur, vol = 0.05) {
   }
 }
 const lead = (note, t, dur, vol = 0.09) => osc('square', N(note), t, dur, vol, delayBus, { attack: 0.004 });
-const sparkle = (note, t, dur) => osc('sine', N(note), t, dur, 0.07, delayBus, { attack: 0.003 });
 // Snow bell: a sine with a detuned twin for shimmer and a short triangle strike an octave up.
 function bell(note, t, dur, vol = 0.07) {
   osc('sine', N(note), t, dur, vol, hiBus, { attack: 0.004 });
@@ -191,59 +187,7 @@ function ping(note, t, dur, vol = 0.028) {
 }
 
 
-// ---------- the traffic song ----------
-// A sixteen-bar tune in A minor for the road, written for an NES-style band:
-// a 25% pulse lead with delayed vibrato on held notes, a thinner 12.5% copy
-// of it three sixteenths behind (the chip-era echo), a triangle bass bouncing
-// octaves, chord stabs in the A section and 32nd-note arpeggios in the B.
-// Each bar is sixteen tokens: a note name starts a note, '-' holds it, '.' rests.
-const CHORD = { Am: [57, 60, 64], G: [55, 59, 62], F: [53, 57, 60], E: [52, 56, 59], Em: [52, 55, 59] };
-const SONG_CHORDS = 'Am G F G Am G F E F G Am Am F G E E'.split(' ').map((c) => CHORD[c]);
-const SONG_LEAD = [
-  // A: a figure sequenced down a step, a run up, then the answer in dotted eighths.
-  'E5 - - A5 - - B5 - C6 - B5 - A5 - E5 -',
-  'D5 - - G5 - - A5 - B5 - A5 - G5 - D5 -',
-  'C5 - - F5 - - G5 - A5 - - - C6 - A5 -',
-  'B5 - - - - - - - G5 - A5 - B5 - D6 -',
-  'E6 - - D6 - - C6 - B5 - C6 - - A5 - -',
-  'D6 - - C6 - - B5 - A5 - B5 - - G5 - -',
-  'C6 - - B5 - - A5 - G5 - A5 - C6 - F6 -',
-  'E6 - - - - - - - D6 C6 B5 A5 G#5 A5 B5 G#5',
-  // B: stabbed repeats, a climb, and a turnaround on E.
-  'A5 - . A5 - . A5 - G5 - A5 - C6 - . .',
-  'B5 - . B5 - . B5 - A5 - B5 - D6 - . .',
-  'C6 - - - B5 - - - A5 - - - E5 - - -',
-  'E5 - A5 - C6 - E6 - D6 C6 B5 A5 G5 A5 B5 C6',
-  'D6 - - C6 - - A5 - - - - - C6 - D6 -',
-  'D6 - - B5 - - G5 - - - - - B5 - D6 -',
-  'E6 - - - D6 - - - B5 - - - G#5 - - -',
-  'B5 - - - - - - - E5 - G#5 - B5 - D6 -',
-].map(parseBar);
-// Triangle bass: octave bounce on the eighths with a gallop into the last beat.
-const SONG_BASS = { 0: 0, 2: 12, 4: 0, 6: 12, 8: 0, 10: 12, 11: 0, 12: 12, 14: 0, 15: 12 };
-const ECHO_STEPS = 3;
-
-function parseBar(src) {
-  const tokens = src.trim().split(/\s+/);
-  if (tokens.length !== STEPS) throw new Error(`song bar needs ${STEPS} steps: ${src}`);
-  const out = new Array(STEPS).fill(null);
-  let open = null;
-  tokens.forEach((tok, i) => {
-    if (tok === '-') {
-      if (!open) throw new Error(`song hold with no note before it: ${src}`);
-      open[1]++;
-      return;
-    }
-    open = null;
-    if (tok === '.') return;
-    const m = /^([A-G])(#?)(\d)$/.exec(tok);
-    if (!m) throw new Error(`bad song token '${tok}' in: ${src}`);
-    const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0);
-    out[i] = open = [12 * (+m[3] + 1) + pc, 1];
-  });
-  return out;
-}
-
+// ---------- chip voices ----------
 // Pulse waves at NES duty cycles, built once per duty.
 const pulseWaves = {};
 function pulseWave(duty) {
@@ -254,9 +198,11 @@ function pulseWave(duty) {
 }
 // A chip voice: quick attack, a small decay to a held level, a short release.
 // `vib` (cents) wobbles held notes once they have sounded for a moment.
-function pulse(duty, note, t, dur, vol, { vib = 0 } = {}) {
+// `wave` is a duty cycle, or 'triangle' for the NES bass channel's tone.
+function pulse(wave, note, t, dur, vol, { vib = 0, dest = bus } = {}) {
   const o = ctx.createOscillator(), g = ctx.createGain();
-  o.setPeriodicWave(pulseWave(duty));
+  if (wave === 'triangle') o.type = 'triangle';
+  else o.setPeriodicWave(pulseWave(wave));
   o.frequency.value = N(note);
   const rel = Math.min(0.05, dur * 0.3), hold = Math.max(0.006, dur - rel), dec = Math.min(0.06, hold);
   g.gain.setValueAtTime(0.0001, t);
@@ -273,44 +219,87 @@ function pulse(duty, note, t, dur, vol, { vib = 0 } = {}) {
     lfo.connect(depth).connect(o.detune);
     lfo.start(t); lfo.stop(t + dur + 0.02);
   }
-  o.connect(g).connect(bus);
+  o.connect(g).connect(dest);
   o.start(t);
   o.stop(t + dur + 0.02);
 }
+const rim = (t, vol = 0.07) => noise(t, 0.025, vol, 'highpass', 3200);
+const meter = (t) => pulse(0.125, 96, t, 0.018, 0.02, { dest: hiBus });   // the peek's coin meter
 
-function songStep(s, t, sixteenth, chord) {
-  const at = songBar % SONG_LEAD.length;
-  const bSection = at >= 8;
-  const turn = at % 8 === 7;
+// ---------- the board band ----------
+// One step of a song. full: the whole band (a road, a river, the gauntlet, a
+// star, the continue countdown). Otherwise the stroll. `chord` is this bar's.
+function songStep(song, s, t, sixteenth, chord, full) {
+  const at = songBar % song.lead.length;
+  const half = song.lead.length / 2;
+  const bSection = at >= half;
+  const turn = at % half === half - 1;
+  const rain = boardWeather() === WEATHER.rain, snow = boardWeather() === WEATHER.snow;
+  const peek = mood.tilted && !mood.attract;
 
-  // Drums: rock beat, a crash into each section, a snare roll on the turnaround.
-  if (s === 0 || s === 8 || s === 10 || (s === 7 && at % 2)) kick(t, 0.45);
-  if (s === 4 || s === 12) snare(t, 0.26);
-  if (turn && s > 12) snare(t, 0.12 + (s - 12) * 0.05);
-  if (s === 0 && at % 8 === 0) noise(t, 0.6, 0.1, 'highpass', 4000);
-  else if (s % 2 === 0) hat(t, false, s % 4 === 2 ? 0.1 : 0.06);
+  // Drums. Full: rock beat, a crash into each section, a snare roll on the
+  // turnaround. Stroll: kick on one and three, a rim on the backbeat.
+  if (full) {
+    if (s === 0 || s === 8 || s === 10 || (s === 7 && at % 2)) kick(t, 0.45);
+    if (s === 4 || s === 12) snare(t, 0.26);
+    if (turn && s > 12) snare(t, 0.12 + (s - 12) * 0.05);
+    if (s === 0 && at % half === 0) noise(t, 0.6, 0.1, 'highpass', 4000);
+    else if (rain) shaker(t, s % 4 === 2 ? 0.05 : 0.025);
+    else if (s % 2 === 0) hat(t, false, s % 4 === 2 ? 0.1 : 0.06);
+  } else {
+    if (s === 0 || s === 8 || (s === 14 && at % 2)) kick(t, 0.3);
+    if (s === 4 || s === 12) rim(t);
+    if (rain) { if (s % 2 === 1) shaker(t, 0.025); } else if (s % 4 === 2) hat(t, false, 0.05);
+  }
 
-  const b = SONG_BASS[s];
-  if (b !== undefined) osc('triangle', N(chord[0] - 12 + b), t, sixteenth * (s === 11 || s === 15 ? 0.9 : 1.7), 0.3, bus, { attack: 0.003 });
+  // Triangle bass: drives on the road, strolls on the grass. Snow rests the stroll every other bar.
+  const b = (full ? BASS.drive : BASS.stroll)[s];
+  if (b !== undefined && (full || !snow || at % 2 === 0)) {
+    const short = s === 11 || s === 15;
+    pulse('triangle', chord[0] - 12 + b, t, sixteenth * (short ? 0.9 : full ? 1.7 : 3), full ? 0.3 : 0.26);
+  }
 
-  // Harmony: stabs on the off-beats in A, arpeggios in B (and all the way through the gauntlet).
-  if (bSection || mood.gauntlet) {
+  // Harmony: stabs on the off-beats in A and arpeggios in B on the road (the
+  // gauntlet arpeggiates throughout); on the grass an eighth-note ripple.
+  if (full && (bSection || mood.gauntlet)) {
     for (let h = 0; h < 2; h++) {
       const i = s * 2 + h;
       pulse(0.125, chord[i % chord.length] + 12 * (1 + ((i / chord.length) | 0) % 2), t + h * sixteenth / 2, sixteenth / 2, 0.022);
     }
-  } else if (s % 4 === 2) {
-    for (const n of chord) pulse(0.5, n, t, sixteenth * 0.9, 0.022);
+  } else if (full) {
+    if (s % 4 === 2) for (const n of chord) pulse(0.5, n, t, sixteenth * 0.9, 0.022);
+  } else if (s % 2 === 0) {
+    pulse(0.125, chord[(s / 2) % chord.length] + 12, t, sixteenth * 1.5, 0.016);
   }
 
-  const n = SONG_LEAD[at][s];
+  // The melody. Full: a pulse lead with vibrato and its echo (rain thins the
+  // lead and adds a second echo). Stroll: the triangle an octave down. Snow
+  // doubles held notes with a bell an octave up.
+  const n = song.lead[at][s];
   if (n) {
     const dur = n[1] * sixteenth * 0.95;
-    pulse(0.25, n[0], t, dur, 0.085, { vib: 18 });
-    // The echo is dropped where it would spill onto the next bar's different chord.
-    const spills = s + ECHO_STEPS >= STEPS && SONG_CHORDS[(at + 1) % SONG_CHORDS.length] !== chord;
-    if (!spills) pulse(0.125, n[0], t + ECHO_STEPS * sixteenth, dur, 0.03, { vib: 18 });
+    // An echo is dropped where it would spill onto the next bar's different chord.
+    const clear = (k) => s + k < STEPS || song.chords[(at + 1) % song.chords.length] === chord;
+    if (full) {
+      pulse(rain ? 0.125 : 0.25, n[0], t, dur, rain ? 0.075 : 0.085, { vib: 18 });
+      if (clear(ECHO_STEPS)) pulse(0.125, n[0], t + ECHO_STEPS * sixteenth, dur, 0.03, { vib: 18 });
+      if (rain && clear(ECHO_STEPS * 2)) pulse(0.125, n[0], t + ECHO_STEPS * 2 * sixteenth, dur, 0.016);
+    } else {
+      pulse('triangle', n[0] - 12, t, dur, 0.13, { vib: 12 });
+    }
+    if (snow && n[1] >= 3) bell(n[0] + 12, t, Math.min(dur * 1.5, 1.2), full ? 0.03 : 0.04);
   }
+
+  // A peek: the band goes behind glass (the filter, set by the scheduler)
+  // while a bright arpeggio climbs the chord two octaves up and the coin
+  // meter ticks each beat, both on the clear bus. A star gets a quicker,
+  // sparkling version of the arpeggio and no meter.
+  if (peek || mood.star) {
+    const tone = chord[(s + at) % chord.length] + 24 + (s % 8 >= 4 ? 12 : 0);
+    if (peek ? s % 2 === 0 : true) pulse(0.125, tone, t, sixteenth * 1.2, peek ? 0.03 : 0.022, { dest: hiBus });
+    if (peek && s % 4 === 0) meter(t);
+  }
+
   if (s === STEPS - 1) songBar++;
 }
 
@@ -319,11 +308,11 @@ const BOARD = { calm: true, danger: true, gauntlet: true };
 function moodName(m) {
   return m.tally ? 'tally' : m.epilogue ? 'epilogue' : m.attract ? 'attract' : m.dead ? 'calm' : m.hearing ? 'hearing' : m.gauntlet ? 'gauntlet' : m.danger || m.star ? 'danger' : 'calm';
 }
-// The weather in force for this mood: set only on the live board.
-const boardWeather = (name) => (weather && BOARD[name] && !mood.dead ? WEATHER[weather] : null);
+// The weather in force: set only on the live board.
+const boardWeather = (name = moodName(mood)) => (weather && BOARD[name] && !mood.dead ? WEATHER[weather] : null);
 function tempoFor(name) {
   const wx = boardWeather(name);
-  return MOODS[name].bpm * (wx ? wx.tempo[name] : 1);
+  return MOODS[name].bpm * (wx ? wx.tempo : 1);
 }
 
 function scheduleStep(s, t) {
@@ -334,14 +323,16 @@ function scheduleStep(s, t) {
   const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : tempoFor(name);
   bpm += (goalBpm - bpm) * 0.12;
   const beat = 60 / bpm, sixteenth = beat / 4;
-  const prog = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : mood.tilted ? PEEK_PROG : wx ? wx.prog : CALM_PROG;
-  const danger = (mood.danger || mood.gauntlet || mood.star) && !mood.dead;   // a star drives like danger
-  const onSong = danger && !mood.tally && !mood.epilogue && !mood.hearing && !mood.attract;
-  const chord = onSong ? SONG_CHORDS[songBar % SONG_CHORDS.length] : prog[bar % prog.length];
+  const song = mood.attract ? TITLE : STAGE;
+  const own = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : null;
+  const chord = own ? own[bar % own.length] : song.chords[songBar % song.chords.length];
   const root = chord[0];
-  const scale = mood.tilted ? LYDIAN : PENTA;
+  const full = (mood.danger || mood.gauntlet || mood.star) && !mood.dead;   // a star drives like danger
 
-  filter.frequency.setTargetAtTime(mood.tilted ? 4000 : mood.countdown ? 800 + mood.countdown * 3000 : Math.min(CUTOFF_MAX, target.cutoff * (wx ? wx.cutoff : 1)), t, 0.2);
+  const cutoff = mood.countdown ? 800 + mood.countdown * 3000
+    : mood.tilted && BOARD[name] ? PEEK_CUTOFF
+    : Math.min(CUTOFF_MAX, target.cutoff * (wx ? wx.cutoff : 1));
+  filter.frequency.setTargetAtTime(cutoff, t, 0.2);
 
   if (mood.dead) {
     if (s === 0) pad(chord, t, beat * 4);
@@ -377,41 +368,16 @@ function scheduleStep(s, t) {
     return;
   }
 
-  if (mood.attract) {
-    // Title tune: pad, walking bass, the motif on square lead, a soft hat.
-    if (s === 0) pad(chord, t, beat * 4);
-    if (s % 4 === 0) bass(root + [0, 7, 12, 7][(s / 4) | 0], t, beat * 0.9, false);
-    const step = MOTIF[(s + bar * 4) % MOTIF.length];
-    if (step >= 0 && s % 2 === 0) lead(scale[(step + bar) % scale.length], t, sixteenth * 2.5, 0.07);
-    if (s % 4 === 2) hat(t, false, 0.06);
-    return;
-  }
-
-  if (danger) {
-    songStep(s, t, sixteenth, chord);
-  } else {
-    // Calm: pad, slow bass, sparse pentatonic wandering. Snow rests the bass
-    // every other bar and thins the lead so the bells carry the tune.
-    const snow = wx === WEATHER.snow;
-    if (s === 0) pad(chord, t, beat * 4);
-    if (!snow || bar % 2 === 0) {
-      if (s === 0 || s === 8) bass(root, t, beat * 1.8, false);
-      if (s === 12 && bar % 2 === 1) bass(root + 7, t, beat * 0.9, false);
-    }
-    if (s % 2 === 0 && Math.random() < (wx ? 0.15 : 0.3)) {
-      const i = Math.floor(Math.random() * scale.length) % scale.length;
-      lead(scale[i], t, sixteenth * 3, 0.06);
-    }
-    if (s % 4 === 2 && Math.random() < 0.5) shaker(t);
-  }
+  // The title plays its theme on the full band; the board plays the stage song.
+  songStep(song, s, t, sixteenth, chord, full || mood.attract);
 
   if (wx === WEATHER.rain) {
     // Falling phrases: four to six drops stepping down the scale one per sixteenth,
     // each phrase starting from a random height, then a rest of a few steps.
+    // Over the song's E major bars a G drop is sharpened to G#.
     if (fig.rainLeft > 0 && fig.rainIdx >= 0) {
-      // Over the song's E major bars a G drop is sharpened to G#.
       const d = RAIN_SCALE[fig.rainIdx % RAIN_SCALE.length];
-      drop(onSong && d % 12 === 7 && chord.some((n) => n % 12 === 8) ? d + 1 : d, t, sixteenth, danger ? 0.022 : 0.03);
+      drop(d % 12 === 7 && chord.some((n) => n % 12 === 8) ? d + 1 : d, t, sixteenth, full ? 0.022 : 0.03);
       fig.rainIdx--; fig.rainLeft--;
       if (fig.rainLeft === 0 || fig.rainIdx < 0) { fig.rainLeft = 0; fig.rainRest = 2 + Math.floor(Math.random() * 6); }
     } else if (fig.rainRest > 0) {
@@ -422,30 +388,15 @@ function scheduleStep(s, t) {
     }
   }
   if (wx === WEATHER.snow) {
-    // A bell line stepping down a two-octave ladder of chord tones over two bars,
-    // starting from a random rung each cycle; two to four pings scattered through
-    // the bar; a whisper of the top two chord tones two octaves up.
-    const ladder = [...chord.map((n) => n + 24), ...chord.map((n) => n + 12)].sort((a, b) => b - a);
+    // Two to four pings scattered through the bar, and a whisper of the top
+    // two chord tones two octaves up.
     if (s === 0) {
-      if (bar % 2 === 0) fig.snowIdx = Math.floor(Math.random() * 2);
       const count = 2 + Math.floor(Math.random() * 3);
       fig.pings = [];
       while (fig.pings.length < count) { const at = Math.floor(Math.random() * STEPS); if (!fig.pings.includes(at)) fig.pings.push(at); }
       for (const n of chord.slice(-2)) osc('sine', N(n + 24), t, beat * 4.2, 0.016, bus, { attack: 0.9, detune: 4 });
     }
-    if (SNOW_BELL[bar % 2].includes(s)) {
-      bell(ladder[fig.snowIdx % ladder.length], t, beat * (danger ? 1.2 : 2), danger ? 0.055 : 0.07);
-      fig.snowIdx++;
-    }
     if (fig.pings.includes(s)) ping(chord[Math.floor(Math.random() * chord.length) % chord.length] + 36, t + Math.random() * sixteenth * 0.5, sixteenth * 0.7);
-  }
-
-  if (mood.tilted || mood.star) {
-    // Peek overlay: high sparkle arp cycling the chord two octaves up. A star gets it too.
-    const tone = chord[(s + bar) % chord.length] + 24;
-    // Under the song it thins to the beats, clear of the lead, echo and arpeggios.
-    if (onSong ? s % 4 === 0 : s % 2 === 0 || danger) sparkle(tone, t, sixteenth * 2.5);
-    if (s % 4 === 0) shaker(t, 0.05);
   }
 }
 
@@ -474,7 +425,7 @@ export const music = {
     mood = { ...QUIET, ...m };
     bpm = tempoFor(moodName(mood));
     step = 0; bar = 0; songBar = 0;
-    fig.rainLeft = 0; fig.rainRest = 0; fig.snowIdx = 0; fig.pings = [];
+    fig.rainLeft = 0; fig.rainRest = 0; fig.pings = [];
     if (ctx) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   },
   // Weather is a property of the level, so it survives reset(). A sky id:

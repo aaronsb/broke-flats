@@ -125,9 +125,10 @@ $('about-open').addEventListener('click', openAbout);
 $('about-close').addEventListener('click', closeAbout);
 
 // Attract music from the start: scheduled now, audible as soon as the
-// browser lets audio play (immediately, or on the first key or tap).
+// browser lets audio play (immediately, or on the first key or tap). A
+// playtest URL that skipped the title has already set the board's mood.
 music.start();
-music.reset({ attract: true });
+if (!started) music.reset({ attract: true });
 const unlock = () => { sfx.unlock(); removeEventListener('keydown', unlock); removeEventListener('pointerdown', unlock); };
 addEventListener('keydown', unlock);
 addEventListener('pointerdown', unlock);
