@@ -66,8 +66,6 @@ export const TITLE = song('C Am F G C Am F G', [
 
 // Triangle bass figures, step -> semitones above the root an octave down.
 // drive: octave bounce on the eighths with a gallop into the last beat.
-// stroll: root and octave on the beats with a fifth picking up the third.
 export const BASS = {
   drive: { 0: 0, 2: 12, 4: 0, 6: 12, 8: 0, 10: 12, 11: 0, 12: 12, 14: 0, 15: 12 },
-  stroll: { 0: 0, 4: 12, 8: 0, 11: 7, 12: 12 },
 };
