@@ -23,7 +23,10 @@ import { SKIES } from '../sky.js';
 const TILT_COST = 0.4;   // coins per second while peeking (2.5 s per coin)
 const NUDGE_AFTER = 12;  // seconds without a peek before the button starts flashing
 const LED_BONUS = 50;    // per follower led across the line
-const FOUND_BONUS = 20;  // per follower that made its own way to the finish
+const FOUND_BONUS = 20;
+// Music energy: each hop adds HOP_ENERGY, and it drains at ENERGY_DRAIN a second,
+// so steady hopping keeps it up and ten idle seconds settle it back to the bed.
+const HOP_ENERGY = 0.14, ENERGY_DRAIN = 0.1;  // per follower that made its own way to the finish
 const FOLLOWER_MUL = 0.5; // added to the score multiplier per follower carried over
 const UPHELD_BONUS = 250; // a clean day: every egg hatched, every follower led rather than found
 const TALLY_TIME = 6;    // seconds to run around while the score counts up
@@ -75,6 +78,7 @@ export class CrossingMode {
     this.tally = null;
     this.followerMul = null;     // a golden egg sets 1; otherwise FOLLOWER_MUL at the tally
     this.tilted = false;
+    this.energy = 0;             // how busy the players are, 0..1: the grass music follows it
     this.forceTilt = false;      // the tilt powerup holds the iso view without a coin cost
     this.sinceTilt = 0;
     this.hinted = new Set();     // rows already dinged for
@@ -123,7 +127,7 @@ export class CrossingMode {
       p.honk = !!c.honk;              // H (G for player 2) moves stalled traffic on
       p.honkReady = 0;
       p.onCoin = () => { run.coins += 1; };
-      const landed = () => this.hintNearby(p);
+      const landed = () => { this.hintNearby(p); this.energy = Math.min(1, this.energy + HOP_ENERGY); };
       p.onLandedHint = landed;
       // Remember the way they went out. A solo death rebuilds the whole mode,
       // so it rides on the run to become the way they come back.
@@ -346,7 +350,8 @@ export class CrossingMode {
     world.cull(back - BACK_LIMIT - 2);
 
     const danger = alive.some((p) => world.laneAt(p.moving ? p.trow : p.row)?.scenario.danger);
-    music.setMood({ danger, tilted: this.tilted });
+    this.energy = Math.max(0, this.energy - ENERGY_DRAIN * dt);
+    music.setMood({ danger, tilted: this.tilted, energy: this.energy });
 
     // Crates show their item only from the side; the HUD chip lists what is running.
     const side = this.tilted || this.forceTilt;
