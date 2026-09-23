@@ -70,9 +70,10 @@ export class Lane {
   }
 
   ground(color, top = 0, thick = 0.5) {
-    this.add(makeGround(GW, this.weathered(color), top, thick));
+    const slab = this.add(makeGround(GW, this.weathered(color), top, thick));
     this.verge(color, top);
     if (this.world?.config?.sky?.wet && PUDDLE_ROWS.has(this.scenario.id)) this.puddles(randInt(0, 2), top);
+    return slab;
   }
 
   // The sky's weather on a ground colour: rain darkens it 12% and pulls it a

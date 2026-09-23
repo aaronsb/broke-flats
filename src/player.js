@@ -3,6 +3,7 @@ import { makeChicken, setFrame } from './characters.js';
 import { makeHalo, makeRedX } from './meshes.js';
 import { W, OFF_EDGE } from './lane.js';
 import { SWIM_Y } from './scenarios/river.js';
+import { iced, ICE_Y } from './snow.js';
 import { DEATHS } from './deaths.js';
 import { POWERUPS } from './powerups.js';
 import { POSES, pickPose } from './poses.js';
@@ -54,6 +55,7 @@ export class Player {
   }
 
   reset() {
+    this.onIce = null;
     this.clearPowers();
     POSES[this.deathAnim]?.exit?.(this);
     this.restore?.();
@@ -193,6 +195,7 @@ export class Player {
   restY(c, r) {
     const lane = this.world.laneAt(r);
     if (this.fences && lane.blockKind(c) === 'fence') return PERCH_Y;
+    if (lane?.scenario.id === 'river' && iced(lane, c)) return ICE_Y;
     if (this.swims && lane?.scenario.id === 'river') return SWIM_Y;
     return 0;
   }
@@ -216,6 +219,7 @@ export class Player {
       return;
     }
     if (!this.skidding) { this.recent.push({ dir: [dc, dr], t: this.time }); if (this.recent.length > SKID_HOPS) this.recent.shift(); }
+    if (this.onIce) { this.onIce.lane.scenario.leftIce?.(this.onIce.lane, this.onIce.c); this.onIce = null; }   // the tile left behind cracks
     this.from = { x: this.x, z: this.z, y: this.y };
     // A hop that starts on a carrier moves with it (a sideways hop along a deck
     // lands on the deck, not where the deck used to be).
@@ -343,6 +347,7 @@ export class Player {
   die(cause) {
     if (!this.alive || this.invincible) return;
     if ((this.hasPower('star') || this.giant) && this.starSave(cause)) return;
+    this.onIce = null;
     this.clearPowers();
     this.alive = false;
     this.skids = 0; this.skidding = false;
@@ -370,15 +375,22 @@ export class Player {
     // A wing over this cell catches you before whatever is below can.
     const wing = this.world.wingAt(this.x, this.row);
     if (wing) { this.mount(wing); this.onLanded?.(); this.onLandedHint?.(); return; }
+    this.onIce = null;                  // the river's onLand sets it again on a frozen tile
     let cause = lane.scenario.onLand?.(lane, this);
     // A giant coming down on a river crushes the boat or the gator, then meets the water.
-    if (cause && cause !== 'water' && this.giant && lane.scenario.id === 'river') { this.starSave(cause); cause = this.swims ? null : 'water'; }
+    // Ice under the wreck still holds.
+    if (cause && cause !== 'water' && this.giant && lane.scenario.id === 'river') {
+      this.starSave(cause);
+      const c = Math.round(this.x);
+      cause = iced(lane, c) ? ((this.onIce = { lane, c }), null) : this.swims ? null : 'water';
+    }
     if (cause === 'bounce') {
       if (!this.heavy) { this.moving = true; this.t = 1; this.bounce(lane); return; }
       // Heavy: past the end of a log is open water; a bumper on land pulls away.
       cause = lane.scenario.id === 'river' ? 'water' : null;
     }
     if (cause) { this.die(cause); return; }
+    if (this.onIce) this.y = ICE_Y;     // whatever height the hop set out for: the tile froze, or the drop came from above
     if (this.carrier) this.carrierOffset = this.x - this.carrier.x;
     if (this.bushes && lane.blockKind(this.col) === 'bush') this.rustle();
     if (lane.takeCoin(this.col)) this.gotCoin();
@@ -497,16 +509,26 @@ export class Player {
         this.x = this.carrier.x + this.carrierOffset;
         this.col = Math.round(this.x);
         this.y = this.carrier.wing ? this.carrier.y + 0.4 : (this.carrier.rideY ?? 0) + Math.min(0, this.carrier.mesh.position.y);
-        if (this.carrier.submerged) { if (this.swims) { this.carrier = null; this.y = SWIM_Y; } else { this.die('water'); return; } }
+        if (this.carrier.submerged) {
+          // A diver going under over ice leaves its rider standing on the ice.
+          const here = this.world.laneAt(this.row), c = Math.round(this.x);
+          if (iced(here, c)) { this.carrier = null; this.x = c; this.onIce = { lane: here, c }; this.y = ICE_Y; }
+          else if (this.swims) { this.carrier = null; this.y = SWIM_Y; } else { this.die('water'); return; }
+        }
         if (Math.abs(this.x) > OFF_EDGE) { this.die(this.carrier.offCause ?? 'water'); return; }
       }
       if (this.bump > 0) { this.bump -= dt; const k = this.bump / 0.12; sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
       // A swimmer afloat sits low, paddles rather than flaps, and takes whatever drifts onto it.
       const here = this.world.laneAt(this.row);
-      if (!this.carrier && this.swims && here?.scenario.id === 'river') {
+      if (!this.carrier && !this.onIce && this.swims && here?.scenario.id === 'river') {
         this.y = SWIM_Y;
         setFrame(m, 0);
         const cause = here.scenario.swimContact?.(here, this);
+        if (cause) { this.die(cause); return; }
+      }
+      // On the ice the traffic passes over as if it were water: a hull or a gator's head still hits.
+      if (this.onIce && !this.carrier && !this.moving) {
+        const cause = here?.scenario.iceContact?.(here, this);
         if (cause) { this.die(cause); return; }
       }
     }

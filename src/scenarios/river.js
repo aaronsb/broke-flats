@@ -8,6 +8,7 @@ import { W, SPAN, VIEW } from '../lane.js';
 import { registerDeath } from '../deaths.js';
 import { rand, randInt, pick, damp } from '../util.js';
 import { traffic, kindsFor, mixesAllowed } from '../tuning.js';
+import { iced, thaw } from '../snow.js';
 
 registerDeath('chomped', { anim: 'flat', title: 'CHOMP', sfx: 'crack' });
 registerDeath('rundown', { anim: 'sink', title: 'RUN DOWN', sfx: 'splash' });
@@ -62,7 +63,7 @@ export default {
   weight: 2,
   band: [1, 3],
   build(lane, { sky, difficulty, gauntlet, level }) {
-    lane.ground(0x3f8fd6, -0.3, 0.2);
+    lane.ground(0x3f8fd6, -0.3, 0.2).userData.water = true;   // snow can freeze it a tile at a time (snow.js)
     lane.dir = pick(-1, 1);
     const tr = traffic(difficulty + lane.r / 120);
     lane.speed = rand(1.2, 2.2) * tr.speed;
@@ -106,6 +107,14 @@ export default {
 
   update(lane, dt, time) {
     lane.advance(dt);
+    // A cracked ice tile goes back to water once no player or follower stands on it.
+    if (lane.data.cracked?.size) {
+      const players = lane.world.players?.() ?? [];
+      for (const c of lane.data.cracked) {
+        const on = players.some((p) => (p.alive && !p.moving && p.row === lane.r && Math.round(p.x) === c) || p.powerCtx?.().train?.bound(c, lane.r));
+        if (!on) { thaw(lane, c); lane.data.cracked.delete(c); }
+      }
+    }
     for (const m of lane.movers) {
       if (m.gape) setFrame(m.mesh, (time + m.gape.phase) % m.gape.period < m.gape.open ? 1 : 0);
       if (!m.diver) continue;
@@ -146,12 +155,31 @@ export default {
     return null;
   },
 
+  // Open water drowns a non-swimmer, unless the tile has frozen over: then
+  // anyone stands on it (snow.js). A log drifting over ice still carries, and
+  // a hop that misses the log lands on the ice rather than bouncing off it.
   onLand(lane, player) {
+    const c = Math.round(player.x);
+    const ice = iced(lane, c);
+    const open = () => { if (ice) { player.onIce = { lane, c }; return null; } return player.swims ? null : 'water'; };
     const m = lane.moverAt(player.x, 0.3);
-    if (!m || m.submerged) return player.swims ? null : 'water';     // waterfowl just swim
+    if (!m || m.submerged) return open();     // waterfowl just swim
     if (m.head && within(lane, m, m.head, player.x, -0.1)) return 'chomped';
-    if (!within(lane, m, m.bed, player.x)) return lane.riding(m, player) ? 'bounce' : player.swims ? null : 'water';
+    if (!within(lane, m, m.bed, player.x)) return !ice && lane.riding(m, player) ? 'bounce' : open();
     player.carrier = m;
+    return null;
+  },
+
+  // Stepping off an ice tile breaks it, once the whole procession is off it.
+  leftIce(lane, c) { (lane.data.cracked ??= new Set()).add(c); },
+
+  // Standing on ice: the traffic passes over as over water. Logs and gator
+  // backs slide by; a hull or a gator's head hits.
+  iceContact(lane, player) {
+    const m = lane.moverAt(player.x, 0.3);
+    if (!m || m.submerged) return null;
+    if (m.head && within(lane, m, m.head, player.x, -0.1)) return 'chomped';
+    if (m.kind === 'boat' || m.kind === 'sub') return 'rundown';
     return null;
   },
 };

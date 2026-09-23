@@ -6,6 +6,7 @@ import { W, OFF_EDGE } from './lane.js';
 import { setFrame } from './characters.js';
 import { SWIM_Y } from './scenarios/river.js';
 import { sfx } from './sfx.js';
+import { iced } from './snow.js';
 import { lerp, randInt } from './util.js';
 
 const HOP = 0.16;
@@ -33,6 +34,14 @@ export class Train {
 
   occupies(c, r) {
     return this.chicks.some((k) => !k.moving && k.rec && k.rec.row === r && Math.round(this.resolveX(k.rec)) === c);
+  }
+
+  // Is some follower on this cell, or still to step on it? trail[i + 1] is
+  // follower i's cell and trail[0] the leader's last landing, where the first
+  // follower steps next, so with a line the whole way ahead is in the trail.
+  bound(c, r) {
+    if (this.occupies(c, r)) return true;
+    return this.chicks.length > 0 && this.trail.slice(0, this.chicks.length + 1).some((rec) => rec.row === r && !rec.carrier && Math.round(rec.x) === c);
   }
 
   record() {
@@ -92,7 +101,9 @@ export class Train {
   // leader perched on holds the young at the same height.
   restY(rec) {
     if (rec.carrier) return rec.carrier.wing ? rec.carrier.y + 0.4 : rec.rideY;
-    return this.player.swims && this.world.laneAt(rec.row)?.scenario.id === 'river' ? SWIM_Y : rec.y ?? 0;
+    const lane = this.world.laneAt(rec.row);
+    if (lane?.scenario.id === 'river' && iced(lane, Math.round(rec.x))) return rec.y ?? 0;   // ice holds the young where it held the leader
+    return this.player.swims && lane?.scenario.id === 'river' ? SWIM_Y : rec.y ?? 0;
   }
 
   sendTo(k, target, delay = 0) {
@@ -194,7 +205,7 @@ export class Train {
       if (k.moving && k.t < 0.5) continue;
       const lane = this.world.laneAt(k.rec.row);
       // A swimmer's young afloat: logs and gator backs pick it up, boats run it down.
-      if (this.player.swims && !k.moving && !k.rec.carrier && lane?.scenario.id === 'river') {
+      if (this.player.swims && !k.moving && !k.rec.carrier && lane?.scenario.id === 'river' && !iced(lane, Math.round(k.rec.x))) {
         const m = lane.moverAt(k.mesh.position.x, 0.3);
         if (m && !m.submerged) {
           const x = k.mesh.position.x;
