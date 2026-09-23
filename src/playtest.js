@@ -28,6 +28,7 @@ export function readPlaytest(search = location.search) {
     debug: q.has('debug'),
     start: q.has('start') || q.has('battle') || q.has('hearing'),
     battle: q.has('battle') || q.has('hearing'),   // `hearing` is the stage's name; `battle` the code's
+    seed: num(q.get('seed'), 0, 2 ** 32 - 1),        // the run's town map
   };
   return o;
 }
@@ -39,6 +40,7 @@ export function applyBeforeStart(game, o) {
   game.debug.sky = o.sky;
   game.debug.scenery = o.scenery;
   game.debug.god = o.god;
+  game.debug.seed = o.seed;
 }
 
 // Apply the in-run options once the crossing exists.

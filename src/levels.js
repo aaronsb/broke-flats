@@ -22,10 +22,14 @@ export const LEVELS = [
 ];
 
 // The first pass through the table introduces crossing types one level at a
-// time; every later loop uses the full mix from the last entry.
-export function levelFor(n) {
-  const base = LEVELS[(n - 1) % LEVELS.length];
+// time; every later loop uses the full mix from the last entry. A town map
+// spot names its own district, which brings its look, hazard mix and hearing;
+// the level number keeps the length of the day and the difficulty, so a deep
+// spot is hard whichever district it is.
+export function levelFor(n, district = null) {
+  const byNumber = LEVELS[(n - 1) % LEVELS.length];
+  const base = district === null ? byNumber : LEVELS[district];
   const loop = Math.floor((n - 1) / LEVELS.length);
   const weights = loop > 0 ? LEVELS[LEVELS.length - 1].weights : base.weights;
-  return { ...base, weights, number: n, difficulty: (n - 1) * 0.6 + loop * 1.5 };
+  return { ...base, bands: byNumber.bands, weights, number: n, difficulty: (n - 1) * 0.6 + loop * 1.5 };
 }

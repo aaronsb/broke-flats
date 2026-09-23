@@ -41,7 +41,7 @@ const ui = {
   title: $('title'), view: $('view'), hint: $('hint'), chicks: $('chicks'), debug: $('debug'), about: $('about'),
   intro: $('intro'), banner: $('banner'),
   summary: $('summary'), summaryTitle: $('summary-title'), summaryBody: $('summary-body'),
-  p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'),
+  p1: $('p1'), p2: $('p2'), lives: $('lives'), retry: $('retry'), minimap: $('minimap'),
 };
 mountSign($('logo'));
 mountSign($('about-sign'));
@@ -81,6 +81,7 @@ function toTitle() {
   game.mode?.exit();
   game.mode = null;
   game.newSession();
+  game.showMap();   // no run, no map
   music.reset({ attract: true });
   ui.title.classList.remove('hide');
   select = new Select(scene, camera);

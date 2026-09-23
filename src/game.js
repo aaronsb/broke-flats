@@ -3,6 +3,8 @@
 import { CrossingMode } from './modes/crossing.js';
 import { BattleMode } from './modes/battle.js';
 import { levelFor } from './levels.js';
+import { makePage, spotAt, newSeed, MAP_ROWS } from './townmap.js';
+import { drawMinimap } from './minimap.js';
 import { SKIES } from './sky.js';
 import { SCENERY } from './scenery/index.js';
 import { DEATHS } from './deaths.js';
@@ -142,6 +144,7 @@ export class Game {
 
   start() {
     this.run = { ...this.freshRun(this.run.coins), lives: this.run.lives };
+    this.run.map = this.newMap(this.debug.seed ?? newSeed());
     const others = Object.keys(SKIES).filter((k) => k !== levelFor(1).sky);
     this.run.oddSky = Math.random() < ODD_WEATHER ? others[Math.floor(Math.random() * others.length)] : null;
     this.over = false;
@@ -151,8 +154,54 @@ export class Game {
     sfx.start();
   }
 
+  // ---- the town map ----
+  // One per run: continues and retries keep it, a new run deals a new one.
+  // `at` is the spot being played, `path` the spots walked on this page, and
+  // `level` the level number `at` was entered as: a jump by level number
+  // (debug, the smoke harness) plays the level table and leaves the map alone.
+  newMap(seed) {
+    const page = makePage(seed, 0);
+    const at = { r: 0, p: page.entry };
+    return { seed, page, at, path: [at], level: 1 };
+  }
+
+  // The spot being played, or null when the level is not one of the map's.
+  spot(n = this.run.level) {
+    const m = this.run.map;
+    return m && m.level === n ? spotAt(m.page, m.at.r, m.at.p) : null;
+  }
+
+  // The ways on from the spot being played: [left, right], each { p, spot } or
+  // null when that way is closed. Past the top row the way leads onto a new page.
+  exits() {
+    const m = this.run.map, here = this.spot();
+    if (!here) return [null, null];
+    return [here.p - 1, here.p + 1].map((p) => {
+      if (!here.exits.includes(p)) return null;
+      const spot = here.r + 1 < MAP_ROWS ? spotAt(m.page, here.r + 1, p) : makePage(m.seed, m.page.page + 1, p).rows[0][0];
+      return { p, spot };
+    });
+  }
+
+  // Walk the map to position p on the next row (a new page past the top).
+  advance(p) {
+    const m = this.run.map;
+    if (m.at.r + 1 < MAP_ROWS) m.at = { r: m.at.r + 1, p };
+    else { m.page = makePage(m.seed, m.page.page + 1, p); m.at = { r: 0, p }; m.path = []; }
+    m.path.push(m.at);
+    m.level = this.run.level + 1;
+  }
+
+  // The HUD map: the page, the route, and the ways offered while a hearing's doors are open.
+  showMap(offer = null) {
+    const m = this.run.map;
+    if (!m) { if (this.ui.minimap) this.ui.minimap.hidden = true; return; }
+    drawMinimap(this.ui.minimap, { map: m.page, at: this.spot() ? m.at : null, path: m.path, offer });
+  }
+
   setLevel(n) {
-    this.level = levelFor(n);
+    this.level = levelFor(n, this.spot(n)?.district ?? null);
+    this.showMap();
     if (n !== this.run.level) this.run.freeDeathUsed = false;   // a cat's free death comes back with each new level
     this.run.level = n;
     const skyName = this.debug.sky ?? (n === 1 ? this.run.oddSky : null) ?? this.level.sky;
@@ -162,8 +211,11 @@ export class Game {
     this.ui.level.innerHTML = `LV <b>${n}</b> ${SKIES[skyName].label}${tag}${this.debug.on ? ' <b>DEBUG</b>' : ''}`;
   }
 
-  // Rolled once on entering a level. A death clears it, so the retry is normal.
+  // Rolled once on entering a level; a map spot's gauntlet is fixed. A death
+  // clears it, so the retry is normal.
   rollGauntlet(n) {
+    const spot = this.spot(n);
+    if (spot) { this.run.gauntlet = spot.gauntlet; return; }
     this.run.gauntlet = n > 1 && Math.random() < GAUNTLET_CHANCE ? GAUNTLET_KINDS[Math.floor(Math.random() * GAUNTLET_KINDS.length)] : null;
   }
 
@@ -193,7 +245,10 @@ export class Game {
   // The board is crossed: the day's grievances go to the hearing.
   stageClear() { this.setMode(new BattleMode(this)); }
 
-  nextLevel() {
+  // On to the next day. `p` is the map position chosen at the hearing's door;
+  // without one the level table decides (debug and harness jumps).
+  nextLevel(p = null) {
+    if (p !== null && this.run.map) this.advance(p);
     this.rollGauntlet(this.run.level + 1);
     this.setLevel(this.run.level + 1);
     this.setMode(new CrossingMode(this));

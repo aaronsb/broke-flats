@@ -5,8 +5,8 @@
 // case closes, and the run record goes on to the next day.
 import * as THREE from 'three';
 import {
-  makeGround, makeCar, makeTruck, makeBoat, makePlane, makeForm, makeHeadlightCone,
-  makeTrain, makeTree, makeHedge, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
+  box, makeGround, makeCar, makeTruck, makeBoat, makePlane, makeForm, makeHeadlightCone,
+  makeTrain, makeTree, makeHedge, makeDistrictSign, makeShrub, makeParkedCar, makeFence, makeDumpster, makePlanter, makeBuildingCell, buildingStyle,
 } from '../meshes.js';
 import { Footprints } from '../scenery/footprints.js';
 import { Debris } from '../debris.js';
@@ -17,6 +17,7 @@ import { sfx } from '../sfx.js';
 import { music } from '../music.js';
 import { CONE } from '../headlights.js';
 import { rand, randInt, pick, clamp } from '../util.js';
+import { LEVELS } from '../levels.js';
 
 const ROWS = { land: 4, sea: 8, air: 12 };            // z depth of each target row
 const POINTS = { land: 10, sea: 20, air: 30 };
@@ -53,6 +54,10 @@ const PILOT_KEYS = [
 ];
 const AIM_KEYS = ['ShiftLeft', 'ShiftRight', 'Tab'];
 const FORWARD = 2.5;   // how far up the field a pilot may advance
+// The doors out: when the case closes, each end of the pilots' row opens onto
+// one of the ways on across the town map. A pilot sliding this far past the
+// edge has left by that door.
+const DOOR_X = W + 1.2, DOOR_OUT = W + 1.6;
 
 export class BattleMode {
   constructor(game) {
@@ -77,6 +82,8 @@ export class BattleMode {
     this.rowDir = { land: pick(-1, 1), sea: pick(-1, 1), air: pick(-1, 1) };   // one way per row, all hearing
     this.keys = {};
     this.ending = 0;
+    this.doors = null;               // [left, right] ways out once the case is closed, each { p, spot } or null
+    this.reach = [-W, W];            // how far the pilots may slide; an open door widens its side
     this.props = [];                 // breakable scenery inside the strip
     this.burning = [];               // trees part way through going up
     this.debris = new Debris(scene);
@@ -152,6 +159,49 @@ export class BattleMode {
     const far = makeGround(FIELD_W, 0x8fca43);
     far.scale.z = 120; far.position.z = -16.5 - 60;
     this.group.add(far);
+  }
+
+  // The case is closed: a door opens at each end of the row the map offers a
+  // way through, a sign over it names where it leads, and a way the map
+  // closes gets a barrier. With no map spot to leave from (a level reached
+  // by number: a debug jump, or ?battle&level=N past the first) the day just moves on.
+  openDoors() {
+    const { game } = this;
+    this.doors = game.exits();
+    if (!this.doors.some(Boolean)) { this.doors = null; game.nextLevel(); return; }
+    this.doors.forEach((d, k) => {
+      const side = k ? 1 : -1;
+      const x = side * DOOR_X;
+      const frame = new THREE.Group();
+      const post = d ? 0x6e5220 : 0x8a1a14;
+      frame.add(box(0.2, 1.8, 0.2, post, 0, 0, -0.5), box(0.2, 1.8, 0.2, post, 0, 0, 0.5), box(0.24, 0.2, 1.2, post, 0, 1.8, 0));
+      if (!d) for (const y of [0.5, 1.1]) frame.add(box(0.12, 0.16, 1.1, 0xf4f2ea, 0, y, 0));
+      frame.position.x = x;
+      this.group.add(frame);
+      const lines = d
+        ? [side < 0 ? '< THIS WAY' : 'THIS WAY >', LEVELS[d.spot.district].district.name, d.spot.gauntlet ? `${d.spot.gauntlet.toUpperCase()} GAUNTLET` : LEVELS[d.spot.district].district.motto]
+        : ['CLOSED', 'NO THROUGH ROUTE', 'BY ORDER OF THE DEPT.'];
+      const sign = makeDistrictSign(lines);
+      sign.scale.setScalar(0.6);
+      sign.position.set(side * (W - 1.2), 0, -1.6);
+      this.group.add(sign);
+    });
+    this.reach = [this.doors[0] ? -DOOR_OUT - 0.1 : -W, this.doors[1] ? DOOR_OUT + 0.1 : W];
+    const name = (d) => (d ? LEVELS[d.spot.district].district.name : 'CLOSED');
+    game.card(`< ${name(this.doors[0])} · PICK A DOOR · ${name(this.doors[1])} >`);
+    game.showMap(this.doors.filter(Boolean).map((d) => d.p));
+    sfx.clink();
+  }
+
+  // The first pilot through a door chooses the way for everyone.
+  walkOut() {
+    const out = this.pilots.find((p) => Math.abs(p.cx) >= DOOR_OUT);
+    if (!out) return;
+    const d = this.doors[out.cx < 0 ? 0 : 1];
+    if (!d) return;
+    this.doors = [];            // once only: nextLevel replaces this mode
+    this.game.card('');
+    this.game.nextLevel(d.p);
   }
 
   exit() {
@@ -242,7 +292,7 @@ export class BattleMode {
   onSwipe(dx, dy) {
     const p = this.pilots[0];
     if (Math.hypot(dx, dy) < 20) this.fire(p);
-    else if (Math.abs(dx) > Math.abs(dy)) p.cx = clamp(p.cx + Math.sign(dx) * 2, -W, W);
+    else if (Math.abs(dx) > Math.abs(dy)) p.cx = clamp(p.cx + Math.sign(dx) * 2, this.reach[0], this.reach[1]);   // an open door is in reach
     else this.cycleAim();
   }
   onViewButton() { this.cycleAim(); }
@@ -406,7 +456,7 @@ export class BattleMode {
         if (this.keys[k.up]) vz += SLIDE * 0.7;
         if (this.keys[k.down]) vz -= SLIDE * 0.7;
       }
-      p.cx = clamp(p.cx + vx * dt, -W, W);
+      p.cx = clamp(p.cx + vx * dt, this.reach[0], this.reach[1]);
       p.cz = clamp(p.cz + vz * dt, 0, FORWARD);
       p.mesh.position.set(p.cx, 0, -p.cz);
       p.mesh.rotation.y = vx < 0 ? Math.PI / 2 : vx > 0 ? -Math.PI / 2 : vz < 0 ? Math.PI : 0;
@@ -483,7 +533,8 @@ export class BattleMode {
 
     if (this.ending) {
       this.ending += dt;
-      if (this.summaryDone) game.nextLevel();
+      if (this.summaryDone && !this.doors) this.openDoors();
+      if (this.doors) this.walkOut();
       return;
     }
     if (!this.game.banner.up) this.timeLeft -= dt;   // the clock waits for the sign
