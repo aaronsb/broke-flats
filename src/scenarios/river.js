@@ -111,7 +111,7 @@ export default {
     if (lane.data.cracked?.size) {
       const players = lane.world.players?.() ?? [];
       for (const c of lane.data.cracked) {
-        const on = players.some((p) => (p.alive && !p.moving && p.row === lane.r && Math.round(p.x) === c) || p.powerCtx?.().train?.occupies(c, lane.r));
+        const on = players.some((p) => (p.alive && !p.moving && p.row === lane.r && Math.round(p.x) === c) || p.powerCtx?.().train?.bound(c, lane.r));
         if (!on) { thaw(lane, c); lane.data.cracked.delete(c); }
       }
     }
@@ -156,18 +156,30 @@ export default {
   },
 
   // Open water drowns a non-swimmer, unless the tile has frozen over: then
-  // anyone stands on it (snow.js). A log drifting over ice still carries.
+  // anyone stands on it (snow.js). A log drifting over ice still carries, and
+  // a hop that misses the log lands on the ice rather than bouncing off it.
   onLand(lane, player) {
     const c = Math.round(player.x);
-    const open = () => { if (iced(lane, c)) { player.onIce = { lane, c }; return null; } return player.swims ? null : 'water'; };
+    const ice = iced(lane, c);
+    const open = () => { if (ice) { player.onIce = { lane, c }; return null; } return player.swims ? null : 'water'; };
     const m = lane.moverAt(player.x, 0.3);
     if (!m || m.submerged) return open();     // waterfowl just swim
     if (m.head && within(lane, m, m.head, player.x, -0.1)) return 'chomped';
-    if (!within(lane, m, m.bed, player.x)) return lane.riding(m, player) ? 'bounce' : open();
+    if (!within(lane, m, m.bed, player.x)) return !ice && lane.riding(m, player) ? 'bounce' : open();
     player.carrier = m;
     return null;
   },
 
   // Stepping off an ice tile breaks it, once the whole procession is off it.
   leftIce(lane, c) { (lane.data.cracked ??= new Set()).add(c); },
+
+  // Standing on ice: the traffic passes over as over water. Logs and gator
+  // backs slide by; a hull or a gator's head hits.
+  iceContact(lane, player) {
+    const m = lane.moverAt(player.x, 0.3);
+    if (!m || m.submerged) return null;
+    if (m.head && within(lane, m, m.head, player.x, -0.1)) return 'chomped';
+    if (m.kind === 'boat' || m.kind === 'sub') return 'rundown';
+    return null;
+  },
 };

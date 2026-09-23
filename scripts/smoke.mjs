@@ -1578,43 +1578,61 @@ if (script === 'ice') {
   const check = (ok, msg) => { if (!ok) errors.push(`ice: ${msg}`); };
   const fs = await import('node:fs');
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
-  await send('Page.navigate', { url: BASE + '?start&sky=snow&force=river&lives=9&coins=40' }); await sleep(4500);
-  await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true`); await sleep(300);
-  // A river row with a bank row below it; the movers hold still (the hourglass's freeze).
-  const setup = `(() => { const w = __game.mode.world; w.frozen = true; w.ensure(40);
-    for (let r = 1; r < 40; r++) { const l = w.laneAt(r), b = w.laneAt(r - 1); if (l?.scenario.id !== 'river' || b?.scenario.id === 'river' || !l.data.ice) continue;
-      for (let c = -6; c <= 6; c++) if (!l.moverAt(c, 0.9) && !b.blocked.has(c)) return { r, c }; }
-    return null; })()`;
-  const spot = await evaluate(setup);
-  check(spot, 'no river row with a clear column on a snowy board');
+  // Boards are random: deal a few until one has the clear column.
+  const board = async () => { for (let n = 0; n < 5; n++) { const b = await deal(); if (b) return b; } return null; };
+  const deal = async () => {
+    await send('Page.navigate', { url: BASE + '?start&sky=snow&force=river&lives=9&coins=40' }); await sleep(4500);
+    await evaluate(`__game.banner.skip(); __game.debug.quickBanner = true; window.__iced = null; import('/src/snow.js').then((m) => { window.__iced = m.iced; })`); await sleep(400);
+    // Four river rows over a bank, with one column clear of movers all the way up; the movers hold still.
+    return evaluate(`(() => { const w = __game.mode.world; w.frozen = true; w.ensure(40); w.data.snowT = 50;
+      for (let r = 1; r < 36; r++) { const b = w.laneAt(r - 1); if (b?.scenario.id === 'river') continue; const up = [0, 1, 2, 3].map((k) => w.laneAt(r + k));
+        if (!up.every((l) => l?.scenario.id === 'river' && l.data.ice)) continue;
+        for (let c = -6; c <= 6; c++) if (!b.blocked.has(c) && up.every((l) => !l.moverAt(c, 0.9))) return { r, c }; }
+      return null; })()`);
+  };
   const put = (r, c) => evaluate(`(() => { const p = __game.mode.player; p.row = ${r}; p.col = ${c}; p.x = ${c}; p.z = -${r}; p.y = 0; p.mesh.position.set(${c}, 0, -${r}); p.maxRow = ${r}; p.recent = []; p.carrier = null; p.onIce = null; })()`);
-  const read = (r, c) => evaluate(`(() => { const w = __game.mode.world, l = w.laneAt(${r}), p = __game.mode.player; const t = w.data.snowT ?? 0, br = l.data.ice.broken.get(${c}) ?? 0;
-    return { alive: p.alive, row: p.row, onIce: !!p.onIce, y: +p.y.toFixed(2), iced: t - br >= 45 / 1.05, broken: +br.toFixed(1), attr: +l.data.ice.attr.getX(l.data.ice.tiles.get(${c})).toFixed(1), t: +t.toFixed(1) }; })()`);
+  const tile = (r, c) => evaluate(`(() => { const w = __game.mode.world, l = w.laneAt(${r}), p = __game.mode.player; const br = l.data.ice.broken.get(${c}) ?? 0;
+    return { alive: p.alive, row: p.row, onIce: !!p.onIce, y: +p.y.toFixed(2), iced: window.__iced(l, ${c}), broken: +br.toFixed(1), attr: +l.data.ice.attr.getX(l.data.ice.tiles.get(${c})).toFixed(1) }; })()`);
   const hop = async (dc, dr) => { await evaluate(`__game.mode.player.hop(${dc}, ${dr})`); await sleep(700); };
-  // Frozen: 50 s into the fall every untouched water tile is ice.
-  await evaluate(`__game.mode.world.data.snowT = 50`);
+
+  let spot = await board();
+  check(spot, 'no four river rows over a bank with a clear column on a snowy board');
   await put(spot.r - 1, spot.c); await sleep(200);
   await hop(0, 1);
-  const on = await read(spot.r, spot.c);
+  const on = await tile(spot.r, spot.c);
   console.log('on the ice', on);
-  check(on.alive && on.row === spot.r && on.onIce && on.iced, `a white tile did not hold the player: ${JSON.stringify(on)}`);
+  check(on.alive && on.row === spot.r && on.onIce && on.iced && on.y === -0.27, `a white tile did not hold the player: ${JSON.stringify(on)}`);
   await shot('ice-on');
   await key('Space', ' '); await sleep(1500); await shot('ice-iso'); await key('Space', ' '); await sleep(300);
-  // Back off to the bank: the tile breaks behind.
+  // Back off to the bank: the tile breaks behind, in state and in the shader's clock.
   await hop(0, -1); await sleep(300);
-  const off = await read(spot.r, spot.c);
+  const off = await tile(spot.r, spot.c);
   console.log('stepped off', off);
   check(off.alive && !off.iced && off.broken > 0 && off.attr === off.broken, `stepping off did not break the tile: ${JSON.stringify(off)}`);
   await key('Space', ' '); await sleep(1500); await shot('ice-broken'); await key('Space', ' '); await sleep(300);
-  // Broken ice is water: hopping back in drowns.
+  // It freezes again: a broken-at time far enough back reads as ice.
+  const refrozen = await evaluate(`(() => { const w = __game.mode.world, l = w.laneAt(${spot.r}); const was = window.__iced(l, ${spot.c}); w.data.snowT = l.data.ice.broken.get(${spot.c}) + 44; return [was, window.__iced(l, ${spot.c})]; })()`);
+  console.log('refreezing', refrozen);
+  check(refrozen[0] === false && refrozen[1] === true, `a broken tile did not freeze again: ${JSON.stringify(refrozen)}`);
+  // Broken ice is water: hopping onto it drowns, and death clears the ice under the player.
+  await evaluate(`(() => { const l = __game.mode.world.laneAt(${spot.r}); l.data.ice.broken.set(${spot.c}, __game.mode.world.data.snowT); })()`);
   await hop(0, 1); await sleep(1200);
-  const sunk = await evaluate(`[__game.run.lastCause ?? null, __game.run.lives]`);
-  console.log('back onto the broken tile', sunk);
-  check(sunk[0] === 'water', `the broken tile held the player: ${JSON.stringify(sunk)}`);
-  // It freezes again as the snow keeps falling.
-  const again = await evaluate(`(() => { const w = __game.mode.world; w.ensure(40); const l = w.laneAt(${spot.r}); if (!l?.data.ice) return null; l.data.ice.broken.set(${spot.c}, 10); w.data.snowT = 10 + 44; return (w.data.snowT - l.data.ice.broken.get(${spot.c})) >= 45 / 1.05; })()`);
-  console.log('refrozen', again);
-  check(again === true, 'a broken tile did not freeze again');
+  const sunk = await evaluate(`[__game.run.lastCause ?? null, !!__game.mode.player?.onIce]`);
+  console.log('onto the broken tile', sunk);
+  check(sunk[0] === 'water' && !sunk[1], `the broken tile held the player, or the ice outlived the death: ${JSON.stringify(sunk)}`);
+
+  // A line of two crosses: the tile it passes holds until the last follower is off, then breaks.
+  spot = await board();
+  check(spot, 'no board with a clear column for the line');
+  await put(spot.r - 1, spot.c); await sleep(200);
+  await evaluate(`__game.mode.train.hatch(true); __game.mode.train.hatch(true)`);
+  const seen = [];
+  for (let k = 0; k < 4; k++) { await hop(0, 1); await sleep(200); seen.push(await evaluate(`(() => { const l = __game.mode.world.laneAt(${spot.r}), t = __game.mode.train;
+    return { lead: __game.mode.player.row, iced: window.__iced(l, ${spot.c}), chickRows: t.chicks.map((k) => k.rec.row), chickY: t.chicks.map((k) => +k.mesh.position.y.toFixed(2)), alive: __game.mode.player.alive }; })()`)); }
+  console.log('line across the ice', seen);
+  // The leader leaves the first ice row on hop 2; followers are on it through hop 3; after hop 4 it is behind them all.
+  check(seen.every((s) => s.alive) && seen[1].iced && seen[2].iced && !seen[3].iced, `the tile under the line broke too early or never: ${JSON.stringify(seen.map((s) => s.iced))}`);
+  check(seen[2].chickY.every((y) => y > -0.3), `a follower sank on the ice: ${JSON.stringify(seen[2])}`);
   // A rainy river has no ice.
   await send('Page.navigate', { url: BASE + '?start&sky=rain&force=river' }); await sleep(4000);
   check(await evaluate(`![...__game.mode.world.rows.values()].some((l) => l.data.ice)`), 'a rainy river grew ice');

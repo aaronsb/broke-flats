@@ -166,7 +166,7 @@ function surfaceFor(boxes) {
 
 const uniforms = { uSnowF: { value: 0 }, uSnowT: { value: 0 } };
 const mat = new THREE.MeshLambertMaterial({ color: 0xf1f5fb, emissive: 0x3a3f48, side: THREE.DoubleSide });   // a lift on the emissive so the sheet reads white under a grey sky
-mat.userData.uSnowF = uniforms.uSnowF;   // the depth the shader is drawing to, for the smoke test
+mat.userData.uSnowF = uniforms.uSnowF;   // the land's fraction, for the smoke test; faces carve against uSnowT and their own aIce
 mat.onBeforeCompile = (shader) => {
   shader.uniforms.uSnowF = uniforms.uSnowF;
   shader.uniforms.uSnowT = uniforms.uSnowT;
