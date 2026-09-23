@@ -5,9 +5,13 @@
 // The board plays one song, the stage song in song.js, and never stops it:
 // every board mood is an arrangement of the same bars at the same tempo, so
 // stepping on and off the road changes the band, not the tune. Grass is the
-// stroll (triangle melody an octave down, light drums, a ripple of arpeggio);
-// a road or river is the full band (pulse lead with its echo, rock beat,
-// driving bass, stabs and arpeggios). A peek muffles the band and lays a
+// bed: the song's chords as a slow pad, a long bass note a bar, a few high
+// chord tones through the echo and a heartbeat kick. How busy the player is
+// (mood.energy, from the hops) brings layers in over it: at STROLL the tune
+// on the triangle an octave down and a rim on the backbeat, at BUSY an
+// eighth-note ripple and hats. Stand still and it settles back to the bed. A
+// road or river brings in the full band and the tune (pulse lead with its
+// echo, rock beat, driving bass, stabs and arpeggios). A peek muffles the band and lays a
 // bright arpeggio and a coin-meter tick over it. Rain and snow re-voice it.
 // The title has its own theme; the hearing, the tally and the epilogue keep
 // their own loops.
@@ -20,6 +24,7 @@ const LOOKAHEAD = 0.12;
 const CUTOFF_MAX = 6500;   // snow's brightening stops here so the pulses do not turn brittle
 const PEEK_CUTOFF = 1500;  // a peek hears the band through glass
 const ECHO_STEPS = 3;      // the chip-era echo: the lead again, thinner, three sixteenths late
+const STROLL = 0.35, BUSY = 0.7;   // grass energy at which the tune, then the ripple, come in
 
 const PENTA = [57, 60, 62, 64, 67, 69, 72, 74, 76, 79];  // A minor pentatonic
 
@@ -41,7 +46,7 @@ const EPILOGUE_PROG = [[48, 52, 55, 59], [45, 48, 52, 55], [53, 57, 60, 64], [55
 // darker, the lead on the thinnest pulse with a second echo, a sixteenth
 // patter for hats, and soft phrases of drops stepping down the scale. Snow:
 // slower still, every held lead note doubled by a bell an octave up, the
-// grass bass resting every other bar, a few high pings per bar, a whisper of
+// bed's bass resting every other bar, a few high pings per bar, a whisper of
 // high pad.
 const WEATHER = {
   rain: { tempo: 0.9, cutoff: 0.6 },
@@ -62,7 +67,7 @@ let nextTime = 0, step = 0, bar = 0, bpm = 150;
 // Where the current song is, in bars. It runs on through every board mood and
 // goes back to bar one on a scene change.
 let songBar = 0;
-const QUIET = { danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
+const QUIET = { energy: 0, danger: false, tilted: false, dead: false, hearing: false, countdown: 0, attract: false, gauntlet: false, epilogue: false, tally: false, star: false };
 let mood = { ...QUIET };
 let muted = false;
 
@@ -267,7 +272,7 @@ const meter = (note, t) => pulse(0.125, note, t, 0.018, 0.02, { dest: out.hi });
 
 // ---------- the board band ----------
 // One step of a song. full: the whole band (a road, a river, the gauntlet, a
-// star, the continue countdown). Otherwise the stroll. `chord` is this bar's.
+// star, the continue countdown). Otherwise the bed. `chord` is this bar's.
 function songStep(song, s, t, sixteenth, chord, full, wx) {
   const at = songBar % song.lead.length;
   const half = song.lead.length / 2;
@@ -275,9 +280,11 @@ function songStep(song, s, t, sixteenth, chord, full, wx) {
   const turn = at % half === half - 1;
   const rain = wx === WEATHER.rain, snow = wx === WEATHER.snow;
   const peek = mood.tilted && !mood.attract;
+  const energy = mood.energy ?? 0;
 
   // Drums. Full: rock beat, a crash into each section, a snare roll on the
-  // turnaround. Stroll: kick on one and three, a rim on the backbeat.
+  // turnaround. Bed: a soft kick on the bar and a shaker now and then; a rim
+  // on the backbeat from STROLL, hats from BUSY.
   if (full) {
     if (s === 0 || s === 8 || s === 10 || (s === 7 && at % 2)) kick(t, 0.45);
     if (s === 4 || s === 12) snare(t, 0.26);
@@ -286,20 +293,25 @@ function songStep(song, s, t, sixteenth, chord, full, wx) {
     else if (rain) shaker(t, s % 4 === 2 ? 0.05 : 0.025);
     else if (s % 2 === 0) hat(t, false, s % 4 === 2 ? 0.1 : 0.06);
   } else {
-    if (s === 0 || s === 8 || (s === 14 && at % 2)) kick(t, 0.3);
-    if (s === 4 || s === 12) rim(t);
-    if (rain) { if (s % 2 === 1) shaker(t, 0.025); } else if (s % 4 === 2) hat(t, false, 0.05);
+    if (s === 0) kick(t, 0.16);
+    if (energy >= STROLL && (s === 4 || s === 12)) rim(t, 0.05);
+    if (rain) { if (s % 2 === 1) shaker(t, 0.02); }
+    else if (energy >= BUSY) { if (s % 4 === 2) hat(t, false, 0.05); }
+    else if (s % 8 === 4) shaker(t, 0.02);
   }
 
-  // Triangle bass: drives on the road, strolls on the grass. Snow rests the stroll every other bar.
-  const b = (full ? BASS.drive : BASS.stroll)[s];
-  if (b !== undefined && (full || !snow || at % 2 === 0)) {
-    const short = s === 11 || s === 15;
-    pulse('triangle', chord[0] - 12 + b, t, sixteenth * (short ? 0.9 : full ? 1.7 : 3), full ? 0.3 : 0.26);
+  // Triangle bass: drives on the road; on the grass one long root a bar,
+  // resting every other bar in snow.
+  if (full) {
+    const b = BASS.drive[s];
+    if (b !== undefined) pulse('triangle', chord[0] - 12 + b, t, sixteenth * (s === 11 || s === 15 ? 0.9 : 1.7), 0.3);
+  } else if (s === 0 && (!snow || at % 2 === 0)) {
+    pulse('triangle', chord[0] - 12, t, sixteenth * 15, 0.22);
   }
 
   // Harmony: stabs on the off-beats in A and arpeggios in B on the road (the
-  // gauntlet arpeggiates throughout); on the grass an eighth-note ripple.
+  // gauntlet arpeggiates throughout); on the grass the chord as a pad, and a
+  // high chord tone on every other beat through the echo.
   if (full && (bSection || mood.gauntlet)) {
     for (let h = 0; h < 2; h++) {
       const i = s * 2 + h;
@@ -307,15 +319,18 @@ function songStep(song, s, t, sixteenth, chord, full, wx) {
     }
   } else if (full) {
     if (s % 4 === 2) for (const n of chord) pulse(0.5, n, t, sixteenth * 0.9, 0.022);
-  } else if (s % 2 === 0) {
-    pulse(0.125, chord[(s / 2) % chord.length] + 12, t, sixteenth * 1.5, 0.016);
+  } else {
+    if (s === 0) pad(chord, t, sixteenth * 16, 0.035);
+    if (s % 8 === 2) osc('triangle', N(chord[(s / 8 + at) % chord.length | 0] + 24), t, sixteenth * 3, 0.03, out.delay, { attack: 0.01 });
+    if (energy >= BUSY && s % 2 === 0) pulse(0.125, chord[(s / 2) % chord.length] + 12, t, sixteenth * 1.5, 0.014);
   }
 
-  // The melody. Full: a pulse lead with vibrato and its echo (rain thins the
-  // lead and adds a second echo). Stroll: the triangle an octave down. Snow
-  // doubles held notes with a bell an octave up.
+  // The melody. Full band: a pulse lead with vibrato and its echo (rain thins
+  // the lead and adds a second echo); snow doubles held notes with a bell an
+  // octave up. On the grass from STROLL: the triangle an octave down.
   const n = song.lead[at][s];
-  if (n) {
+  if (n && !full && energy >= STROLL) pulse('triangle', n[0] - 12, t, n[1] * sixteenth * 0.95, 0.08, { vib: 12 });
+  if (n && full) {
     const dur = n[1] * sixteenth * 0.95;
     // An echo stops at the bar line when the next bar changes chord, and is
     // dropped if it would start there.
@@ -324,14 +339,10 @@ function songStep(song, s, t, sixteenth, chord, full, wx) {
       const steps = same ? n[1] : Math.min(n[1], STEPS - s - k);
       if (steps > 0) pulse(0.125, n[0], t + k * sixteenth, steps * sixteenth * 0.95, vol, { vib });
     };
-    if (full) {
-      pulse(rain ? 0.125 : 0.25, n[0], t, dur, rain ? 0.075 : 0.085, { vib: 18 });
-      echo(ECHO_STEPS, 0.03, 18);
-      if (rain) echo(ECHO_STEPS * 2, 0.016, 0);
-    } else {
-      pulse('triangle', n[0] - 12, t, dur, 0.1, { vib: 12 });
-    }
-    if (snow && n[1] >= 3) bell(n[0] + 12, t, Math.min(dur * 1.5, 1.2), full ? 0.03 : 0.04);
+    pulse(rain ? 0.125 : 0.25, n[0], t, dur, rain ? 0.075 : 0.085, { vib: 18 });
+    echo(ECHO_STEPS, 0.03, 18);
+    if (rain) echo(ECHO_STEPS * 2, 0.016, 0);
+    if (snow && n[1] >= 3) bell(n[0] + 12, t, Math.min(dur * 1.5, 1.2), 0.03);
   }
 
   // A peek: the band goes behind glass (the filter, set by the scheduler)
