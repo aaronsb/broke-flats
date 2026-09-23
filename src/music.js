@@ -54,6 +54,9 @@ let weather = null;
 const fig = { rainIdx: 0, rainLeft: 0, rainRest: 0, pings: [] };
 
 let ctx, master, bus, delayBus, hiBus, stingBus, filter;
+// The song now sounding plays every voice through its own generation of
+// gains, one per bus, so a transition can fade what it leaves ringing.
+let out = null;
 let timer = null;
 let nextTime = 0, step = 0, bar = 0, bpm = 150;
 // Where the current song is, in bars. It runs on through every board mood and
@@ -94,19 +97,55 @@ function setup() {
   // Bumpers skip the mood bus so they play at full voice while it ducks under them.
   stingBus = ctx.createGain();
   stingBus.connect(comp);
+  generation(ctx.currentTime);
+}
+
+// ---------- transitions ----------
+// iMUSE-style: a scene change never cuts a song mid-beat and never lets two
+// songs sound together. reset() queues the next mood; the scheduler switches
+// on the next beat, the outgoing song's generation fades over FADE from that
+// beat (its long pads, bells and echoes included), and the tempo glides to
+// the new song's over its first bar instead of snapping. A bumper clears the
+// floor: the song sounding fades as the sting starts, and the next song
+// enters on the downbeat after the sting ends.
+const FADE = 0.2;
+const GLIDE = 0.15;        // share of the tempo gap closed per sixteenth
+let pending = null;        // a mood waiting for the next beat
+let holdUntil = 0;         // no song before this time: a bumper is playing
+let fromSilence = false;   // the next song enters out of a bumper: nothing to glide from, so it starts at its own tempo
+
+// A fresh generation for the next song from time t; the old one fades out and is let go.
+function generation(t) {
+  const old = out;
+  out = { main: ctx.createGain(), hi: ctx.createGain(), delay: ctx.createGain() };
+  out.main.connect(bus); out.hi.connect(hiBus); out.delay.connect(delayBus);
+  if (!old) return;
+  for (const g of Object.values(old)) {
+    g.gain.setValueAtTime(1, t);
+    g.gain.linearRampToValueAtTime(0.0001, t + FADE);
+  }
+  setTimeout(() => { for (const g of Object.values(old)) g.disconnect(); }, (t - ctx.currentTime + FADE + 1) * 1000);
+}
+
+// The queued mood takes over at time t, on a beat: the song restarts from its downbeat.
+function switchTo(m, t) {
+  mood = m;
+  if (fromSilence) { bpm = tempoFor(moodName(mood)); fromSilence = false; }
+  step = 0; bar = 0; songBar = 0;
+  fig.rainLeft = 0; fig.rainRest = 0; fig.pings = [];
+  generation(t);
 }
 
 // ---------- bumpers ----------
 // Stage stings: a race-start figure for the board (three beats on one pitch,
 // the fourth longer and a fifth up), the gauntlet's a semitone darker with a
 // snare on each beat, the hearing's a two-note office chime. Each entry:
-// duration, then [offset, note, length, voice] beats.
+// [offset, note, length, voice] beats; the next song enters as the last one ends.
 const BUMPERS = {
-  day:      { dur: 2.4, beats: [[0, 69, 0.14, 'lead'], [0.5, 69, 0.14, 'lead'], [1.0, 69, 0.14, 'lead'], [1.5, 76, 0.75, 'lead']] },
-  gauntlet: { dur: 2.4, beats: [[0, 68, 0.14, 'lead'], [0.5, 68, 0.14, 'lead'], [1.0, 68, 0.14, 'lead'], [1.5, 75, 0.75, 'lead']], snare: true },
-  hearing:  { dur: 1.8, beats: [[0, 76, 0.9, 'chime'], [0.45, 72, 1.1, 'chime']] },
+  day:      { beats: [[0, 69, 0.14, 'lead'], [0.5, 69, 0.14, 'lead'], [1.0, 69, 0.14, 'lead'], [1.5, 76, 0.75, 'lead']] },
+  gauntlet: { beats: [[0, 68, 0.14, 'lead'], [0.5, 68, 0.14, 'lead'], [1.0, 68, 0.14, 'lead'], [1.5, 75, 0.75, 'lead']], snare: true },
+  hearing:  { beats: [[0, 76, 0.9, 'chime'], [0.45, 72, 1.1, 'chime']] },
 };
-const DUCK = 0.18;   // mood gain under a bumper
 function stingVoice(kind, note, t, dur) {
   if (kind === 'chime') {
     osc('sine', N(note), t, dur, 0.16, stingBus, { attack: 0.004 });
@@ -120,7 +159,7 @@ function stingVoice(kind, note, t, dur) {
 
 
 // ---------- voices ----------
-function osc(type, freq, t, dur, vol, dest = bus, { attack = 0.005, slideTo = null, detune = 0 } = {}) {
+function osc(type, freq, t, dur, vol, dest = out.main, { attack = 0.005, slideTo = null, detune = 0 } = {}) {
   const o = ctx.createOscillator();
   const g = ctx.createGain();
   o.type = type;
@@ -136,7 +175,7 @@ function osc(type, freq, t, dur, vol, dest = bus, { attack = 0.005, slideTo = nu
 }
 
 let noiseBuf = null;
-function noise(t, dur, vol, type, freq, q = 1) {
+function noise(t, dur, vol, type, freq, q = 1, dest = out.main) {
   if (!noiseBuf) {
     const n = ctx.sampleRate;
     noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -151,39 +190,39 @@ function noise(t, dur, vol, type, freq, q = 1) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  s.connect(f).connect(g).connect(bus);
+  s.connect(f).connect(g).connect(dest);
   s.start(t);
   s.stop(t + dur + 0.02);
 }
 
-const kick = (t, vol = 0.5) => osc('triangle', 150, t, 0.22, vol, bus, { slideTo: 45, attack: 0.002 });
-const snare = (t, vol = 0.25) => { noise(t, 0.12, vol, 'bandpass', 1800, 1); osc('triangle', 220, t, 0.08, vol * 0.5, bus, { slideTo: 120 }); };
+const kick = (t, vol = 0.5, dest = out.main) => osc('triangle', 150, t, 0.22, vol, dest, { slideTo: 45, attack: 0.002 });
+const snare = (t, vol = 0.25, dest = out.main) => { noise(t, 0.12, vol, 'bandpass', 1800, 1, dest); osc('triangle', 220, t, 0.08, vol * 0.5, dest, { slideTo: 120 }); };
 const hat = (t, open = false, vol = 0.12) => noise(t, open ? 0.16 : 0.04, vol, 'highpass', open ? 5000 : 7000);
 const shaker = (t, vol = 0.06) => noise(t, 0.09, vol, 'bandpass', 6000, 2);
 
 function bass(note, t, dur, driving) {
-  osc(driving ? 'sawtooth' : 'square', N(note - 12), t, dur, driving ? 0.22 : 0.18, bus, { attack: 0.004 });
+  osc(driving ? 'sawtooth' : 'square', N(note - 12), t, dur, driving ? 0.22 : 0.18, out.main, { attack: 0.004 });
 }
 function pad(chord, t, dur, vol = 0.05) {
   for (const n of chord) {
-    osc('triangle', N(n), t, dur, vol, bus, { attack: 0.35, detune: 6 });
-    osc('triangle', N(n), t, dur, vol, bus, { attack: 0.35, detune: -6 });
+    osc('triangle', N(n), t, dur, vol, out.main, { attack: 0.35, detune: 6 });
+    osc('triangle', N(n), t, dur, vol, out.main, { attack: 0.35, detune: -6 });
   }
 }
-const lead = (note, t, dur, vol = 0.09) => osc('square', N(note), t, dur, vol, delayBus, { attack: 0.004 });
+const lead = (note, t, dur, vol = 0.09) => osc('square', N(note), t, dur, vol, out.delay, { attack: 0.004 });
 // Snow bell: a sine with a detuned twin for shimmer and a short triangle strike an octave up.
 function bell(note, t, dur, vol = 0.07) {
-  osc('sine', N(note), t, dur, vol, hiBus, { attack: 0.004 });
-  osc('sine', N(note), t, dur * 0.8, vol * 0.5, hiBus, { attack: 0.004, detune: 9 });
-  osc('triangle', N(note + 12), t, dur * 0.3, vol * 0.25, hiBus, { attack: 0.002, detune: -5 });
+  osc('sine', N(note), t, dur, vol, out.hi, { attack: 0.004 });
+  osc('sine', N(note), t, dur * 0.8, vol * 0.5, out.hi, { attack: 0.004, detune: 9 });
+  osc('triangle', N(note + 12), t, dur * 0.3, vol * 0.25, out.hi, { attack: 0.002, detune: -5 });
 }
 // Rain drop: a soft triangle with a short release, nudged late by a random slice of the step.
-const drop = (note, t, sixteenth, vol = 0.03) => osc('triangle', N(note), t + Math.random() * sixteenth * 0.25, sixteenth * 1.3, vol, hiBus, { attack: 0.003 });
+const drop = (note, t, sixteenth, vol = 0.03) => osc('triangle', N(note), t + Math.random() * sixteenth * 0.25, sixteenth * 1.3, vol, out.hi, { attack: 0.003 });
 // Snow ping: a tiny high sine with a detuned twin, light catching a flake.
 function ping(note, t, dur, vol = 0.028) {
   const detune = (Math.random() - 0.5) * 24;
-  osc('sine', N(note), t, dur, vol, hiBus, { attack: 0.002, detune });
-  osc('sine', N(note), t, dur * 0.8, vol * 0.6, hiBus, { attack: 0.002, detune: detune + 11 });
+  osc('sine', N(note), t, dur, vol, out.hi, { attack: 0.002, detune });
+  osc('sine', N(note), t, dur * 0.8, vol * 0.6, out.hi, { attack: 0.002, detune: detune + 11 });
 }
 
 
@@ -199,7 +238,7 @@ function pulseWave(duty) {
 // A chip voice: quick attack, a small decay to a held level, a short release.
 // `vib` (cents) wobbles held notes once they have sounded for a moment.
 // `wave` is a duty cycle, or 'triangle' for the NES bass channel's tone.
-function pulse(wave, note, t, dur, vol, { vib = 0, dest = bus } = {}) {
+function pulse(wave, note, t, dur, vol, { vib = 0, dest = out.main } = {}) {
   const o = ctx.createOscillator(), g = ctx.createGain();
   if (wave === 'triangle') o.type = 'triangle';
   else o.setPeriodicWave(pulseWave(wave));
@@ -224,7 +263,7 @@ function pulse(wave, note, t, dur, vol, { vib = 0, dest = bus } = {}) {
   o.stop(t + dur + 0.02);
 }
 const rim = (t, vol = 0.07) => noise(t, 0.025, vol, 'highpass', 3200);
-const meter = (note, t) => pulse(0.125, note, t, 0.018, 0.02, { dest: hiBus });   // the peek's coin meter, on the chord's root
+const meter = (note, t) => pulse(0.125, note, t, 0.018, 0.02, { dest: out.hi });   // the peek's coin meter, on the chord's root
 
 // ---------- the board band ----------
 // One step of a song. full: the whole band (a road, a river, the gauntlet, a
@@ -301,7 +340,7 @@ function songStep(song, s, t, sixteenth, chord, full, wx) {
   // sparkling version of the arpeggio and no meter.
   if (peek || mood.star) {
     const tone = chord[(s + at) % chord.length] + 24 + (s % 8 >= 4 ? 12 : 0);
-    if (peek ? s % 2 === 0 : true) pulse(0.125, tone, t, sixteenth * 1.2, peek ? 0.03 : 0.022, { dest: hiBus });
+    if (peek ? s % 2 === 0 : true) pulse(0.125, tone, t, sixteenth * 1.2, peek ? 0.03 : 0.022, { dest: out.hi });
     if (peek && s % 4 === 0) meter(chord[0] + 36, t);
   }
 
@@ -326,7 +365,7 @@ function scheduleStep(s, t) {
   const wx = boardWeather(name);
   // A running continue countdown pushes the tempo up toward the end.
   const goalBpm = mood.countdown ? 110 + mood.countdown * 90 : tempoFor(name);
-  bpm += (goalBpm - bpm) * 0.12;
+  bpm += (goalBpm - bpm) * GLIDE;
   const beat = 60 / bpm, sixteenth = beat / 4;
   const song = mood.attract ? TITLE : STAGE;
   const own = mood.tally ? TALLY_PROG : mood.epilogue ? EPILOGUE_PROG : mood.hearing ? HEARING_PROG : null;
@@ -356,7 +395,7 @@ function scheduleStep(s, t) {
   if (mood.epilogue) {
     // End-credits feel: slow pad, a sine bass every two beats, a sparse lead drifting up the chord.
     if (s === 0) pad(chord, t, beat * 4);
-    if (s === 0 || s === 8) osc('sine', N(root - 12), t, beat * 1.9, 0.3, bus, { attack: 0.05 });
+    if (s === 0 || s === 8) osc('sine', N(root - 12), t, beat * 1.9, 0.3, out.main, { attack: 0.05 });
     if (s % 4 === 2 && Math.random() < 0.75) lead(chord[(((s / 4) | 0) + bar) % chord.length] + 12, t, sixteenth * 5, 0.05);
     return;
   }
@@ -367,8 +406,8 @@ function scheduleStep(s, t) {
     if (s === 0) pad(chord, t, beat * 4);
     if (s === 0 || s === 6) bass(root, t, beat * 1.4, false);
     if (s === 10) bass(root + 7, t, beat * 1.2, false);
-    if (s === 3 || s === 11) for (const n of chord.slice(1)) osc('triangle', N(n + 12), t, sixteenth * 1.8, 0.035, bus, { attack: 0.01 });
-    if (s % 4 === 1 && Math.random() < 0.7) osc('sine', N(chord[chord.length - 1 - (((s >> 2) + bar) % chord.length)] + 24), t, sixteenth * 3.5, 0.06, delayBus, { attack: 0.01 });
+    if (s === 3 || s === 11) for (const n of chord.slice(1)) osc('triangle', N(n + 12), t, sixteenth * 1.8, 0.035, out.main, { attack: 0.01 });
+    if (s % 4 === 1 && Math.random() < 0.7) osc('sine', N(chord[chord.length - 1 - (((s >> 2) + bar) % chord.length)] + 24), t, sixteenth * 3.5, 0.06, out.delay, { attack: 0.01 });
     if (s % 2 === 0) shaker(t, s % 4 === 0 ? 0.06 : 0.03);
     return;
   }
@@ -401,7 +440,7 @@ function scheduleStep(s, t) {
       const count = 2 + Math.floor(Math.random() * 3);
       fig.pings = [];
       while (fig.pings.length < count) { const at = Math.floor(Math.random() * STEPS); if (!fig.pings.includes(at)) fig.pings.push(at); }
-      for (const n of chord.slice(-2)) osc('sine', N(n + 24), t, beat * 4.2, 0.016, bus, { attack: 0.9, detune: 4 });
+      for (const n of chord.slice(-2)) osc('sine', N(n + 24), t, beat * 4.2, 0.016, out.main, { attack: 0.9, detune: 4 });
     }
     if (fig.pings.includes(s)) ping(chord[Math.floor(Math.random() * chord.length) % chord.length] + 36, t + Math.random() * sixteenth * 0.5, sixteenth * 0.7);
   }
@@ -410,7 +449,10 @@ function scheduleStep(s, t) {
 function tick() {
   const now = ctx.currentTime;
   while (nextTime < now + LOOKAHEAD) {
+    // A bumper holds the floor: the clock jumps to its end and the next song starts there on a downbeat.
+    if (nextTime < holdUntil) { nextTime = holdUntil; step = 0; continue; }
     const t = Math.max(nextTime, now + 0.002);
+    if (pending && step % 4 === 0) { switchTo(pending, t); pending = null; }
     scheduleStep(step, t);
     nextTime += 60 / bpm / 4;
     step = (step + 1) % STEPS;
@@ -426,34 +468,38 @@ export const music = {
     step = 0; bar = 0;
     timer = setInterval(tick, 25);
   },
-  setMood(m) { mood = { ...mood, ...m }; },
-  // Scene change: drop every flag, snap the tempo to the new mood, restart on the downbeat.
+  // Flags for the song sounding; a queued song picks them up too, since the
+  // board sets them every frame and the switch may be a beat away.
+  setMood(m) {
+    mood = { ...mood, ...m };
+    if (pending) pending = { ...pending, ...m };
+  },
+  // Scene change: drop every flag and queue the new mood for the next beat.
+  // Before the music has started there is nothing to transition from.
   reset(m = {}) {
-    mood = { ...QUIET, ...m };
-    bpm = tempoFor(moodName(mood));
-    step = 0; bar = 0; songBar = 0;
-    fig.rainLeft = 0; fig.rainRest = 0; fig.pings = [];
-    if (ctx) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
+    const next = { ...QUIET, ...m };
+    if (!ctx) { mood = next; bpm = tempoFor(moodName(mood)); return; }
+    pending = next;
   },
   // Weather is a property of the level, so it survives reset(). A sky id:
   // 'rain' or 'snow' colours the board moods; anything else clears it.
   setWeather(name) { weather = Object.hasOwn(WEATHER, name) ? name : null; },
   get weather() { return weather; },
-  // One stage sting, now. The mood bus ducks for its length and comes back at the end.
+  // One stage sting, now, alone: the song sounding fades as it starts, and
+  // the queued song (or the same one, from the top) enters on the downbeat
+  // after it.
   bumper(kind) {
     if (!ctx) return;
     const fig = BUMPERS[kind] ?? BUMPERS.day;
     const t0 = ctx.currentTime + 0.03;
-    const g = bus.gain;
-    g.cancelScheduledValues(t0);
-    g.setValueAtTime(g.value, t0);
-    g.linearRampToValueAtTime(DUCK, t0 + 0.08);
-    g.setValueAtTime(DUCK, t0 + fig.dur - 0.35);
-    g.linearRampToValueAtTime(1, t0 + fig.dur);
+    generation(t0);
+    pending ??= { ...mood };
+    holdUntil = t0 + Math.max(...fig.beats.map(([at, , len]) => at + len));   // the song comes in as the sting's last note ends
+    fromSilence = true;
     for (const [at, note, len, voice] of fig.beats ?? []) {
       stingVoice(voice, note, t0 + at, len);
-      if (fig.snare) snare(t0 + at, 0.3);
-      else kick(t0 + at, 0.35);
+      if (fig.snare) snare(t0 + at, 0.3, stingBus);
+      else kick(t0 + at, 0.35, stingBus);
     }
   },
   toggleMute() {
