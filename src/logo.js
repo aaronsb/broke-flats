@@ -155,21 +155,29 @@ const chicken = (fill = TAR) => `
 // An escaped text node: the titles come from level data, so no markup rides along.
 const esc = (t) => String(t ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
-// Day start: a white crossing-style board on a post, the chicken to the left
-// of the day count, the sky small underneath. Bad weather hangs a
-// weather-service placard from the bottom edge on two chains.
-const daySign = ({ title, sub, advisory }) => `
+// Font size that fits `text` into `width` units: the arcade face is monospaced
+// at one em per glyph, capped at `max`.
+const fit = (text, width, max) => Math.min(max, width / Math.max(1, String(text ?? '').length));
+
+// Day start: the district's welcome sign, a green board in the town sign's
+// livery on two wooden posts: a chicken stencilled in the corner, NOW ENTERING, the district, its motto, and a
+// white tab with the day and the sky. Bad weather hangs a weather-service
+// placard from the bottom edge on two chains.
+const daySign = ({ title, sub, motto, advisory }) => `
   <svg class="board day" viewBox="0 0 300 250" role="img" aria-label="${esc(title)}">
-    <g class="post"><rect x="145" y="150" width="10" height="100" fill="${IRON}"/><rect x="145" y="150" width="3.5" height="100" fill="${IRON_DARK}"/></g>
+    <g class="post"><rect x="78" y="150" width="9" height="100" fill="${WOOD}"/><rect x="213" y="150" width="9" height="100" fill="${WOOD}"/><rect x="78" y="150" width="3" height="100" fill="#5c3f26"/><rect x="213" y="150" width="3" height="100" fill="#5c3f26"/></g>
     <g class="plate">
-      <rect x="34" y="18" width="232" height="136" rx="8" fill="${TAR}"/>
-      <rect x="39" y="23" width="222" height="126" rx="5" fill="#f4f2ea"/>
-      <rect x="45" y="29" width="210" height="114" rx="3" fill="none" stroke="${TAR}" stroke-width="3"/>
-      <g transform="translate(58 62)">${chicken()}</g>
-      <text x="196" y="86" text-anchor="middle" font-size="${title?.length > 6 ? 16 : 22}" fill="${TAR}">${esc(title)}</text>
-      <text x="200" y="120" text-anchor="middle" font-size="10" fill="${TAR}" opacity=".78">${esc(sub)}</text>
-      <circle cx="52" cy="36" r="2.5" fill="${IRON_DARK}"/><circle cx="248" cy="36" r="2.5" fill="${IRON_DARK}"/>
-      <circle cx="52" cy="136" r="2.5" fill="${IRON_DARK}"/><circle cx="248" cy="136" r="2.5" fill="${IRON_DARK}"/>
+      <rect x="26" y="18" width="248" height="136" rx="6" fill="${BONE}"/>
+      <rect x="31" y="23" width="238" height="126" rx="4" fill="${GREEN}"/>
+      <circle cx="240" cy="36" r="9" fill="#fff" opacity=".06"/>
+      <g transform="translate(46 30) scale(.4)" opacity=".7">${chicken(BONE)}</g>
+      <text x="150" y="46" text-anchor="middle" font-size="7" fill="#eceada" opacity=".55">NOW ENTERING</text>
+      <text class="name" x="150" y="${76 + fit(title, 216, 20) / 2}" text-anchor="middle" font-size="${fit(title, 216, 20)}" fill="#f4f2e4">${esc(title)}</text>
+      <text x="150" y="108" text-anchor="middle" font-size="${fit(motto, 216, 7)}" fill="#eceada" opacity=".8">${esc(motto)}</text>
+      <rect x="70" y="118" width="160" height="22" rx="2" fill="#f4f2ea"/>
+      <text x="150" y="133" text-anchor="middle" font-size="${fit(sub, 150, 8)}" fill="${TAR}">${esc(sub)}</text>
+      <circle cx="40" cy="32" r="2.5" fill="#1d4429"/><circle cx="260" cy="32" r="2.5" fill="#1d4429"/>
+      <circle cx="40" cy="140" r="2.5" fill="#1d4429"/><circle cx="260" cy="140" r="2.5" fill="#1d4429"/>
     </g>
     ${advisory ? `
     <g class="placard">
@@ -195,7 +203,7 @@ const gauntletSign = ({ title, sub, variant }) => {
   const centre = maze ? `
       <rect x="62" y="56" width="176" height="96" rx="4" fill="#12103a"/>
       <text x="150" y="112" text-anchor="middle" font-size="34" fill="#ff4fa3" stroke="#7a1a4a" stroke-width="1.5">${esc(title)}</text>
-      <text x="150" y="136" text-anchor="middle" font-size="7.5" fill="${YELLOW}">${esc(sub)}</text>`
+      <text x="150" y="136" text-anchor="middle" font-size="${fit(sub, 168, 7.5)}" fill="${YELLOW}">${esc(sub)}</text>`
     : mines ? `
       <g class="plaque">
         <rect x="58" y="52" width="184" height="104" rx="5" fill="#f4f2ea"/>
@@ -203,12 +211,12 @@ const gauntletSign = ({ title, sub, variant }) => {
         <rect x="68" y="62" width="164" height="84" rx="2" fill="none" stroke="#f4f2ea" stroke-width="2"/>
         <text x="150" y="96" text-anchor="middle" font-size="26" fill="#f4f2ea">DANGER</text>
         <text x="150" y="121" text-anchor="middle" font-size="${title?.length > 10 ? 10.5 : 14}" fill="#f4f2ea">${esc(title)}</text>
-        <text x="150" y="139" text-anchor="middle" font-size="6.5" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>
+        <text x="150" y="139" text-anchor="middle" font-size="${fit(sub, 156, 6.5)}" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>
       </g>`
     : `
       <rect x="58" y="60" width="184" height="88" rx="3" fill="${TAR}"/>
       <text x="150" y="100" text-anchor="middle" font-size="${title?.length > 12 ? 12 : 16}" fill="${YELLOW}">${esc(title)}</text>
-      <text x="150" y="126" text-anchor="middle" font-size="7.5" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>`;
+      <text x="150" y="126" text-anchor="middle" font-size="${fit(sub, 172, 7.5)}" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>`;
   return `
   <svg class="board gauntlet ${variant ?? ''}" viewBox="0 0 300 250" role="img" aria-label="${esc(title)}">
     ${maze ? '' : stripes('bn-stripes')}
@@ -241,7 +249,7 @@ const hearingSign = ({ title, sub }) => {
       <g fill="#3a2a12">${lines.map((ln, i) => `<text x="262" y="${64 + i * 26}" text-anchor="middle" font-size="${ln.length > 12 ? 11 : 13}" fill="#f0dc9a" opacity=".55" transform="translate(1 1)">${esc(ln)}</text><text x="262" y="${64 + i * 26}" text-anchor="middle" font-size="${ln.length > 12 ? 11 : 13}">${esc(ln)}</text>`).join('')}</g>
       <rect x="168" y="130" width="188" height="26" rx="2" fill="#6e5220"/>
       <rect x="172" y="133" width="180" height="20" rx="1" fill="#f4f2ea"/>
-      <text x="262" y="147" text-anchor="middle" font-size="8" fill="${TAR}">${esc(sub)}</text>
+      <text x="262" y="147" text-anchor="middle" font-size="${fit(sub, 172, 8)}" fill="${TAR}">${esc(sub)}</text>
     </g>
   </svg>`;
 };

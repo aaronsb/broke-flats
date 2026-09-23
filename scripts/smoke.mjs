@@ -1393,6 +1393,32 @@ if (script === 'freight') {
   await key('Space', ' '); await sleep(1500); await shotF('freight-iso');
   await key('Space', ' '); await sleep(300);
 }
+// District signs on the board: the welcome sign behind the start and the leaving
+// sign past the finish, top-down and tilted.
+if (script === 'districts') {
+  const check = (ok, msg) => { if (!ok) errors.push(`districts: ${msg}`); };
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  const signs = `(() => { const out = []; for (const l of __game.mode.world.rows.values()) l.group.traverse((o) => { if (o.userData.sign) out.push([l.r, l.scenario.id, ...o.userData.sign]); }); return out; })()`;
+  await start();
+  await evaluate(`__game.debug.god = true; __game.run.coins = 50`);
+  await sleep(600); await shot('district-start-top');
+  await key('Space', ' '); await sleep(1500); await shot('district-start-iso');
+  await key('Space', ' '); await sleep(300);
+  const atStart = await evaluate(signs);
+  console.log('start signs', atStart);
+  check(atStart.some(([r, , top, name]) => r === -2 && top === 'WELCOME TO' && name === 'PINE HOLLOW'), `no welcome sign behind the start: ${JSON.stringify(atStart)}`);
+  await evaluate(`__game.mode.world.ensure(200)`);
+  const fin = await evaluate(`[...__game.mode.world.rows.values()].find((l) => l.scenario.id === 'finish')?.r ?? null`);
+  check(fin !== null, 'no finish row within 200 rows');
+  await evaluate(`(() => { const p = __game.mode.player, row = ${fin} - 4; p.row = row; p.col = 0; p.x = 0; p.z = -row; p.mesh.position.set(0, 0, -row); })()`);
+  await sleep(1200); await shot('district-finish-top');
+  await key('Space', ' '); await sleep(1500); await shot('district-finish-iso');
+  await key('Space', ' '); await sleep(300);
+  const atFinish = (await evaluate(signs)).filter(([, id]) => id === 'finish');
+  console.log('finish signs', atFinish);
+  check(atFinish.length === 1 && atFinish[0][2] === 'NOW LEAVING' && atFinish[0][3] === 'PINE HOLLOW', `the finish has no leaving sign: ${JSON.stringify(atFinish)}`);
+}
 if (script === 'banner') {
   const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };
   const until = async (expr, ms) => { for (let i = 0; i < ms / 50; i++) { if (await evaluate(expr)) return true; await sleep(50); } return false; };
@@ -1403,7 +1429,7 @@ if (script === 'banner') {
   const day = await read();
   console.log('day sign', day);
   check(day.show && !day.hidden && day.kind === 'day', `day sign not showing: ${JSON.stringify(day)}`);
-  check(day.text.includes('DAY 1'), `day sign reads ${JSON.stringify(day.text)}`);
+  check(day.text.includes('DAY 1') && day.text.includes('PINE HOLLOW') && day.text.includes('NOW ENTERING'), `day sign reads ${JSON.stringify(day.text)}`);
   // Input during the hold goes nowhere.
   await key('ArrowUp'); await sleep(350);
   const held = await evaluate(`__game.mode.players[0].row`);
@@ -1439,7 +1465,7 @@ if (script === 'banner') {
   console.log('hearing sign', hearing);
   check(await evaluate(`__game.mode.constructor.name`) === 'BattleMode', 'not at the hearing after the tally');
   check(hearing.up && hearing.kind === 'hearing', `hearing sign not up: ${JSON.stringify(hearing)}`);
-  check(hearing.text.includes('DEPARTMENT OF PEDESTRIAN GRIEVANCES') && hearing.text.includes('NOW SERVING · DAY 3'), `hearing sign reads ${JSON.stringify(hearing.text)}`);
+  check(hearing.text.includes('DEPARTMENT OF PEDESTRIAN GRIEVANCES') && hearing.text.includes('RE: DOWNTOWN · DAY 3'), `hearing sign reads ${JSON.stringify(hearing.text)}`);
   check(hearing.text.split('GRIEVANCES').length >= 3, 'the department name is only on the seal, not engraved on the plaque');
   const clock = [await evaluate(`__game.mode.timeLeft`)]; await sleep(500); clock.push(await evaluate(`__game.mode.timeLeft`));
   console.log('office clock under the sign', clock);

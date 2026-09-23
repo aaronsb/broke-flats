@@ -29,10 +29,11 @@ export class Banner {
 
   get up() { return this.kind !== null; }
 
-  // kind: day | gauntlet | hearing. variant picks the gauntlet's board (mines,
-  // maze); advisory hangs the weather placard under the day sign. tune: false
-  // drops the bumper (a retry after a death). done() fires when the exit starts.
-  show(kind, { title, sub, variant = null, advisory = null, ms = 2600, tune = true, done = null } = {}) {
+  // kind: day | gauntlet | hearing. motto rides under the day sign's district;
+  // variant picks the gauntlet's board (mines, maze); advisory hangs the weather
+  // placard under the day sign. tune: false drops the bumper (a retry after a
+  // death). done() fires when the exit starts.
+  show(kind, { title, sub, motto = null, variant = null, advisory = null, ms = 2600, tune = true, done = null } = {}) {
     this.clear();
     const layer = this.ui.banner;
     if (!layer) { done?.(); return; }
@@ -41,7 +42,7 @@ export class Banner {
     this.since = performance.now();
     layer.innerHTML = '';
     layer.dataset.kind = kind;
-    layer.appendChild(makeBanner(kind, { title, sub, variant, advisory }));
+    layer.appendChild(makeBanner(kind, { title, sub, motto, variant, advisory }));
     layer.hidden = false;
     requestAnimationFrame(() => { if (this.kind === kind) layer.classList.add('show'); });
     if (!still()) for (const [at, hit] of HITS[variant ?? kind] ?? HITS.day) this.later(() => sfx[hit]?.(), at);

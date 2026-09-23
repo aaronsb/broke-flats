@@ -55,6 +55,7 @@ export class CrossingMode {
       weights: this.game.stageWeights(), bands: level.bands, difficulty: level.difficulty, sky,
       scenery: this.game.scenery(),
       level: level.number,
+      district: level.district,
       fx: this.fx,
       ignoreGaps: !!this.game.debug.force || !!this.game.run.gauntlet,
       gauntlet: this.game.run.gauntlet,
@@ -89,16 +90,18 @@ export class CrossingMode {
     if (geese.length) this.hint += this.game.roster.length > 1 ? ` · ${geese.map((p) => (p.index ? 'G' : 'H')).join('/')} honk` : ' · H honk';
   }
 
-  // The stage sign: the day and its sky, or the gauntlet's hazard board.
+  // The stage sign: the district's welcome board with the day and its sky, or
+  // the gauntlet's hazard board naming the district it runs through.
   sign() {
     const { level, sky, run, debug, banner } = this.game;
     if (debug.quickBanner) return;
     const day = `DAY ${level.number}`;
     const label = SKIES[sky.name]?.label ?? '';
-    const wx = label === 'DAY' ? 'CLEAR SKIES' : label;   // DAY 1 over DAY read as a stutter
+    const wx = label === 'DAY' ? 'CLEAR SKIES' : label;   // DAY 1 · DAY read as a stutter
     const pace = this.retry ? { ms: 1400, tune: false } : {};
-    if (run.gauntlet) banner.show('gauntlet', { title: `${run.gauntlet.toUpperCase()} GAUNTLET`, sub: `${day} · ${wx}`, variant: run.gauntlet, ...pace });
-    else banner.show('day', { title: day, sub: wx, advisory: sky.slip ? 'ADVISORY: SLIPPERY' : null, ...pace });
+    const { name, motto } = level.district;
+    if (run.gauntlet) banner.show('gauntlet', { title: `${run.gauntlet.toUpperCase()} GAUNTLET`, sub: `${name} · ${wx}`, variant: run.gauntlet, ...pace });
+    else banner.show('day', { title: name, sub: `${day} · ${wx}`, motto, advisory: sky.slip ? 'ADVISORY: SLIPPERY' : null, ...pace });
   }
 
   buildPlayers() {
