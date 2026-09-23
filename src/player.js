@@ -27,7 +27,9 @@ const SIZE_TWEEN = 0.4;   // seconds a mushroom or acorn takes to change the pla
 const GIANT_ARC = 0.75;   // a giant's two-row hop flies higher
 const GIANT_HOP = 1.5;    // and takes this many times as long
 // Skids (sky.js `slip`). The last SKID_HOPS hops landing inside SKID_WINDOW
-// seconds of game time make a fast run; on a slippery board it slides on.
+// seconds of game time make a fast run; on a slippery board it slides on in
+// the direction of the last hop, along the grid: a run up a strip that turns
+// along it slides along the strip, never off it into the row beside.
 const SKID_HOPS = 3;
 const SKID_WINDOW = 0.9;
 const INTRO_ROWS = 4;     // no skid lands here: the start line never slides you into the first band
@@ -246,7 +248,7 @@ export class Player {
     if (!slip || bounced || this.carrier || this.sizeT < SIZE_TWEEN || this.row < INTRO_ROWS || this.recent.length < SKID_HOPS) return false;
     const r = this.recent;
     if (r[r.length - 1].t - r[0].t > SKID_WINDOW) return false;
-    const dc = Math.sign(r.reduce((a, h) => a + h.dir[0], 0)), dr = Math.sign(r.reduce((a, h) => a + h.dir[1], 0));
+    const [dc, dr] = r[r.length - 1].dir;
     this.recent = [];
     if (!dc && !dr) return false;
     this.skidDir = [dc, dr];
