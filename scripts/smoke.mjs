@@ -1401,23 +1401,33 @@ if (script === 'districts') {
   const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
   const signs = `(() => { const out = []; for (const l of __game.mode.world.rows.values()) l.group.traverse((o) => { if (o.userData.sign) out.push([l.r, l.scenario.id, ...o.userData.sign]); }); return out; })()`;
   await start();
-  await evaluate(`__game.debug.god = true; __game.run.coins = 50`);
+  await evaluate(`for (const p of __game.mode.players) p.invincible = true; __game.run.coins = 50`);
   await sleep(600); await shot('district-start-top');
   await key('Space', ' '); await sleep(1500); await shot('district-start-iso');
   await key('Space', ' '); await sleep(300);
   const atStart = await evaluate(signs);
   console.log('start signs', atStart);
-  check(atStart.some(([r, , top, name]) => r === -2 && top === 'WELCOME TO' && name === 'PINE HOLLOW'), `no welcome sign behind the start: ${JSON.stringify(atStart)}`);
+  check(atStart.some(([r, , top, name]) => r < 0 && top === 'WELCOME TO' && name === 'PINE HOLLOW'), `no welcome sign behind the start: ${JSON.stringify(atStart)}`);
   await evaluate(`__game.mode.world.ensure(200)`);
   const fin = await evaluate(`[...__game.mode.world.rows.values()].find((l) => l.scenario.id === 'finish')?.r ?? null`);
   check(fin !== null, 'no finish row within 200 rows');
-  await evaluate(`(() => { const p = __game.mode.player, row = ${fin} - 4; p.row = row; p.col = 0; p.x = 0; p.z = -row; p.mesh.position.set(0, 0, -row); })()`);
+  await evaluate(`(() => { const p = __game.mode.player, row = ${fin} - 1; p.row = row; p.col = 0; p.x = 0; p.z = -row; p.mesh.position.set(0, 0, -row); })()`);
   await sleep(1200); await shot('district-finish-top');
   await key('Space', ' '); await sleep(1500); await shot('district-finish-iso');
   await key('Space', ' '); await sleep(300);
   const atFinish = (await evaluate(signs)).filter(([, id]) => id === 'finish');
   console.log('finish signs', atFinish);
   check(atFinish.length === 1 && atFinish[0][2] === 'NOW LEAVING' && atFinish[0][3] === 'PINE HOLLOW', `the finish has no leaving sign: ${JSON.stringify(atFinish)}`);
+  // Frostgate under a full fall: the leaving sign's face stays clear of snow.
+  await evaluate(`__game.run.level = 4; __game.nextLevel()`); await sleep(600);
+  await evaluate(`for (const p of __game.mode.players) p.invincible = true; __game.mode.world.data.snowT = 90; __game.mode.world.ensure(200)`);
+  const snowFin = await evaluate(`[...__game.mode.world.rows.values()].find((l) => l.scenario.id === 'finish')?.r ?? null`);
+  await evaluate(`(() => { const p = __game.mode.player, row = ${snowFin} - 1; p.row = row; p.col = 0; p.x = 0; p.z = -row; p.mesh.position.set(0, 0, -row); })()`);
+  await sleep(1200); await key('Space', ' '); await sleep(1500); await shot('district-finish-snow-iso');
+  await key('Space', ' '); await sleep(300);
+  const snowSign = (await evaluate(signs)).filter(([, id]) => id === 'finish');
+  console.log('snow finish sign', snowSign);
+  check(snowSign.length === 1 && snowSign[0][3] === 'FROSTGATE', `the snowed finish has no Frostgate sign: ${JSON.stringify(snowSign)}`);
 }
 if (script === 'banner') {
   const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };

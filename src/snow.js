@@ -35,6 +35,7 @@ function staticBoxes(lane) {
   for (const e of lane.eggs.values()) mark(e);
   for (const c of lane.crates.values()) mark(c.mesh);
   for (const f of lane.flags.values()) mark(f);
+  lane.group.traverse((o) => { if (o.userData.sign) mark(o); });   // a district sign's face stays readable
   lane.group.updateMatrixWorld(true);
   const toLocal = lane.group.matrixWorld.clone().invert();
   const boxes = [];

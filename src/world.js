@@ -6,8 +6,10 @@ import { makeDistrictSign } from './meshes.js';
 
 export { W, SPAN } from './lane.js';
 
-const FOLLOW_CHANCE = 0.4;
-const WELCOME_ROW = 2;       // rows behind the start where the welcome sign stands   // a band with followers (a road, for the barriers) gets one this often
+const FOLLOW_CHANCE = 0.4;   // a band with followers (a road, for the barriers) gets one this often
+// The welcome sign stands this many rows behind the start and this far left of
+// the path: in view from above, and clear of the tilted camera's line to the player.
+const WELCOME_ROW = 2, WELCOME_X = -4.5;
 
 // The board: owns the rows, sequences scenario bands, and dispatches the
 // per-row hooks. Scenario-specific behaviour lives in src/scenarios/.
@@ -39,7 +41,7 @@ export class World {
       for (let r = -1; r >= -12; r--) this.addRow(r, SCENARIOS[INTRO]);
       // The district's welcome sign stands in the meadow behind the start.
       const d = this.config.district;
-      if (d) this.rows.get(-WELCOME_ROW).add(makeDistrictSign(['WELCOME TO', d.name, d.motto]), 0);
+      if (d) this.rows.get(-WELCOME_ROW).add(makeDistrictSign(['WELCOME TO', d.name, d.motto]), WELCOME_X);
     }
     while (this.nextRow <= upTo) this.addRow(this.nextRow++);
   }
@@ -99,8 +101,9 @@ export class World {
   // After the level's danger-band quota, lay the finish line and then only meadow.
   queueFinish() {
     const pad = { scenario: SCENARIOS[INTRO], index: 0, count: 1 };
-    // The row past the finish holds the leaving sign: bare, so no crate stands in front of it.
-    this.queue.push(pad, { scenario: SCENARIOS.finish, index: 0, count: 1 }, { ...pad, bare: true }, { ...pad });
+    // The two rows past the finish carry the leaving sign and the lean of its
+    // board: bare, so no crate stands in front of it or hides under it.
+    this.queue.push(pad, { scenario: SCENARIOS.finish, index: 0, count: 1 }, { ...pad, bare: true }, { ...pad, bare: true });
     this.done = true;
   }
 
