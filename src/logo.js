@@ -196,9 +196,10 @@ const stripes = (id, a = YELLOW, b = TAR) => `
   </pattern></defs>`;
 
 // Gauntlet: a striped hazard board on two posts. Mines swap the centre panel
-// for a red DANGER plaque; the maze puts up an arcade marquee ringed in bulbs.
+// for a red DANGER plaque; the maze puts up an arcade marquee ringed in bulbs;
+// the snake maze's stripes are green.
 const gauntletSign = ({ title, sub, variant }) => {
-  const mines = variant === 'mines', maze = variant === 'maze';
+  const mines = variant === 'mines', maze = variant === 'maze', snake = variant === 'snake';
   const bulbs = maze ? [...Array(11)].map((_, i) => `<circle class="bulb ${i % 2 ? 'b' : 'a'}" cx="${52 + i * 19.6}" cy="42" r="4.5" fill="${YELLOW}"/><circle class="bulb ${i % 2 ? 'a' : 'b'}" cx="${52 + i * 19.6}" cy="166" r="4.5" fill="${YELLOW}"/>`).join('') : '';
   const centre = maze ? `
       <rect x="62" y="56" width="176" height="96" rx="4" fill="#12103a"/>
@@ -219,7 +220,7 @@ const gauntletSign = ({ title, sub, variant }) => {
       <text x="150" y="126" text-anchor="middle" font-size="${fit(sub, 172, 7.5)}" fill="#f4f2ea" opacity=".85">${esc(sub)}</text>`;
   return `
   <svg class="board gauntlet ${variant ?? ''}" viewBox="0 0 300 250" role="img" aria-label="${esc(title)}">
-    ${maze ? '' : stripes('bn-stripes')}
+    ${maze ? '' : snake ? stripes('bn-stripes', '#8ccf3a', '#1e4a1a') : stripes('bn-stripes')}
     <g class="post"><rect x="78" y="180" width="9" height="70" fill="${IRON}"/><rect x="213" y="180" width="9" height="70" fill="${IRON}"/><rect x="78" y="180" width="3" height="70" fill="${IRON_DARK}"/><rect x="213" y="180" width="3" height="70" fill="${IRON_DARK}"/></g>
     <g class="plate">
       <rect x="34" y="24" width="232" height="160" rx="6" fill="${TAR}"/>

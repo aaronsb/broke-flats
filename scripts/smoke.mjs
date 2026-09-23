@@ -1429,6 +1429,69 @@ if (script === 'districts') {
   console.log('snow finish sign', snowSign);
   check(snowSign.length === 1 && snowSign[0][3] === 'FROSTGATE', `the snowed finish has no Frostgate sign: ${JSON.stringify(snowSign)}`);
 }
+// Snake maze: a follower on every corridor cell, collecting grows the line and
+// the streak, stepping back onto the line resets it, the clock closes the maze,
+// the tally cashes the line out and the next day starts without it.
+if (script === 'snake') {
+  const check = (ok, msg) => { if (!ok) errors.push(`snake: ${msg}`); };
+  const fs = await import('node:fs');
+  const shot = async (n) => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.data, 'base64')); };
+  await send('Page.navigate', { url: BASE + '?start&gauntlet=snake&god&coins=40' }); await sleep(4500);
+  // Come in with a flock of three: they go on to the next day, the line collected here does not.
+  await evaluate(`__game.run.flock[0] = { count: 3, waiting: 0 }; __game.debug.quickBanner = true; __game.restartStage()`); await sleep(600);
+  const board = await evaluate(`(() => { const w = __game.mode.world; w.ensure(80); const s = w.data.snake; if (!s) return null;
+    let corridors = 0, eggs = 0; for (const l of w.rows.values()) if (l.scenario.id === 'snake') { corridors += s.grid[l.r - s.firstRow].filter((v) => v === 1).length; eggs += l.eggs.size; }
+    return { rows: s.rows, placed: s.placed, corridors, eggs, clock: s.clock, hunted: [...w.rows.values()].some((l) => l.scenario.id === 'snake' && l.movers.length) }; })()`);
+  console.log('board', board);
+  check(board && board.placed > 0 && board.eggs === board.corridors && board.placed === board.corridors, `not every corridor cell holds a follower: ${JSON.stringify(board)}`);
+  check(board && !board.hunted, 'something moves in the snake maze');
+  check(board && board.clock > 0, 'the clock was not set');
+  // Stand on the first corridor cell of the second maze row, then walk to cells not yet visited.
+  const walk = await evaluate(`(() => { const s = __game.mode.world.data.snake, g = s.grid, W = 8; const open = (i, j) => j >= 0 && j < s.rows && i >= 0 && i < g[0].length && g[j][i] === 1;
+    let i0 = g[1].findIndex((v) => v === 1), j0 = 1; const p = __game.mode.player, row = s.firstRow + j0, x = i0 - W;
+    p.row = row; p.col = x; p.x = x; p.z = -row; p.mesh.position.set(x, 0, -row);
+    const seen = new Set([i0 + ',' + j0]), keys = []; let i = i0, j = j0;
+    for (let n = 0; n < 8; n++) { const d = [[0, 1, 'ArrowUp'], [1, 0, 'ArrowRight'], [-1, 0, 'ArrowLeft'], [0, -1, 'ArrowDown']].find(([di, dj]) => open(i + di, j + dj) && !seen.has((i + di) + ',' + (j + dj)));
+      if (!d) break; i += d[0]; j += d[1]; seen.add(i + ',' + j); keys.push(d[2]); }
+    return keys; })()`);
+  console.log('walk', walk);
+  for (const k of walk) { await key(k); await sleep(320); }
+  await sleep(400);
+  const after = await evaluate(`(() => { const s = __game.mode.world.data.snake; return { line: __game.mode.train.count, streak: s.streak[0] ?? 0, bonus: s.bonus[0] ?? 0, touches: s.touches }; })()`);
+  console.log('after walk', after);
+  check(after.line === 3 + walk.length && after.streak === walk.length && after.bonus === walk.length * 10, `walking ${walk.length} new cells after a flock of 3 gave ${JSON.stringify(after)}`);
+  await sleep(300); await shot('snake-top');
+  await key('Space', ' '); await sleep(1500); await shot('snake-iso'); await key('Space', ' '); await sleep(300);
+  // Back the way we came: onto the first follower in the line.
+  const back = { ArrowUp: 'ArrowDown', ArrowDown: 'ArrowUp', ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }[walk[walk.length - 1]];
+  await key(back); await sleep(500);
+  const touched = await evaluate(`(() => { const s = __game.mode.world.data.snake; return { line: __game.mode.train.count, bonus: s.bonus[0] ?? 0, touches: s.touches }; })()`);
+  console.log('stepped on the line', touched);
+  check(touched.bonus === 0 && touched.touches === 1 && touched.line === 3 + walk.length, `stepping on the line did not reset the streak: ${JSON.stringify(touched)}`);
+  // The clock runs out: the maze closes and the day tallies.
+  const coins0 = await evaluate(`__game.run.coins`);
+  await evaluate(`__game.mode.world.data.snake.clock = 0.05`);
+  for (let i = 0; i < 400 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+  const tally = await evaluate(`(() => ({ timedOut: !!__game.mode.world.data.snake.timedOut, snake: __game.mode.tally?.snake, lines: [...document.querySelectorAll('#summary .row .label')].map((e) => e.textContent), coins: __game.run.coins }))()`);
+  console.log('tally', tally);
+  check(tally.timedOut && tally.snake?.collected === walk.length, `the clock did not close the maze with the line counted: ${JSON.stringify(tally)}`);
+  check(tally.lines.some((l) => l.startsWith('FOLLOWERS CASHED')) && tally.lines.some((l) => l.startsWith('STREAK')), `the tally lacks the snake lines: ${JSON.stringify(tally.lines)}`);
+  check(tally.coins - coins0 >= walk.length, `the line was not cashed out as coins: ${coins0} -> ${tally.coins}`);
+  await key('Enter', 'Enter'); await sleep(1500);
+  const next = await evaluate(`[__game.run.flock[0]?.count ?? 0, __game.mode.constructor.name]`);
+  console.log('after the tally', next);
+  check(next[0] === 3, `the next day should start with the flock of 3, not ${next[0]}`);
+  // Beat the clock: step onto the finish with time left.
+  await send('Page.navigate', { url: BASE + '?start&gauntlet=snake&god' }); await sleep(4500);
+  await evaluate(`__game.banner.skip()`); await sleep(300);
+  const fin = await evaluate(`(() => { __game.mode.world.ensure(120); return [...__game.mode.world.rows.values()].find((l) => l.scenario.id === 'finish')?.r ?? null; })()`);
+  await evaluate(`(() => { const p = __game.mode.player, row = ${fin} - 1; p.row = row; p.col = 0; p.x = 0; p.z = -row; p.mesh.position.set(0, 0, -row); })()`);
+  await sleep(300); await key('ArrowUp'); 
+  for (let i = 0; i < 400 && !(await evaluate(`__game.summary.ready`)); i++) await sleep(50);
+  const beat = await evaluate(`[...document.querySelectorAll('#summary .row .label')].map((e) => e.textContent)`);
+  console.log('beat the clock', beat);
+  check(beat.some((l) => l.startsWith('TIME LEFT')) && beat.some((l) => l.startsWith('PHEW')) && beat.some((l) => l.startsWith('LEFT BEHIND')), `finishing early lacks TIME LEFT, PHEW or LEFT BEHIND: ${JSON.stringify(beat)}`);
+}
 if (script === 'banner') {
   const check = (ok, msg) => { if (!ok) errors.push(`banner: ${msg}`); };
   const until = async (expr, ms) => { for (let i = 0; i < ms / 50; i++) { if (await evaluate(expr)) return true; await sleep(50); } return false; };

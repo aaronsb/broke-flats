@@ -28,10 +28,12 @@ const GATES_MAX = 2;
 const DIRS = [[0, 1], [-1, 0], [0, -1], [1, 0]];
 
 // Corridor surfaces: the level each starts at, the death it deals, the tile colour.
+// `path` is the snake maze's garden paving: no vehicle, no markings, never picked here.
 const KINDS = {
   road:   { from: 1, death: 'car',   tile: 0x4a4a52 },
   track:  { from: 2, death: 'train', tile: 0x6a645c },
   runway: { from: 3, death: 'plane', tile: 0x3e3e46 },
+  path:   { from: Infinity, death: null, tile: 0xcbb68c },
 };
 // Wall kinds: make(weak) builds a cell, `kind` is what blocks (a perk may pass
 // it), `roof` hides a crate under the weak cell, `thin` panels turn to follow the wall.
@@ -46,8 +48,10 @@ const THEME_WALLS = { forest: ['hedge'], residential: ['picket'], city: ['wall']
 
 // grid[j][i]: 0 wall, 1 corridor, 2 weakness. Odd cells are the corridor
 // lattice; a perfect maze is carved on it, then the ring, the spine, the
-// doors, and the loops that leave no dead end deeper than STUB.
-export function generate(rows) {
+// doors, and the loops that leave no dead end deeper than `stub`. `loops` and
+// `weak` are the shares of walls between two corridors knocked through or
+// made weak.
+export function generate(rows, { loops: loopShare = LOOPS, stub: maxStub = STUB, weak: weakShare = WEAK_SHARE } = {}) {
   const grid = Array.from({ length: rows }, () => new Array(COLS).fill(0));
   const open = (i, j) => i >= 0 && i < COLS && j >= 0 && j < rows && grid[j][i] === 1;
   const seen = new Set(['1,1']);
@@ -78,13 +82,13 @@ export function generate(rows) {
       const ni = ci + s[0], nj = cj + s[1];
       if (degree(ni, nj) !== 2) return len;
       pi = ci; pj = cj; ci = ni; cj = nj; len++;
-      if (len > STUB) return len;
+      if (len > maxStub) return len;
     }
   };
   for (let guard = 0, fixed = true; fixed && guard < 400; guard++) {
     fixed = false;
     for (let j = 1; j <= rows - 2 && !fixed; j += 2) for (let i = 1; i <= COLS - 2 && !fixed; i += 2) {
-      if (degree(i, j) !== 1 || stubLen(i, j) <= STUB) continue;
+      if (degree(i, j) !== 1 || stubLen(i, j) <= maxStub) continue;
       const outs = DIRS.filter(([di, dj]) => !open(i + di, j + dj) && open(i + 2 * di, j + 2 * dj));
       if (!outs.length) continue;
       const [di, dj] = pick(...outs);
@@ -99,7 +103,7 @@ export function generate(rows) {
     if ((open(i - 1, j) && open(i + 1, j)) || (open(i, j - 1) && open(i, j + 1))) between.push([i, j]);
   }
   between.sort(() => Math.random() - 0.5);
-  const loops = Math.round(between.length * LOOPS), weak = Math.round(between.length * WEAK_SHARE);
+  const loops = Math.round(between.length * loopShare), weak = Math.round(between.length * weakShare);
   between.slice(0, loops).forEach(([i, j]) => { grid[j][i] = 1; });
   between.slice(loops, loops + weak).forEach(([i, j]) => { grid[j][i] = 2; });
   return { grid, spine };
@@ -107,7 +111,7 @@ export function generate(rows) {
 
 // Breadth-first from the bottom doors to the top row over corridor cells.
 // Returns one corridor column per row along the path, or null when cut off.
-function pathThrough(grid) {
+export function pathThrough(grid) {
   const rows = grid.length;
   const prev = new Map();
   const queue = [];
@@ -164,7 +168,7 @@ function plan(world, rows, level, firstRow) {
   const top = rows - 2;   // the far ring row: the ghosts start there, spread out, and two of them scatter to its corners
   return {
     grid, rows, firstRow, kind, path, spine,
-    wall: pick(...(THEME_WALLS[world.config.scenery?.id] ?? ['hedge'])),
+    wall: wallFor(world),
     homes: [[COLS - 4, top], [3, top], [COLS - 8, top], [7, top]],
     corners: [[COLS - 2, top], [1, top], [COLS - 2, 1], [1, 1]],
     gates: kind === 'track' ? pickGates(grid) : [],
@@ -177,6 +181,7 @@ function plan(world, rows, level, firstRow) {
 // axes it connects (ax along the row, az up the board).
 function surface(lane, c, kind, ax, az) {
   lane.add(box(1, 0.03, 1, KINDS[kind].tile, c, 0, 0, false));
+  if (kind === 'path') return;
   if (!ax && !az) ax = true;
   if (kind === 'track') {
     if (ax) {
@@ -194,6 +199,44 @@ function surface(lane, c, kind, ax, az) {
   if (az) lane.add(box(wid, 0.01, len, col, c, 0.03, 0, false));
 }
 
+// One row of a planned maze ({ grid, rows, kind, wall }): ground, edges,
+// corridor floors and wall cells. Returns the columns of its corridor cells.
+export function layRow(lane, maze, j) {
+  const { grid } = maze;
+  const row = grid[j];
+  lane.data.maze = maze;
+  lane.data.j = j;
+  lane.terrain();
+  lane.edges();
+  const wall = WALLS[maze.wall];
+  const at = (i, jj) => (i >= 0 && i < COLS && jj >= 0 && jj < maze.rows ? grid[jj][i] : -1);
+  const isWall = (i, jj) => at(i, jj) === 0 || at(i, jj) === 2;
+  const free = [];
+  for (let i = 0; i < COLS; i++) {
+    const c = i - W, v = row[i];
+    if (v === 1) { surface(lane, c, maze.kind, at(i - 1, j) === 1 || at(i + 1, j) === 1, at(i, j - 1) === 1 || at(i, j + 1) === 1); free.push(c); continue; }
+    const mesh = wall.make(v === 2);
+    if (wall.thin) {
+      // A panel follows the wall it is part of; a weak panel stands across the way through it.
+      const hx = isWall(i - 1, j) || isWall(i + 1, j), hz = isWall(i, j - 1) || isWall(i, j + 1);
+      const alongZ = v === 2 ? at(i - 1, j) === 1 && at(i + 1, j) === 1 : hz && !hx;
+      if (alongZ) mesh.rotation.y = Math.PI / 2;
+      if (v === 0 && hx && hz) { const m2 = wall.make(false); m2.rotation.y = Math.PI / 2; lane.add(m2, c); }
+    }
+    lane.add(mesh, c);
+    if (v === 0) lane.block(c, wall.kind);
+    else {
+      lane.data.hidden = true;            // the way through only shows from the side
+      if (wall.roof && Math.random() < WEAK_CRATE) lane.crate(c, rollPowerup());
+    }
+  }
+  return free;
+}
+
+// The scenery's wall kind for a maze on this world.
+export const wallFor = (world) => pick(...(THEME_WALLS[world.config.scenery?.id] ?? ['hedge']));
+export { COLS };
+
 export default {
   id: 'maze',
   danger: true,
@@ -205,33 +248,9 @@ export default {
     if (index === 0) world.data.maze = plan(world, count, level, lane.r);
     const maze = world.data.maze;
     const { grid } = maze;
-    const j = index, row = grid[j];
-    lane.data.maze = maze;
-    lane.data.j = j;
-    lane.terrain();
-    lane.edges();
-    const wall = WALLS[maze.wall];
+    const j = index;
     const at = (i, jj) => (i >= 0 && i < COLS && jj >= 0 && jj < maze.rows ? grid[jj][i] : -1);
-    const isWall = (i, jj) => at(i, jj) === 0 || at(i, jj) === 2;
-    const free = [];
-    for (let i = 0; i < COLS; i++) {
-      const c = i - W, v = row[i];
-      if (v === 1) { surface(lane, c, maze.kind, at(i - 1, j) === 1 || at(i + 1, j) === 1, at(i, j - 1) === 1 || at(i, j + 1) === 1); free.push(c); continue; }
-      const mesh = wall.make(v === 2);
-      if (wall.thin) {
-        // A panel follows the wall it is part of; a weak panel stands across the way through it.
-        const hx = isWall(i - 1, j) || isWall(i + 1, j), hz = isWall(i, j - 1) || isWall(i, j + 1);
-        const alongZ = v === 2 ? at(i - 1, j) === 1 && at(i + 1, j) === 1 : hz && !hx;
-        if (alongZ) mesh.rotation.y = Math.PI / 2;
-        if (v === 0 && hx && hz) { const m2 = wall.make(false); m2.rotation.y = Math.PI / 2; lane.add(m2, c); }
-      }
-      lane.add(mesh, c);
-      if (v === 0) lane.block(c, wall.kind);
-      else {
-        lane.data.hidden = true;            // the way through only shows from the side
-        if (wall.roof && Math.random() < WEAK_CRATE) lane.crate(c, rollPowerup());
-      }
-    }
+    const free = layRow(lane, maze, j);
     // Gates: an arm across each open side of the cell, swung from the corner post.
     for (const g of maze.gates) {
       if (g.j !== j) continue;

@@ -11,6 +11,7 @@ import { lerp, clamp } from '../util.js';
 import { W } from '../lane.js';
 import { FLAG_BONUS } from '../scenarios/mines.js';
 import { MAZE_CLEAR_BONUS } from '../scenarios/maze.js';
+import { SNAKE_FOLLOWER, SNAKE_CLEAR_BONUS, TIME_PAY } from '../scenarios/snake.js';
 import { rollVariant } from '../characters.js';
 import { Debris } from '../debris.js';
 import { stampOf } from '../stamp.js';
@@ -56,6 +57,9 @@ export class CrossingMode {
       scenery: this.game.scenery(),
       level: level.number,
       district: level.district,
+      // The snake maze lays the first player's young on every corridor cell;
+      // whoever collects one gets a young of their own kind in their line.
+      young: () => this.game.roster[0].young(this.game.run.variants[0]),
       fx: this.fx,
       ignoreGaps: !!this.game.debug.force || !!this.game.run.gauntlet,
       gauntlet: this.game.run.gauntlet,
@@ -64,6 +68,7 @@ export class CrossingMode {
     this.world.onMine = () => { this.mined = 0.001; };
     this.world.players = () => this.players;   // maze ghosts read the players they hunt
     this.buildPlayers();
+    this.flockAtStart = this.trains.map((t) => t.count);   // the snake maze cashes out everything past these
     this.game.run.lastPose = null;   // spent: the next arrival is earned afresh
     this.world.ensure(26);
     this.finished = false;
@@ -84,6 +89,8 @@ export class CrossingMode {
     if (this.mines) this.hint = 'arrows hop · Q/E turn · F flag the cell you face · followers sweep: beep and a red blink on a mine';
     this.maze = this.game.run.gauntlet === 'maze' || this.game.debug.force === 'maze';
     if (this.maze) this.hint = 'arrows hop · four vehicles hunt the maze · eat every coin for the bonus · SPACE peek finds the gaps';
+    this.snake = this.game.run.gauntlet === 'snake' || this.game.debug.force === 'snake';
+    if (this.snake) this.hint = 'arrows hop · collect them all before the clock · stepping on your own line resets the streak';
     if (this.game.roster.length > 1) this.hint = 'P1 arrows · P2 WASD · SPACE peek in 3D (burns coins) · M mute';
     const geese = this.players.filter((p) => p.honk);
     document.body.classList.toggle('honk', geese.length > 0);
@@ -185,6 +192,8 @@ export class CrossingMode {
 
   // A hop is refused into another player's cell, another player's follower,
   // or too far ahead of a living partner. Your own followers swap with you.
+  // In the snake maze a partner's line is walked through: in corridors one
+  // cell wide, two lines would otherwise wall each other in.
   blocked(me, col, row) {
     for (const p of this.players) {
       if (p === me || !p.alive) continue;
@@ -192,7 +201,7 @@ export class CrossingMode {
       if (pc === col && pr === row) return true;
       if (row > p.row + LEASH) return true;
     }
-    return this.trains.some((t) => t.player !== me && t.occupies(col, row));
+    return !this.snake && this.trains.some((t) => t.player !== me && t.occupies(col, row));
   }
 
   setTilt(on) {
@@ -377,7 +386,19 @@ export class CrossingMode {
 
     const chicks = this.trains.reduce((a, t) => a + t.count, 0);
     const waiting = this.trains.reduce((a, t) => a + t.waiting, 0);
-    game.hud(game.run.score + front, `<b>${chicks}</b>${waiting ? ` +${waiting} WAITING` : ''}`);
+    const snake = this.snake && world.data.snake;
+    const clock = snake ? ` · STREAK <b>${snake.bonus.reduce((a, b) => a + (b ?? 0), 0)}</b> · <b>${Math.max(0, Math.ceil(snake.clock))}s</b>` : '';
+    game.hud(game.run.score + front, `<b>${chicks}</b>${waiting ? ` +${waiting} WAITING` : ''}${clock}`);
+    // The snake maze's clock runs while the board is in play; at zero the maze closes and the day tallies.
+    if (snake && !this.tally && !this.finished && !game.banner.up && snake.clock > 0) {
+      snake.clock -= dt;
+      if (snake.clock <= 0) {
+        snake.clock = 0; snake.timedOut = true; this.finished = true;
+        game.card('TIME'); setTimeout(() => game.card(''), 1400);
+        // The maze closes: whoever is still waiting stays put, and can no longer be collected.
+        for (const l of world.rows.values()) if (l.scenario.id === 'snake') { (l.data.left ??= new Map()); for (const [c, m] of l.eggs) l.data.left.set(c, m); l.eggs.clear(); }
+      }
+    }
 
     if (this.mined) {
       // A mine went off: a beat to take it in, then straight to the next level with nothing earned.
@@ -411,11 +432,16 @@ export class CrossingMode {
   // run around and collect the followers waiting there before the battle.
   startTally(front) {
     const { game } = this;
-    const led = this.trains.reduce((a, t) => a + t.count, 0);
+    // The snake maze's line is cashed out, not led home: only the flock each player came in with counts as led.
+    const base = (t, i) => (this.snake ? Math.min(t.count, this.flockAtStart[i] ?? 0) : t.count);
+    const led = this.trains.reduce((a, t, i) => a + base(t, i), 0);
     const found = this.trains.reduce((a, t) => a + t.waiting, 0);
-    const missed = Math.max(0, (this.world.data.eggsPlaced ?? 0) - this.trains.reduce((a, t) => a + t.hatched, 0));
-    const per = this.trains.map((t) => t.count + t.waiting);   // whose stamps, in roster order
-    this.tally = { t: 0, led, found, missed, per, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines', maze: this.maze };
+    const missed = this.snake ? 0 : Math.max(0, (this.world.data.eggsPlaced ?? 0) - this.trains.reduce((a, t) => a + t.hatched, 0));
+    const per = this.trains.map((t, i) => base(t, i) + t.waiting);   // whose stamps, in roster order
+    const snake = this.snake && this.world.data.snake
+      ? { collected: this.trains.reduce((a, t, i) => a + t.count - base(t, i), 0), placed: this.world.data.snake.placed, bonus: this.world.data.snake.bonus.reduce((a, b) => a + (b ?? 0), 0), left: Math.floor(this.world.data.snake.clock), timedOut: !!this.world.data.snake.timedOut }
+      : null;
+    this.tally = { t: 0, led, found, missed, per, rows: front, done: false, gauntlet: !!game.run.gauntlet, mines: game.run.gauntlet === 'mines', maze: this.maze, snake };
     for (const p of this.players) p.invincible = true;
     // Minefield finale: everything left in the ground goes up, nearest rows first.
     if (this.tally.mines) for (const l of this.world.rows.values()) if (l.scenario.id === 'mines') l.scenario.detonateAll(l, this.players[0].row);
@@ -444,7 +470,17 @@ export class CrossingMode {
       if (rows.length && !left) lines.push({ label: 'MAZE CLEARED', each: MAZE_CLEAR_BONUS });
       else lines.push({ label: 'PELLETS LEFT', count: left, each: 0 });
     }
-    if (T.gauntlet) lines.push({ label: 'PHEW, MADE IT', each: GAUNTLET_BONUS });
+    if (T.snake) {
+      // Each follower in the line pays points and a coin; the streak and the clock pay points.
+      const S = T.snake;
+      lines.push({ label: 'FOLLOWERS CASHED', count: S.collected, each: SNAKE_FOLLOWER });
+      if (S.collected === S.placed) lines.push({ label: 'EVERY LAST ONE', each: SNAKE_CLEAR_BONUS });
+      else lines.push({ label: 'LEFT BEHIND', count: S.placed - S.collected, each: 0 });
+      lines.push({ label: 'STREAK', count: S.bonus, each: 1 });
+      if (!S.timedOut) lines.push({ label: 'TIME LEFT', count: S.left, each: TIME_PAY });
+      game.run.coins += S.collected;
+    }
+    if (T.gauntlet && !T.snake?.timedOut) lines.push({ label: 'PHEW, MADE IT', each: GAUNTLET_BONUS });
     game.run.coins += T.led + T.found;
     game.run.score -= T.rows;        // rows were credited at the line; the panel counts them again
     music.reset({ tally: true });
@@ -456,7 +492,9 @@ export class CrossingMode {
     const quip = grievanceFor({ scenarios: [...this.world.rows.values()].map((l) => l.scenario.id), lastDeath: game.run.lastCause ?? null, level, rows: T.rows });
     // A clean day is UPHELD: nothing missed, nothing merely found. A day with
     // no eggs and no followers at all is a clean walk and counts.
-    const ruling = T.missed === 0 && T.found === 0 ? { text: 'UPHELD', bonus: UPHELD_BONUS } : { text: 'NOTED', bonus: 0 };
+    // In the snake maze a clean day also leaves no follower behind.
+    const clean = T.missed === 0 && T.found === 0 && (!T.snake || T.snake.collected === T.snake.placed);
+    const ruling = clean ? { text: 'UPHELD', bonus: UPHELD_BONUS } : { text: 'NOTED', bonus: 0 };
     T.summaryMs = game.summary.show(`DAY ${level} · CLAIM FILED`, lines, {
       quip,
       stamp: `FILED · DAY ${level}`,
@@ -477,8 +515,9 @@ export class CrossingMode {
     if (T.summaryDone) {
       if (T.gauntlet) game.run.gauntlet = null;
       game.run.lastCause = null;       // the next day's grievance is its own
-      // Everyone carries over, gathered or not.
-      this.trains.forEach((t, i) => { game.run.flock[i] = { count: t.total, waiting: 0 }; });
+      // Everyone carries over, gathered or not. The snake maze's line disbands:
+      // only the flock it came in with (as counted at the line) goes on.
+      this.trains.forEach((t, i) => { game.run.flock[i] = { count: this.snake ? T.per[i] : t.total, waiting: 0 }; });
       game.card('');
       game.stageClear();
     }
